@@ -36,6 +36,8 @@ launchd plists, конфигов, Python-пакетов, моделей и OpenW
   контролируемого перезапуска. Модельные binaries/weights сверяются отдельно.
 - 95 шаблонов конфигурации связывают содержимое Git с установленными файлами.
   Новые количества/итоги при дальнейшем обновлении смотреть в manifest.
+- Effective unit заводского daemon консолидирован без перезапуска процесса
+  (PID до и после 908); сеть не перезапускалась.
 - Заводской SDK выделен отдельно: версия 1.2.11 и точный проверяемый двухстрочный
   live-status patch; Bluetooth/launcher/ALSA/boot настройки сохранены.
 - Router UCI, LAN/WAN/AP/DHCP/firewall/SSH и профили NetworkManager обоих Linux
@@ -55,7 +57,10 @@ launchd plists, конфигов, Python-пакетов, моделей и OpenW
 `requirements/robot.lock`, с editable install без дополнительных зависимостей.
 Команды в README. Полный Git history обязателен для historical-preimage тестов.
 Отдельно выполняется JavaScript тест панели и сборка wheel/sdist.
-Результаты и число skip фиксируются в итоговом verification.json.
+Итог: **1753 теста, 1727 прошли, 26 пропущены**, ошибок нет; JavaScript панели
+и wheel/sdist прошли. После исправления пути network dispatcher повторно
+прошли 8 deployment-тестов. Число skip и границы проверки записаны в
+verification.json.
 
 Deployment-тесты проверяют обязательные секреты, SHA шаблонов, JSON, отсутствие
 старых release-путей, установку в изолированный root, backup, scope-изоляцию,

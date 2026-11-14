@@ -1,0 +1,373 @@
+{
+  "schema_version": 1,
+  "verified_at": "2026-11-14T08:25:26.812281+00:00",
+  "runtime_source_commit": "7fc7f0204179ae1bac2430e281b66520e7f9630f",
+  "tests": {
+    "python": {
+      "run": 1753,
+      "passed": 1727,
+      "skipped": 26,
+      "errors": 0,
+      "failures": 0,
+      "duration_s": 154.82,
+      "environment": "fresh .venv-review from dev.lock + robot.lock",
+      "skip_scope": "Windows kernel/NTFS and separately supplied historical hardware fixtures"
+    },
+    "panel_javascript": "passed (Node REPL VM, test_conversation_mode_page.cjs)",
+    "wheel_sdist_build": "passed",
+    "pip_check": "passed",
+    "git_diff_check": "passed",
+    "deployment_after_dispatcher_update": {
+      "run": 8,
+      "errors": 0,
+      "failures": 0
+    }
+  },
+  "hosts": {
+    "hub": {
+      "release": {
+        "commit": "7fc7f0204179ae1bac2430e281b66520e7f9630f",
+        "files": 640,
+        "content_sha256": "61b17c5a9a588a784d95ade8e34601f8c9a316a380f657adb10f64f768746091",
+        "ok": true,
+        "mismatches": []
+      },
+      "source_root": "/home/deploy/reachy-companion/current",
+      "units": [
+        {
+          "MainPID": "0",
+          "Environment": "",
+          "Id": "pi-wifi-diagnostics.service",
+          "ActiveState": "inactive",
+          "DropInPaths": ""
+        },
+        {
+          "MainPID": "390926",
+          "Environment": "PYTHONPATH=/home/deploy/reachy-companion/current/src OMP_NUM_THREADS=2",
+          "Id": "reachy-hub.service",
+          "ActiveState": "active",
+          "DropInPaths": ""
+        },
+        {
+          "MainPID": "0",
+          "Environment": "",
+          "Id": "reachy-network-qos.service",
+          "ActiveState": "active",
+          "DropInPaths": ""
+        },
+        {
+          "MainPID": "0",
+          "Environment": "PYTHONPATH=/home/deploy/reachy-companion/current/src",
+          "Id": "reachy-production.service",
+          "ActiveState": "failed",
+          "DropInPaths": ""
+        },
+        {
+          "MainPID": "0",
+          "Environment": "PYTHONPATH=/home/deploy/reachy-companion/current/src",
+          "Id": "reachy-report-retention.service",
+          "ActiveState": "inactive",
+          "DropInPaths": ""
+        },
+        {
+          "Id": "reachy-report-retention.timer",
+          "ActiveState": "active",
+          "DropInPaths": ""
+        },
+        {
+          "MainPID": "3915",
+          "Environment": "",
+          "Id": "reachy-robot-tunnel.service",
+          "ActiveState": "active",
+          "DropInPaths": ""
+        },
+        {
+          "MainPID": "390931",
+          "Environment": "PYTHONPATH=/home/deploy/reachy-companion/current/src OMP_NUM_THREADS=2",
+          "Id": "reachy-voice.service",
+          "ActiveState": "active",
+          "DropInPaths": ""
+        }
+      ],
+      "configuration_files": 30,
+      "configuration_mismatches": []
+    },
+    "robot": {
+      "release": {
+        "commit": "7fc7f0204179ae1bac2430e281b66520e7f9630f",
+        "files": 640,
+        "content_sha256": "61b17c5a9a588a784d95ade8e34601f8c9a316a380f657adb10f64f768746091",
+        "ok": true,
+        "mismatches": []
+      },
+      "source_root": "/home/pollen/reachy-companion/current",
+      "units": [
+        {
+          "MainPID": "0",
+          "Environment": "PYTHONPATH=/home/pollen/reachy-companion/current/src",
+          "Id": "reachy-camera-sensor.service",
+          "ActiveState": "inactive",
+          "DropInPaths": ""
+        },
+        {
+          "MainPID": "0",
+          "Environment": "PYTHONPATH=/home/pollen/reachy-companion/current/src",
+          "Id": "reachy-companion-firewall.service",
+          "ActiveState": "active",
+          "DropInPaths": ""
+        },
+        {
+          "MainPID": "907",
+          "Environment": "",
+          "Id": "reachy-mini-bluetooth.service",
+          "ActiveState": "active",
+          "DropInPaths": ""
+        },
+        {
+          "MainPID": "908",
+          "Environment": "REACHY_U96_SAFE_START_DISABLED=1 PYTHONDONTWRITEBYTECODE=1",
+          "Id": "reachy-mini-daemon.service",
+          "ActiveState": "active",
+          "DropInPaths": ""
+        },
+        {
+          "MainPID": "0",
+          "Environment": "",
+          "Id": "reachy-network-qos.service",
+          "ActiveState": "active",
+          "DropInPaths": ""
+        },
+        {
+          "MainPID": "0",
+          "Environment": "PYTHONPATH=/home/pollen/reachy-companion/current/src",
+          "Id": "reachy-production-audio.service",
+          "ActiveState": "failed",
+          "DropInPaths": ""
+        },
+        {
+          "MainPID": "0",
+          "Environment": "PYTHONPATH=/home/pollen/reachy-companion/current/src",
+          "Id": "reachy-report-retention.service",
+          "ActiveState": "inactive",
+          "DropInPaths": ""
+        },
+        {
+          "Id": "reachy-report-retention.timer",
+          "ActiveState": "active",
+          "DropInPaths": ""
+        },
+        {
+          "MainPID": "516874",
+          "Environment": "PYTHONPATH=/home/pollen/reachy-companion/current/src OMP_NUM_THREADS=2",
+          "Id": "reachy-voice-agent.service",
+          "ActiveState": "active",
+          "DropInPaths": ""
+        }
+      ],
+      "configuration_files": 38,
+      "configuration_mismatches": []
+    },
+    "mac": {
+      "configuration_files": 12,
+      "configuration_mismatches": [],
+      "restarted_jobs": {
+        "local.reachy.worker": {
+          "before_pid": "pid = 51336",
+          "after_pid": "pid = 64511",
+          "changed": true
+        },
+        "local.reachy.gateway": {
+          "before_pid": "pid = 60568",
+          "after_pid": "pid = 64510",
+          "changed": true
+        }
+      },
+      "artifacts": [
+        {
+          "path": "@@HOME@@/.llama-app/unzstd",
+          "verified": true
+        },
+        {
+          "path": "@@HOME@@/.local/bin/llama",
+          "verified": true
+        },
+        {
+          "path": "models/qwen3.5-9b/Qwen3.5-9B-Q4_K_M.gguf",
+          "verified": true
+        },
+        {
+          "path": "models/Qwen3.5-0.8B-Q8_0.gguf",
+          "verified": true
+        },
+        {
+          "path": "models/smolvlm2-500m/SmolVLM2-500M-Video-Instruct-Q8_0.gguf",
+          "verified": true
+        },
+        {
+          "path": "models/smolvlm2-500m/mmproj-SmolVLM2-500M-Video-Instruct-Q8_0.gguf",
+          "verified": true
+        },
+        {
+          "path": "models/whisper-medium/model.bin",
+          "verified": true
+        },
+        {
+          "path": "models/whisper-medium/config.json",
+          "verified": true
+        },
+        {
+          "path": "models/whisper-medium/tokenizer.json",
+          "verified": true
+        },
+        {
+          "path": "models/whisper-medium/vocabulary.txt",
+          "verified": true
+        },
+        {
+          "path": "models/ru_RU-ruslan-medium.onnx",
+          "verified": true
+        },
+        {
+          "path": "models/ru_RU-ruslan-medium.onnx.json",
+          "verified": true
+        },
+        {
+          "path": "models/yolox/object_detection_yolox_2022nov.onnx",
+          "verified": true
+        },
+        {
+          "path": "@@HOME@@/.local/bin/sox",
+          "verified": true
+        }
+      ]
+    },
+    "router": {
+      "configuration_files": 15,
+      "configuration_mismatches": []
+    }
+  },
+  "runtime": {
+    "state": "needs_start",
+    "issues": [
+      "vision:source_unavailable",
+      "detector:source_unavailable",
+      "service:reachy-production:failed",
+      "service:reachy-production-audio:failed",
+      "session:unavailable"
+    ],
+    "compute_ready": {
+      "llm": true,
+      "router": true,
+      "worker": true,
+      "gateway": true,
+      "vlm": true
+    },
+    "session_started_by_audit": false,
+    "camera_sensor_started_by_audit": false,
+    "factory_daemon_restarted": false,
+    "factory_daemon_pid_before": 908,
+    "factory_daemon_pid_after": "908",
+    "network_services_restarted": false,
+    "sdk_patch_verified": true
+  },
+  "runtime_code_identity": {
+    "files": 237,
+    "sha256": "3d079e2d4fd95e69cf3ec0c2ad1c17aaa832aeca5bba6ffbbfb989a991e4e508",
+    "local_matches_deployed_commit": true
+  },
+  "installed_project_packages": {
+    "hub": {
+      "files": 119,
+      "mismatches": [],
+      "unexpected_python": [],
+      "versions": [
+        "0.2.0"
+      ]
+    },
+    "robot": {
+      "files": 119,
+      "mismatches": [],
+      "unexpected_python": [],
+      "versions": [
+        "0.2.0"
+      ]
+    }
+  },
+  "python_environments": {
+    "mac": {
+      "locked_packages": 53,
+      "mismatches": {},
+      "additional_packages": {
+        "setuptools": "84.2.1",
+        "build": "1.6.1",
+        "wheel": "0.48.0",
+        "pyproject-hooks": "1.3.3",
+        "pip": "26.2.2",
+        "reachy-companion": "0.2.0"
+      }
+    },
+    "hub": {
+      "locked_packages": 5,
+      "mismatches": {},
+      "additional_packages": {
+        "pip": "25.1.1",
+        "reachy-companion": "0.2.0"
+      }
+    },
+    "robot": {
+      "locked_packages": 1,
+      "mismatches": {},
+      "additional_packages": {
+        "reachy-companion": "0.2.0",
+        "pip": "25.1.1"
+      }
+    },
+    "robot_factory": {
+      "locked_packages": 86,
+      "mismatches": {},
+      "additional_packages": {}
+    }
+  },
+  "http_endpoints": [
+    {
+      "component": "hub",
+      "path": "/health",
+      "status": 200
+    },
+    {
+      "component": "voice_router",
+      "path": "/health",
+      "status": 200
+    },
+    {
+      "component": "agent",
+      "path": "/status",
+      "status": 200
+    },
+    {
+      "component": "panel",
+      "path": "/control",
+      "status": 200
+    },
+    {
+      "component": "factory",
+      "path": "/api/state/full",
+      "status": 200
+    }
+  ],
+  "excluded_private_material": [
+    "credentials",
+    "SSH private keys",
+    "password hashes",
+    "conversation memory",
+    "audio/video",
+    "raw audit and backups"
+  ],
+  "limitations": [
+    "No clean-media OS reinstall performed",
+    "No physical speech/camera/motion acceptance during this audit",
+    "Production was failed/stopped before audit and remains stopped",
+    "Legacy snapshot SDK version mismatch and dormant Windows routes remain documented",
+    "Observed SoX bytes pinned; original build provenance unavailable"
+  ]
+}

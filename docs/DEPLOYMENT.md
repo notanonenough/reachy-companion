@@ -136,6 +136,22 @@ python3.13 -m venv /home/deploy/reachy-companion/.venv-router
 /home/deploy/reachy-companion/.venv-router/bin/python -m pip install -r /home/deploy/reachy-companion/current/deploy/current/hub/python.lock
 ```
 
+Собрать wheel на машине ревью (`.venv-review/bin/python -m build --no-isolation`),
+перенести один и тот же `dist/reachy_companion-0.2.0-py3-none-any.whl` на оба
+Linux узла и установить в их окружения:
+
+```sh
+ROOT/.venv-router/bin/python -m pip install --no-deps --force-reinstall /private/reachy_companion-0.2.0-py3-none-any.whl
+```
+
+На роботе заменить `.venv-router` на `.venv`. Это синхронизирует также CLI и
+package metadata, а не только `PYTHONPATH`. Проверить, что
+`importlib.metadata.distributions()` содержит одну версию `reachy-companion`
+(0.2.0); старые дубли metadata/каталоги pip `~eachy*` переместить в backup вне
+`site-packages`. На Mac допустим editable install из текущего checkout.
+Версии вспомогательных pip/build/setuptools/wheel записаны в итоговом
+`observations/verification.json`, отдельно от runtime locks.
+
 Проект импортируется через `PYTHONPATH=ROOT/current/src`, заданный в units.
 На Mac используется `PYTHONPATH=ROOT/src` из plists и полный checkout. При
 разработке можно установить `pip install --no-deps -e .`. Для фиксированного
