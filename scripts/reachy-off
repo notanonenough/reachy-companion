@@ -1,0 +1,9 @@
+#!/usr/bin/env python3
+"""Stop the conversation and unload all Reachy compute from this Mac."""
+import os
+from pathlib import Path
+import sys
+
+root=Path(__file__).resolve().parents[1]
+python=str(root/'.venv/bin/python')
+os.execv(python,[python,str(root/'scripts/production-control'),'shutdown',*sys.argv[1:]])

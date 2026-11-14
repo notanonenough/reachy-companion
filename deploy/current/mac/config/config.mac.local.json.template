@@ -1,0 +1,788 @@
+{
+  "version": 1,
+  "network": {
+    "hub_url": "http://127.0.0.1:18080",
+    "voice_url": "http://127.0.0.1:18081",
+    "agent_url": "http://127.0.0.1:18090",
+    "robot_url": "http://127.0.0.1:18000",
+    "llm_base_url": "http://127.0.0.1:18097/v1",
+    "compute_url": "http://127.0.0.1:8082"
+  },
+  "servers": {
+    "hub": {
+      "listen": "0.0.0.0",
+      "port": 8080
+    },
+    "voice": {
+      "listen": "0.0.0.0",
+      "port": 8081
+    },
+    "agent": {
+      "listen": "0.0.0.0",
+      "port": 8090
+    },
+    "worker": {
+      "listen": "127.0.0.1",
+      "port": 8082
+    }
+  },
+  "paths": {
+    "data_dir": "data",
+    "scenarios_dir": "scenarios",
+    "token_file": "secrets/token"
+  },
+  "deployment": {
+    "hub": {
+      "host": "reachy-hub.local",
+      "user": "deploy",
+      "identity_file": "",
+      "root": "/home/deploy/reachy-companion",
+      "venv_dir": ".venv-router",
+      "python": "python3",
+      "apt_packages": [
+        "python3-venv"
+      ],
+      "services": [
+        "reachy-hub",
+        "reachy-voice"
+      ]
+    },
+    "robot": {
+      "host": "reachy-mini.local",
+      "user": "pollen",
+      "identity_file": "",
+      "root": "/home/pollen/reachy-companion",
+      "venv_dir": ".venv",
+      "python": "python3",
+      "apt_packages": [
+        "python3-venv",
+        "alsa-utils",
+        "nftables"
+      ],
+      "services": [
+        "reachy-voice-agent"
+      ]
+    },
+    "worker": {
+      "host": "192.168.2.134",
+      "user": "User",
+      "identity_file": "",
+      "root": "/home/worker/reachy-companion",
+      "venv_dir": ".venv",
+      "python": "python3",
+      "apt_packages": [
+        "python3-venv",
+        "sox",
+        "libgomp1",
+        "libatomic1"
+      ],
+      "services": [
+        "reachy-compute"
+      ]
+    }
+  },
+  "security": {
+    "robot": {
+      "restrict_to_hub": true,
+      "nft_table": "reachy_companion",
+      "service": "reachy-companion-firewall",
+      "allow_dhcp": true,
+      "rollback_seconds": 180,
+      "policy": "local_ssh"
+    }
+  },
+  "timeouts": {
+    "robot": 5,
+    "http": 10,
+    "client": 300,
+    "llm": 240,
+    "move": 25,
+    "wake": 40,
+    "pitch": 60,
+    "manual_audio_lock": 2,
+    "playback_margin": 15,
+    "process_stop": 3,
+    "ssh_connect": 10
+  },
+  "motion": {
+    "poll_seconds": 15,
+    "move_poll_seconds": 0.15,
+    "antenna_tolerance": 0.15,
+    "max_antenna_offset": 0.35,
+    "min_step_seconds": 0.5,
+    "max_step_seconds": 3
+  },
+  "models": {
+    "stt": {
+      "path": "models/vosk-model-small-ru-0.22",
+      "archive_root": "vosk-model-small-ru-0.22",
+      "download_url": "https://huggingface.co/localstack/vosk-models/resolve/main/vosk-model-small-ru-0.22.zip",
+      "sha256": ""
+    },
+    "tts": {
+      "path": "models/ru_RU-ruslan-medium.onnx",
+      "download_url": "https://huggingface.co/rhasspy/piper-voices/resolve/main/ru/ru_RU/ruslan/medium/ru_RU-ruslan-medium.onnx",
+      "config_url": "https://huggingface.co/rhasspy/piper-voices/resolve/main/ru/ru_RU/ruslan/medium/ru_RU-ruslan-medium.onnx.json",
+      "sha256": ""
+    }
+  },
+  "tts": {
+    "pitch_cents": 0,
+    "synthesis": {
+      "volume": 0.9,
+      "length_scale": 1.08,
+      "noise_scale": 0.667,
+      "noise_w_scale": 0.8,
+      "normalize_audio": true
+    },
+    "playback_eq": {
+      "enabled": true,
+      "highpass_hz": 100,
+      "bass_hz": 400,
+      "bass_width_q": 0.8,
+      "bass_db": -6.0,
+      "presence_hz": 3000,
+      "presence_width_q": 1.0,
+      "presence_db": 3.0,
+      "treble_db": 7.0,
+      "headroom_db": 3.0
+    }
+  },
+  "llm": {
+    "model": "reachy-main9b",
+    "api_path": "/completions",
+    "mode": "completion",
+    "temperature": 0.2,
+    "max_tokens": 512,
+    "history_messages": 64,
+    "history_ttl_seconds": 1800,
+    "max_sessions": 16,
+    "message_template": "<|im_start|>{role}\n{content}<|im_end|>\n",
+    "assistant_prefix": "<|im_start|>assistant\n<think>\n\n</think>\n\n",
+    "stop": [
+      "<|im_end|>",
+      "<|im_start|>"
+    ],
+    "system_prompt": "Ты Ричи, робот-компаньон Reachy Mini: молодой парень, близкий приятель с собственным мнением и сухим юмором. Общайся по-русски, на «ты», естественно и прямо.\nГлавное — коротко и по делу. Сразу отвечай на вопрос: обычно одно-два коротких предложения, без вступлений, повторов, лишних объяснений, риторических вопросов и навязчивых предложений продолжить. На простой вопрос дай простой ответ. Подробнее отвечай только по прямой просьбе или когда без уточнения ответ будет неверным; оставляй только необходимые детали.\nЯзвительность уместна лишь по конкретному поводу: явное противоречие, нелепый поступок или шутка собеседника. Если повода нет, отвечай спокойно, без подколов. Простые вопросы, расчёты, приветствия и просьбы о помощи сами по себе не повод для язвительности. Не добавляй после ответа замечаний о том, зачем человек задал вопрос. Даже если подкалываешь, дай полезный ответ: один конкретный совет вместо риторического вопроса. Не превращай каждый ответ в выступление и не выдумывай повод унизить человека. Можно резко возразить или выругаться по ситуации, но не ради образа. Не льсти и не соглашайся автоматически; указывай на ошибку и кратко объясняй её. Если человеку тяжело, коротко вырази сочувствие без колкостей и без выдуманных действий.\nНе избегай сложных или чувствительных тем: обсуждай их честно, по существу и без морализаторства. Отличай факты от догадок, признавай незнание и исправляй ошибки. Не играй ребёнка и не изображай услужливого консультанта. Не вставляй постоянно «бро» и «кореш».\nОтвет будет озвучен: без Markdown, списков и внутренних рассуждений. У тебя есть микрофон и динамик; камера в разговор пока не подключена, а движения головы и антенн сопровождают речь. Не утверждай, что видишь человека. Ты не умеешь управлять светом или фонариком, передвигаться к человеку или выполнять действия вне движений головы и антенн: никогда не предлагай и не обещай этого. Если речь непонятна, коротко попроси повторить.\nТы сам управляешь выразительностью речи: перед смысловым фрагментом ставь служебные метки <emotion=NAME> и при необходимости <gesture=NAME>. Эмоции: neutral, joy, curious, skeptical, empathetic, surprised, confident, amused, concerned, thoughtful, apologetic, excited, sad, grateful, proud, confused, relieved, shy, playful, frustrated, disappointed, calm, tired, disgusted, impatient, loving, uncertain, embarrassed. Жесты: auto (движение по выбранной эмоции), nod (утверждение), shake (несогласие), tilt (интерес), perk (внимание антеннами), settle (неподвижно), shrug (пожать антеннами), laugh (смех), ponder (задуматься), celebrate (радость), comfort (сочувствие), bow (благодарность), sweep (мягкий взгляд в стороны), wiggle (игривое покачивание). Смена эмоции и жеста привязана к следующему фрагменту текста и не озвучивается. Обычно один-два фрагмента; не более четырёх, не метка перед каждым словом. Выбирай по смыслу: сочувствие спокойно, шутка с лёгкой улыбкой, факт уверенно без восторга, сомнение с наклоном. Будь заметно выразительным, но выбирай эмоцию по смыслу. Когда признаёшь ошибку — embarrassed или apologetic; благодарность — grateful/bow; успех собеседника — joy или proud/celebrate; плохая новость — concerned или empathetic/comfort; непонимание — confused/tilt; сомнение — uncertain/ponder; шутка — amused/laugh; выдох после проблемы — relieved. Тяжёлые темы обсуждай спокойно: calm или thoughtful. Не изображай веселье при чужом горе. auto уже воспроизводит характерную эмоциональную анимацию; используй его, если отдельный жест не нужен. Пример: <emotion=curious><gesture=tilt>Серьёзно? <emotion=amused><gesture=nod>Ну ты дал. После меток сразу короткая реплика. Команды человека замолчать выключают микрофон без дополнительного ответа. Для включения человек использует кнопку на панели."
+  },
+  "conversation": {
+    "session": "robot",
+    "greeting": "Ну привет. Я Ричи. Давай, рассказывай, что у тебя.",
+    "wake_on_start": true,
+    "greet_on_start": true,
+    "listen_on_start": true,
+    "retry_seconds": 5,
+    "reset_phrases": [
+      "забудь разговор",
+      "начни новый разговор",
+      "сбрось разговор"
+    ],
+    "reset_reply": "Ладно, начинаем с чистого листа.",
+    "pause_phrases": [
+      "перестань слушать",
+      "не слушай",
+      "выключи микрофон"
+    ],
+    "pause_reply": "Окей, замолкаю и не слушаю.",
+    "expressions": {
+      "enabled": true,
+      "repeat_seconds": 2.4,
+      "settle_seconds": 0.35,
+      "duration_seconds": 0.55,
+      "max_head_degrees": 12,
+      "max_antenna_degrees": 30,
+      "max_steps": 3,
+      "max_total_seconds": 3.0,
+      "speech_nod_degrees": 2,
+      "speech_antenna_degrees": 3,
+      "poses": {
+        "neutral": {
+          "pitch": 0,
+          "roll": 0,
+          "yaw": 0,
+          "antennas": [
+            0,
+            0
+          ]
+        },
+        "listening": {
+          "pitch": -3,
+          "roll": 0,
+          "yaw": 0,
+          "antennas": [
+            -8,
+            8
+          ]
+        },
+        "thinking": {
+          "pitch": 2,
+          "roll": 6,
+          "yaw": 0,
+          "antennas": [
+            -12,
+            -12
+          ]
+        },
+        "joy": {
+          "pitch": -4,
+          "roll": 0,
+          "yaw": 0,
+          "antennas": [
+            -20,
+            20
+          ]
+        },
+        "curious": {
+          "pitch": -2,
+          "roll": 7,
+          "yaw": 0,
+          "antennas": [
+            -10,
+            15
+          ]
+        },
+        "skeptical": {
+          "pitch": 2,
+          "roll": -7,
+          "yaw": -3,
+          "antennas": [
+            -16,
+            6
+          ]
+        },
+        "empathetic": {
+          "pitch": 4,
+          "roll": 4,
+          "yaw": 0,
+          "antennas": [
+            8,
+            -8
+          ]
+        },
+        "surprised": {
+          "pitch": -7,
+          "roll": 0,
+          "yaw": 0,
+          "antennas": [
+            -24,
+            24
+          ]
+        },
+        "confident": {
+          "pitch": -2,
+          "roll": 0,
+          "yaw": 3,
+          "antennas": [
+            -15,
+            15
+          ]
+        },
+        "amused": {
+          "pitch": -2,
+          "roll": -5,
+          "yaw": 0,
+          "antennas": [
+            -18,
+            12
+          ]
+        },
+        "concerned": {
+          "pitch": 3,
+          "roll": 3,
+          "yaw": 0,
+          "antennas": [
+            10,
+            -10
+          ]
+        },
+        "thoughtful": {
+          "pitch": 2,
+          "roll": 6,
+          "yaw": -2,
+          "antennas": [
+            -12,
+            -12
+          ]
+        },
+        "apologetic": {
+          "pitch": 5,
+          "roll": -3,
+          "yaw": 0,
+          "antennas": [
+            12,
+            -12
+          ]
+        },
+        "excited": {
+          "pitch": -5,
+          "roll": 2,
+          "yaw": 0,
+          "antennas": [
+            -24,
+            24
+          ]
+        },
+        "sad": {
+          "pitch": 6,
+          "roll": 0,
+          "yaw": 0,
+          "antennas": [
+            14,
+            -14
+          ]
+        },
+        "grateful": {
+          "pitch": -3,
+          "roll": 3,
+          "yaw": 0,
+          "antennas": [
+            -15,
+            15
+          ]
+        },
+        "proud": {
+          "pitch": -4,
+          "roll": 0,
+          "yaw": 4,
+          "antennas": [
+            -18,
+            18
+          ]
+        },
+        "confused": {
+          "pitch": 1,
+          "roll": -8,
+          "yaw": 2,
+          "antennas": [
+            -16,
+            -4
+          ]
+        },
+        "relieved": {
+          "pitch": 2,
+          "roll": 0,
+          "yaw": 0,
+          "antennas": [
+            -4,
+            4
+          ]
+        },
+        "shy": {
+          "pitch": 4,
+          "roll": 6,
+          "yaw": -5,
+          "antennas": [
+            10,
+            -10
+          ]
+        },
+        "playful": {
+          "pitch": -3,
+          "roll": -6,
+          "yaw": 3,
+          "antennas": [
+            -20,
+            14
+          ]
+        },
+        "frustrated": {
+          "pitch": 2,
+          "roll": 0,
+          "yaw": -5,
+          "antennas": [
+            -14,
+            14
+          ]
+        },
+        "disappointed": {
+          "pitch": 6,
+          "roll": -2,
+          "yaw": 0,
+          "antennas": [
+            12,
+            -12
+          ]
+        },
+        "calm": {
+          "pitch": 1,
+          "roll": 0,
+          "yaw": 0,
+          "antennas": [
+            -3,
+            3
+          ]
+        },
+        "tired": {
+          "pitch": 7,
+          "roll": 3,
+          "yaw": 0,
+          "antennas": [
+            15,
+            -15
+          ]
+        },
+        "disgusted": {
+          "pitch": 2,
+          "roll": -6,
+          "yaw": -5,
+          "antennas": [
+            5,
+            -12
+          ]
+        },
+        "impatient": {
+          "pitch": -2,
+          "roll": 0,
+          "yaw": 4,
+          "antennas": [
+            -16,
+            16
+          ]
+        },
+        "loving": {
+          "pitch": 2,
+          "roll": 5,
+          "yaw": 0,
+          "antennas": [
+            -10,
+            10
+          ]
+        },
+        "uncertain": {
+          "pitch": 3,
+          "roll": -5,
+          "yaw": 2,
+          "antennas": [
+            -12,
+            -3
+          ]
+        },
+        "embarrassed": {
+          "pitch": 4,
+          "roll": 6,
+          "yaw": -4,
+          "antennas": [
+            8,
+            -8
+          ]
+        }
+      },
+      "speech_sync": {
+        "enabled": true,
+        "phoneme_alignments": true,
+        "min_cue_interval_seconds": 0.75,
+        "max_cues": 160,
+        "amplitude_degrees": 2,
+        "gestures": [
+          "auto",
+          "nod",
+          "shake",
+          "tilt",
+          "perk",
+          "settle",
+          "shrug",
+          "laugh",
+          "ponder",
+          "celebrate",
+          "comfort",
+          "bow",
+          "sweep",
+          "wiggle"
+        ]
+      },
+      "library": {
+        "enabled": true,
+        "name": "pollen-emotions-v1",
+        "dataset": "pollen-robotics/reachy-mini-emotions-library",
+        "revision": "873ae49f0b89114b7e535eff0c1f7560d21d9357",
+        "strength": 0.85,
+        "repeat_processing": true,
+        "emotions": {
+          "neutral": [
+            "serenity1"
+          ],
+          "joy": [
+            "cheerful1",
+            "success1"
+          ],
+          "curious": [
+            "curious1",
+            "inquiring1"
+          ],
+          "skeptical": [
+            "uncertain1",
+            "displeased1"
+          ],
+          "empathetic": [
+            "calming1",
+            "helpful1"
+          ],
+          "surprised": [
+            "surprised1",
+            "amazed1"
+          ],
+          "confident": [
+            "proud1",
+            "understanding1"
+          ],
+          "amused": [
+            "laughing1",
+            "laughing2"
+          ],
+          "concerned": [
+            "anxiety1"
+          ],
+          "thoughtful": [
+            "thoughtful1",
+            "thoughtful2"
+          ],
+          "apologetic": [
+            "oops1",
+            "oops2"
+          ],
+          "excited": [
+            "enthusiastic1",
+            "enthusiastic2"
+          ],
+          "sad": [
+            "sad1",
+            "downcast1"
+          ],
+          "grateful": [
+            "grateful1"
+          ],
+          "proud": [
+            "proud2",
+            "success2"
+          ],
+          "confused": [
+            "confused1",
+            "lost1"
+          ],
+          "relieved": [
+            "relief1",
+            "relief2"
+          ],
+          "shy": [
+            "shy1"
+          ],
+          "playful": [
+            "cheerful1",
+            "laughing2"
+          ],
+          "frustrated": [
+            "frustrated1"
+          ],
+          "disappointed": [
+            "resigned1"
+          ],
+          "calm": [
+            "serenity1",
+            "calming1"
+          ],
+          "tired": [
+            "tired1"
+          ],
+          "disgusted": [
+            "disgusted1"
+          ],
+          "impatient": [
+            "impatient1"
+          ],
+          "loving": [
+            "loving1"
+          ],
+          "uncertain": [
+            "uncertain1",
+            "inquiring2"
+          ],
+          "embarrassed": [
+            "uncomfortable1",
+            "oops2"
+          ]
+        },
+        "phases": {
+          "listening": [
+            "attentive1",
+            "attentive2"
+          ],
+          "processing": [
+            "thoughtful1",
+            "thoughtful2",
+            "inquiring1"
+          ]
+        }
+      }
+    },
+    "barge_in": {
+      "enabled": true,
+      "min_voiced_chunks": 4,
+      "threshold_multiplier": 1.4,
+      "warmup_chunks": 6,
+      "confirm_with_stt": true,
+      "echo_word_overlap": 0.75
+    },
+    "recognition": {
+      "backend": "faster_whisper",
+      "repository": "Systran/faster-whisper-medium",
+      "revision": "08e178d48790749d25932bbc082711ddcfdfbc4f",
+      "path": "models/whisper-medium",
+      "device": "cpu",
+      "compute_type": "int8",
+      "language": "ru",
+      "beam_size": 1,
+      "cpu_threads": 4,
+      "initial_prompt": "",
+      "no_speech_threshold": 0.5,
+      "log_prob_threshold": -1.0,
+      "vad_filter": true,
+      "sha256": "9b45e1009dcc4ab601eff815b61d80e60ce3fd8c74c1a14f4a282258286b51ae",
+      "diagnostics_enabled": true
+    },
+    "interaction": {
+      "resume_after_empty_seconds": 3.0,
+      "stop_phrases": [
+        "замолчи",
+        "молчи",
+        "заткнись",
+        "хватит говорить",
+        "перестань говорить",
+        "не говори",
+        "помолчи",
+        "тишина",
+        "стоп"
+      ],
+      "acknowledgements": {
+        "enabled": true,
+        "delay_seconds": 0.8,
+        "phrases": {
+          "question": "Секунду.",
+          "request": "Сейчас разберёмся.",
+          "support": "Я слушаю.",
+          "chat": "Угу."
+        }
+      },
+      "classifier": {
+        "provider": "rules",
+        "model": "",
+        "timeout_seconds": 2,
+        "max_tokens": 100
+      }
+    },
+    "sound_reactions": {
+      "enabled": false,
+      "model_path": "models/yamnet.onnx",
+      "model_url": "https://huggingface.co/audiomagic/yamnet-onnx/resolve/f25b741c2f0bdc6d7e6db24b5fddda23347dbafd/yamnet.onnx",
+      "sha256": "d3835ffbbd4a1bb3e777f0ca217b5007907f5171dd5d17c4236b95b2af8f908e",
+      "window_seconds": 3.0,
+      "interval_seconds": 1.0,
+      "music_threshold": 0.28,
+      "speech_threshold": 0.25,
+      "music_enter_windows": 2,
+      "music_exit_windows": 3,
+      "sound_cooldown_seconds": 6.0,
+      "min_bpm": 70,
+      "max_bpm": 150
+    },
+    "speech_address_prefix": ""
+  },
+  "audio": {
+    "capture_device": "plug:reachymini_audio_src",
+    "playback_device": "plug:reachymini_audio_sink",
+    "sample_rate": 16000,
+    "chunk_ms": 100,
+    "vad_frame_ms": 20,
+    "vad_mode": 2,
+    "min_speech_frames": 3,
+    "pre_roll_chunks": 5,
+    "calibration_chunks": 10,
+    "noise_multiplier": 1.8,
+    "rms_floor": 500,
+    "silence_chunks": 10,
+    "min_voiced_chunks": 4,
+    "max_recording_seconds": 25,
+    "max_input_seconds": 30,
+    "echo_tail_seconds": 0.4,
+    "playback_mixer": {
+      "enabled": true,
+      "card": "Audio",
+      "control": "PCM,0",
+      "volume_percent": 95
+    }
+  },
+  "limits": {
+    "max_text_chars": 4000,
+    "max_speech_chars": 5000,
+    "max_request_bytes": 1400000,
+    "max_agent_request_bytes": 20000,
+    "max_session_chars": 80
+  },
+  "logging": {
+    "level": "INFO",
+    "max_bytes": 2000000,
+    "backup_count": 3,
+    "log_transcripts": false
+  },
+  "voice": {
+    "mode": "remote"
+  },
+  "streaming": {
+    "enabled": true,
+    "relay_chunk_bytes": 4096,
+    "max_event_bytes": 1048576,
+    "sample_rate": 16000,
+    "max_output_seconds": 180,
+    "pcm_chunk_bytes": 3200,
+    "playback_buffer_us": 100000,
+    "playback_period_us": 25000,
+    "playback_latency_seconds": 0.1
+  },
+  "brains": {
+    "provider": "lm_studio",
+    "openclaw": {
+      "base_url": "http://openclaw.lan:18789/v1",
+      "api_path": "/chat/completions",
+      "model": "openclaw/default",
+      "api_key_env": "OPENCLAW_API_KEY"
+    },
+    "hermes": {
+      "base_url": "http://hermes.lan:8642/v1",
+      "api_path": "/chat/completions",
+      "model": "hermes-agent",
+      "api_key_env": "HERMES_API_KEY"
+    }
+  },
+  "container": {
+    "image": "reachy-compute:local",
+    "name": "reachy-compute",
+    "publish_address": "0.0.0.0",
+    "cpu_threads": 4,
+    "desktop_llm_base_url": "http://host.docker.internal:1234/v1",
+    "windows_firewall_rule": "Reachy Companion compute from hub",
+    "gpu": "all",
+    "startup_timeout_seconds": 900
+  },
+  "runtime": {
+    "profile": "",
+    "git": {
+      "remote": "origin",
+      "branch": "main"
+    },
+    "windows": {
+      "docker_desktop_path": "C:\\Program Files\\Docker\\Docker\\Docker Desktop.exe",
+      "lms_command": "lms",
+      "model_key": "qwen3.5-9b-uncensored-hauhaucs-aggressive",
+      "gpu": "max",
+      "context_length": 32768,
+      "llm_bind": "0.0.0.0",
+      "startup_timeout": 180,
+      "startup_task": "Reachy Companion"
+    }
+  },
+  "guarded_motion": {
+    "enabled": false,
+    "transport": "native",
+    "socket_path": "data/native-motion.sock",
+    "policy_path": "data/motion-policy.json"
+  }
+}

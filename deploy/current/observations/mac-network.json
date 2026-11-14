@@ -1,0 +1,10 @@
+{
+  "interface": "en0",
+  "network_service": "Wi-Fi",
+  "ssid": "Vuqar 5G",
+  "mtu": 1492,
+  "mode": "DHCP",
+  "expected_ipv4": "192.168.100.31",
+  "gateway": "192.168.100.1",
+  "restore_secret": "SECRET_WIFI_VUQAR_5G_PSK"
+}

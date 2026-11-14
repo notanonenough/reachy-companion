@@ -89,14 +89,17 @@ def dispatch(agent, text, epoch, expected):
     if not matches(text,getattr(agent,'current_reply_text','')):
         raise ValueError('Exact non-echo snapshot request required')
     deadline=time.monotonic()+50
+    permission=agent.camera_permission.snapshot()
     if expected['microphone_epoch']!=epoch or not agent.audio_lock.locked() or agent.stopping.is_set():
         raise RuntimeError('Spoken snapshot admission changed')
     def check():
+        if not permission['enabled'] or permission['error'] or agent.camera_permission.snapshot()!=permission:
+            raise RuntimeError('Camera permission changed')
         if agent.stopping.is_set():raise RuntimeError('Agent stopped')
         check_operator(agent.operator_status(),expected,deadline)
     check()
     agent.pending_pcm=None;agent.resume_audio=None
-    packet=dict(config=dict(network=dict(llm_base_url=agent.config['network']['llm_base_url']),
+    packet=dict(config=dict(camera_permission_path=str(agent.camera_permission.path),network=dict(llm_base_url=agent.config['network']['llm_base_url']),
                             llm=dict(model=agent.config['llm']['model'])),
                 port=agent.config['servers']['agent']['port'],token=agent.config.token,
                 expected=expected,deadline=deadline,question=text)

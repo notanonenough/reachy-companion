@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>PATH</key>
+		<string>@@HOME@@/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+		<key>PYTHONPATH</key>
+		<string>@@ROOT@@/src</string>
+	</dict>
+	<key>KeepAlive</key>
+	<true/>
+	<key>Label</key>
+	<string>local.reachy.worker</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>@@ROOT@@/.venv/bin/python</string>
+		<string>-m</string>
+		<string>reachy_companion.production_logs</string>
+		<string>run</string>
+		<string>--log</string>
+		<string>@@ROOT@@/data/mac-runtime/local.reachy.worker.log</string>
+		<string>--</string>
+		<string>@@ROOT@@/.venv/bin/python</string>
+		<string>-m</string>
+		<string>reachy_companion</string>
+		<string>--config</string>
+		<string>@@ROOT@@/config.mac.local.json</string>
+		<string>worker</string>
+		<string>serve</string>
+	</array>
+	<key>RunAtLoad</key>
+	<false/>
+	<key>StandardErrorPath</key>
+	<string>/dev/null</string>
+	<key>StandardOutPath</key>
+	<string>/dev/null</string>
+	<key>ThrottleInterval</key>
+	<integer>5</integer>
+	<key>WorkingDirectory</key>
+	<string>@@ROOT@@</string>
+</dict>
+</plist>

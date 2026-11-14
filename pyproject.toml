@@ -13,11 +13,13 @@ dependencies = []
 hub = []
 autonomous = ["jsonschema>=4.23,<5"]
 autonomous-pc = ["jsonschema>=4.23,<5", "lmstudio==1.5.0"]
+vision = ["numpy>=2,<3", "onnxruntime>=1.20,<2", "Pillow>=10,<13"]
 worker = ["vosk==0.3.44; sys_platform == 'darwin'", "vosk==0.3.45; sys_platform != 'darwin'", "piper-tts==1.8.0", "faster-whisper==1.2.1", "onnx==1.23.2"]
 robot = ["webrtcvad-wheels==2.0.14.post1"]
 dev = [
     "jsonschema>=4.23,<5", "build>=1.2,<2", "setuptools>=68", "wheel>=0.45,<1",
     "numpy>=2,<3", "fastapi>=0.115,<1", "httpx>=0.27,<1",
+    "onnxruntime>=1.20,<2", "Pillow>=10,<13",
 ]
 
 [project.scripts]

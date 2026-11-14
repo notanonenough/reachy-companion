@@ -1,0 +1,49 @@
+#!/usr/bin/env python3
+"""Measure STT on silence or a local PCM WAV; never plays audio or starts a session."""
+import argparse
+import base64
+import json
+from pathlib import Path
+import sys
+import time
+from urllib.request import Request,urlopen
+import wave
+
+ROOT=Path(__file__).resolve().parents[1]
+sys.path.insert(0,str(ROOT/'src'))
+
+
+def main():
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--config',type=Path,default=ROOT/'config.mac.local.json')
+    parser.add_argument('--wav',type=Path);parser.add_argument('--seconds',type=float,default=2)
+    args=parser.parse_args()
+    if args.wav:
+        if args.wav.stat().st_size>1024*1024:parser.error('WAV input exceeds 1 MiB')
+        with wave.open(str(args.wav),'rb') as w:
+            if (w.getnchannels(),w.getsampwidth(),w.getframerate(),w.getcomptype())!=(1,2,16000,'NONE'):
+                parser.error('Expected mono 16-bit PCM WAV at 16000 Hz')
+            pcm=w.readframes(w.getnframes())
+        source='local_wav'
+    else:
+        if not .1<=args.seconds<=8:parser.error('Silence duration must be 0.1–8 seconds')
+        pcm=b'\0\0'*int(16000*args.seconds);source='synthetic_silence'
+    from reachy_companion.config import Config
+    c=Config(args.config)
+    payload=dict(pcm_base64=base64.b64encode(pcm).decode(),diagnostics=True)
+    request=Request(c['network']['compute_url'].rstrip('/')+'/transcribe',
+        data=json.dumps(payload).encode(),headers={'Content-Type':'application/json','Authorization':'Bearer '+c.token})
+    start=time.monotonic()
+    try:
+        with urlopen(request,timeout=15) as response:raw=response.read(8193)
+        if len(raw)>8192:raise ValueError('Response bound')
+        result=json.loads(raw)
+        print(json.dumps(dict(source=source,audio_s=len(pcm)/32000,request_s=round(time.monotonic()-start,3),
+            transcript_chars=len(result.get('transcript','')),diagnostics=result.get('diagnostics',{})),ensure_ascii=False,indent=2))
+    except (OSError,ValueError) as exc:
+        print(json.dumps(dict(source=source,request_s=round(time.monotonic()-start,3),error_class=type(exc).__name__)))
+        return 1
+    return 0
+
+
+if __name__=='__main__':raise SystemExit(main())

@@ -62,6 +62,7 @@ class Binding:
     evidence: tuple[str, ...]
     dependencies: tuple[tuple[str, str], ...]
     durable_revision: int = field(default=-1, kw_only=True)
+    visual_target: tuple | None = field(default=None, kw_only=True)
 
 
 @dataclass

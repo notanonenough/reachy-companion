@@ -41,7 +41,7 @@ class RemoteGateway:
         headers = {'Authorization': 'Bearer ' + self.token, 'Content-Type': 'application/json'}
         request = Request(self.url.rstrip('/') + path,
                           data=None if payload is None else json.dumps(payload).encode(), headers=headers)
-        with self.opener.open(request, timeout=self.config['http_timeout_s'] + 1) as response:
+        with self.opener.open(request, timeout=min(1,self.config['http_timeout_s'] + 1) if path=='/health' else self.config['http_timeout_s'] + 1) as response:
             raw = response.read(65537)
         if len(raw) > 65536:
             raise ValueError('Oversized gateway response')
@@ -140,6 +140,8 @@ class Scheduler:
         self.next_context=0
         self.closed=False
         self.services=None;self.production=False;self.latencies={};self.overload_since=None;self.overload_notice_pending=False;self.audio_busy_since=None
+        self.last_dialogue_at=None
+        self.pressure_report={};self.overload_trigger={}
 
     def enable_production(self, store, sensors=None, deliveries=None, tools=None):
         if self.services:raise ValueError('One production owner only')
@@ -153,15 +155,24 @@ class Scheduler:
         for name in ('audio.level','audio.transcript','camera','battery','power','servo.load','network','lidar'):
             self.state.ingest(dict(type='sensor',id=name,availability='unknown',source_id='unconfigured'),time.monotonic())
 
+    def pressure_status(self,now):
+        return dict(phase=self.state.overload,
+                    elapsed_s=round(max(0,now-self.overload_since),3) if self.overload_since is not None and self.state.overload!='ACTIVE' else 0,
+                    **self.pressure_report,last_trigger=dict(self.overload_trigger))
+
     def pressure(self,now):
         if not self.production:return
         state=self.state
         if state.stopped:return
         settings=self.config.get('production',{})
-        jobs=[job for job in (self.fast_job,self.main_job,self.motion_job,self.context_job) if job and not job.future.done()]
+        named={name:job for name in ('fast','main','motion','context')
+               if (job:=getattr(self,name+'_job')) and not job.future.done()}
+        sensors={}
         if self.services:
-            jobs += [row[0] for row in (*self.services.tool_jobs.values(),*self.services.polls.values()) if not row[0].future.done()]
-            if self.services.maintenance and not self.services.maintenance[0].future.done():jobs.append(self.services.maintenance[0])
+            named.update({'tool:'+name:row[0] for name,row in self.services.tool_jobs.items() if not row[0].future.done()})
+            sensors={'sensor:'+name:row[0] for name,row in self.services.polls.items() if not row[0].future.done()}
+            if self.services.maintenance and not self.services.maintenance[0].future.done():named['maintenance']=self.services.maintenance[0]
+            if self.services.update_job and not self.services.update_job[0].future.done():named['updates']=self.services.update_job[0]
         audio_busy=False
         if self.speech_adapter:
             status=self.speech_adapter.status()
@@ -169,10 +180,21 @@ class Scheduler:
         if self.audio_adapter:audio_busy=audio_busy or self.audio_adapter.status().get('execution_busy',False)
         if audio_busy and self.audio_busy_since is None:self.audio_busy_since=now
         if not audio_busy:self.audio_busy_since=None
-        age=max(max((now-job.started for job in jobs),default=0),0 if self.audio_busy_since is None else now-self.audio_busy_since)
+        ages={name:max(0,now-job.started) for name,job in {**named,**sensors}.items()}
+        if self.audio_busy_since is not None:ages['audio']=max(0,now-self.audio_busy_since)
+        limit=settings.get('overload_latency_s',10)
+        overdue=[name for name,age in ages.items() if age>limit]
+        ages={name:round(age,3) for name,age in ages.items()}
         queued=len(state.candidates)+sum(t.status=='ready' for t in state.tasks.values())
-        if state.overload=='ACTIVE' and (age>settings.get('overload_latency_s',10) or queued>settings.get('overload_queue',6) or self.services and self.services.unresolved and not self.services.tool_jobs):
+        unresolved=sorted(self.services.unresolved) if self.services else []
+        reasons=['latency:'+name for name in overdue]
+        if queued>settings.get('overload_queue',6):reasons.append('queue_depth')
+        if unresolved and not self.services.tool_jobs:reasons.append('unknown_tool_completion')
+        self.pressure_report=dict(active_age_s=ages,queue_depth=queued,latency_limit_s=limit,
+                                  queue_limit=settings.get('overload_queue',6),reasons=reasons,unresolved_tools=unresolved)
+        if state.overload=='ACTIVE' and reasons:
             state.overload='DRAINING';self.overload_since=now
+            self.overload_trigger=dict(reasons=list(reasons),active_age_s=dict(ages),queue_depth=queued)
             state.motion_proposals.clear();state.speech_proposals.clear()
             state.record('overload_entered')
             self.overload_notice_pending=bool(self.speech_adapter and not (state.muted or state.privacy or state.quiet))
@@ -187,12 +209,15 @@ class Scheduler:
                         request_id=uid(),authority=state.authority,deadline=now+10))
                     audio_busy=True;state.record('overload_notice_proposed')
                 except Exception:state.record('overload_notice_rejected')
-        if state.overload=='DRAINING' and not jobs and not audio_busy and self.fast_job is None and self.main_job is None and self.motion_job is None and not (self.services and self.services.unresolved):
-            summaries=[t.result[:128] for t in state.tasks.values() if t.result]
-            state.previous.append(('Drain results: '+'; '.join(summaries))[:128])
-            state.candidates.clear()
-            for task in state.tasks.values():
-                if task.status=='ready':task.status='discarded';task.result=None
+        # Fresh sensor reads keep running during drain and must not prevent its
+        # completion. A reader that exceeded the threshold remains accounted
+        # until its actual return; neither timeouts nor retries free that slot.
+        sensor_stalled=any(name in sensors for name in overdue)
+        if state.overload=='DRAINING' and not named and not sensor_stalled and not audio_busy and self.fast_job is None and self.main_job is None and self.motion_job is None and not unresolved:
+            # Ready results retain their original expiry/authority and remain
+            # committable after consolidation. Do not erase a human request
+            # received while draining, or replace an answer with 128 characters.
+            state.previous.append('Drain completed; review ready answers, pending inputs and tool results.')
             state.overload='CONSOLIDATING';state.record('drain_completed')
 
     def ingest(self, event, now=None):
@@ -200,6 +225,9 @@ class Scheduler:
         if self.audio_adapter and event.get('type')=='operator':self.audio_adapter.interrupt()
         if self.speech_adapter and event.get('type') in ('operator','utterance'):
             self.speech_adapter.interrupt('human_utterance' if event['type']=='utterance' else 'operator',False)
+        if event.get('type')=='utterance':
+            self.last_dialogue_at=time.monotonic() if now is None else now
+            self.next_autonomous=self.last_dialogue_at+30
         old_authority=self.state.authority
         self.state.ingest(event, time.monotonic() if now is None else now)
         if event.get('type')=='operator' and self.state.privacy:self.revoke_context(old_authority)
@@ -259,7 +287,8 @@ class Scheduler:
         else:receipt=None
         if self.audio_adapter:
             self.state.audio_source_bound=self.audio_adapter.status()['source_boot'] is not None
-            event=self.audio_adapter.advance(self.state.authority,receipt)
+            event=self.audio_adapter.advance(self.state.authority,receipt,
+                allow_start=not self.production or self.state.overload=='ACTIVE')
             if event:self.ingest(event,now)
             if self.production and hasattr(self.audio_adapter,'drain_level'):
                 level=self.audio_adapter.drain_level(self.state.authority)
@@ -275,12 +304,23 @@ class Scheduler:
             if self.motion_job and self.motion_job.future.done():
                 try:
                     report=self.motion_job.future.result()
-                    self.state.record('motion_completed' if report['accepted'] else 'motion_failed',request_id=report['request_id'])
+                    if not report.get('skipped'):
+                        self.state.record('motion_completed' if report['accepted'] else 'motion_failed',request_id=report['request_id'])
                 except Exception:self.state.record('motion_failed')
                 self.motion_job=None
         if self.state.privacy and not was_private:self.revoke_context(before_operator)
+        # Detect pressure before background admission can refill emptied slots.
+        self.pressure(now)
         if self.services:self.services.advance(now)
         self.pressure(now)
+        if self.motion_adapter and getattr(self.motion_adapter,'follow_person',False):
+            self.state.working['visual_tracking']=self.motion_adapter.status()['tracking_mode']
+            enabled=(self.production and self.state.overload=='ACTIVE' and not self.state.stopped
+                and not self.state.privacy and not self.state.quiet and not self.state.muted)
+            request=self.motion_adapter.follow_request(self.state.sensors.get('camera.person'),now,enabled,
+                allow_scan=(self.last_dialogue_at is None or now-self.last_dialogue_at>10)
+                    and not (self.speech_adapter and self.speech_adapter.status().get('execution_busy')))
+            if request and not self.motion_job:self.motion_job=Job(self.motion_adapter.follow,request)
         if self.config.get('context',{}).get('enabled') and hasattr(self.gateway,'context') and hasattr(self.gateway,'revoke_context'):
             if self.context_job and self.context_job.future.done():
                 request_id,authority,started=self.context_binding
@@ -291,7 +331,8 @@ class Scheduler:
                     self.state.update_context(result['output'],now,now-started)
                 except Exception:self.state.record('context_failed')
                 self.context_job=self.context_binding=None
-            if not self.context_job and now>=self.next_context:
+            if (not self.context_job and now>=self.next_context and not self.state.stopped
+                    and (not self.production or self.state.overload=='ACTIVE')):
                 request_id=uid();self.context_binding=(request_id,self.state.authority,now)
                 self.context_job=Job(self.gateway.context,request_id,self.state.current_utterance,self.state.privacy,self.state.authority)
                 self.next_context=now+self.config['context'].get('refresh_s',.5)
@@ -301,8 +342,6 @@ class Scheduler:
             try:
                 result = self.main_job.future.result()
                 self.latencies['main']=max(0,now-getattr(self.main_job,'started',now))
-                if self.production and self.state.overload=='DRAINING' and isinstance(result.get('output'),str) and task.authority==self.state.authority:
-                    self.state.previous.append(('Drained main: '+result['output'])[:128])
                 if result['compute_boot_id'] != task.authority.compute_boot_id or result['request_id'] != task.attempt_id:
                     self.state.complete(task.task_id, task.attempt_id, task.authority, None, now, error=True)
                 else:
@@ -327,7 +366,9 @@ class Scheduler:
                 # Capacity rejection before reducer consumes the candidate.
                 if choice.get('start') and (self.main_job or self.services and self.services.maintenance):
                     self.state.record('main_execution_busy')
-                    task = None
+                    # A full main lane must not suppress an independent gaze.
+                    choice={key:value for key,value in choice.items() if key!='start'}
+                    task = self.state.apply(choice, self.binding, now)
                 else:
                     task = self.state.apply(choice, self.binding, now)
                 if self.state.motion_proposals:
@@ -359,7 +400,11 @@ class Scheduler:
         self.next_tick = now + self.config['period_s']
         if self.fast_job:
             self.state.record('tick_busy_gap'); return
-        if (self.production and not self.state.privacy and not self.state.candidates and not self.main_job
+        if self.production:
+            self.state.visual.advance(self.state,now,allow_start=not self.main_job
+                and not (self.services and self.services.maintenance)
+                and not (self.speech_adapter and self.speech_adapter.status().get('execution_busy')))
+        if (self.production and self.state.overload=='ACTIVE' and not self.state.privacy and not self.state.candidates and not self.main_job
                 and now>=self.next_autonomous and not any(task.status=='ready' for task in self.state.tasks.values())):
             # One replaceable self-directed input, never an invented human utterance.
             ref='autonomous:'+uid()

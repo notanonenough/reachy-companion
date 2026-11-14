@@ -1,0 +1,16 @@
+[Unit]
+Description=Reachy production owned audio capture and playback
+After=reachy-voice-agent.service
+Requires=reachy-voice-agent.service
+Wants=reachy-camera-sensor.service
+
+[Service]
+User=pollen
+WorkingDirectory=@@ROOT@@
+Environment="PYTHONPATH=@@SOURCE_ROOT@@/src"
+UMask=0077
+ExecStart=@@ROOT@@/.venv/bin/python @@SOURCE_ROOT@@/deploy/autonomous/production_start.py device --root @@ROOT@@ --listen-device 192.168.0.184 --lease-datagram-port 8782
+Restart=no
+TimeoutStopSec=15
+LogRateLimitIntervalSec=30s
+LogRateLimitBurst=200

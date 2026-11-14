@@ -1,0 +1,14 @@
+[Unit]
+Description=Reachy Mini Bluetooth GATT Service
+After=network.target bluetooth.target
+Requires=bluetooth.target
+
+[Service]
+Type=simple
+ExecStart=/bin/bash -c 'sudo /usr/sbin/rfkill unblock bluetooth && sleep 2 && /usr/bin/python3 /bluetooth/bluetooth_service.py'
+Restart=on-failure
+User=pollen
+WorkingDirectory=/bluetooth
+
+[Install]
+WantedBy=multi-user.target

@@ -7,26 +7,38 @@ import shlex
 from pathlib import Path
 import subprocess
 import time
+import sys
+import re
+import signal
 from urllib.request import Request, urlopen
 
 ROOT=Path(__file__).resolve().parents[1]
+sys.path.insert(0,str(ROOT/'src'))
 LABELS=('llm','fast','worker','gateway','tunnels')
+MAC_AGENTS=Path.home()/'Library/Application Support/Reachy Companion/LaunchAgents'
+
+
+def labels():
+    return LABELS+(('vlm',) if (MAC_AGENTS/'local.reachy.vlm.plist').is_file() else ())
 
 
 def command(*args, check=True):
-    return subprocess.run(args,check=check,capture_output=True,text=True)
+    return subprocess.run(args,check=check,capture_output=True,text=True,timeout=25)
 
 
 def health():
     result={}
-    token=(ROOT/'secrets/autonomous-mac.token').read_text().strip()
-    for name,port in [('llm',18097),('router',18098),('worker',8082),('gateway',8097)]:
+    try:token=(ROOT/'secrets/autonomous-mac.token').read_text().strip()
+    except OSError:token=''
+    ports=[('llm',18097),('router',18098),('worker',8082),('gateway',8097)]
+    if 'vlm' in labels():ports.append(('vlm',18099))
+    for name,port in ports:
         try:
             request=Request('http://127.0.0.1:%s/health'%port,
                 headers={'Authorization':'Bearer '+token} if name=='gateway' else {})
             with urlopen(request,timeout=2) as response:value=json.load(response)
-            result[name]=value.get('status')=='ok' or value.get('ok') is True or value.get('role')=='pc_gateway'
-        except OSError:result[name]=False
+            result[name]=(value.get('status')=='ok' or value.get('ok') is True or value.get('role')=='pc_gateway') and not value.get('quarantined')
+        except (OSError,ValueError):result[name]=False
     return result
 
 
@@ -36,7 +48,7 @@ r=pathlib.Path('/home/deploy/reachy-companion');c=json.loads((r/'config.local.js
 p=pathlib.Path(c['paths']['token_file']);p=p if p.is_absolute() else r/p
 request=urllib.request.Request('http://127.0.0.1:8791/status',headers={'Authorization':'Bearer '+p.read_text().strip()})
 with urllib.request.urlopen(request,timeout=2) as response:d=json.load(response)
-print(json.dumps({k:d.get(k) for k in ('stage','elapsed_s','listening_ready','counts')}))
+print(json.dumps({k:d.get(k) for k in ('stage','reason','elapsed_s','listening_ready','counts')}))
 """
     result=command('ssh','-o','BatchMode=yes','-o','ConnectTimeout=5','reachy-hub',
                    'python3 -c '+shlex.quote(code),check=False)
@@ -44,27 +56,139 @@ print(json.dumps({k:d.get(k) for k in ('stage','elapsed_s','listening_ready','co
     except ValueError:return {'stage':'unavailable','listening_ready':False}
 
 
-def status():
-    print(json.dumps({'mac':health()},ensure_ascii=False))
-    print(json.dumps({'session':session()},ensure_ascii=False))
-    for host,services in [('reachy-hub',('reachy-hub','reachy-voice','reachy-production')),
-                          ('reachy-mini',('reachy-mini-daemon','reachy-voice-agent','reachy-production-audio'))]:
-        result=command('ssh','-o','BatchMode=yes','-o','ConnectTimeout=5',host,
-                       'systemctl is-active '+' '.join(services),check=False)
-        print(host+': '+', '.join('%s=%s'%(service,value) for service,value in zip(services,result.stdout.splitlines())))
-        if result.stderr:print(result.stderr.strip())
+def status(json_output=False):
+    from reachy_companion.production_status import collect,format_human
+    report=collect(ROOT)
+    print(json.dumps(report,ensure_ascii=False,indent=2) if json_output else format_human(report))
+    return report
+
+
+
+def robot_state():
+    code="""import json,pathlib,urllib.request
+r=pathlib.Path('/home/deploy/reachy-companion');a=json.loads((r/'config.autonomous.mac.local.json').read_text())
+required=a.get('motion',{}).get('enabled',False);mode=None
+if required:
+ c=json.loads((r/'config.local.json').read_text())
+ with urllib.request.urlopen(c['network']['robot_url'].rstrip('/')+'/api/state/full',timeout=2) as f:mode=json.load(f).get('control_mode')
+print(json.dumps(dict(motion_required=required,control_mode=mode)))
+"""
+    result=command('ssh','-o','BatchMode=yes','-o','ConnectTimeout=5','reachy-hub',
+                   'python3 -c '+shlex.quote(code))
+    value=json.loads(result.stdout)
+    if type(value.get('motion_required')) is not bool:raise RuntimeError('Unknown motor profile')
+    return value
+
+
+def ensure_robot_awake():
+    state=robot_state()
+    if not state['motion_required'] or state['control_mode']=='enabled':return False
+    if state['control_mode']!='disabled':raise RuntimeError('Motor mode requires manual inspection; wake refused')
+    # One explicit guarded wake, after the new device owner acquires its permit.
+    code="""import json,pathlib,urllib.request,time
+r=pathlib.Path('/home/deploy/reachy-companion');c=json.loads((r/'config.local.json').read_text())
+p=pathlib.Path(c['paths']['token_file']);p=p if p.is_absolute() else r/p
+headers={'Authorization':'Bearer '+p.read_text().strip(),'Content-Type':'application/json'}
+q=urllib.request.Request(c['network']['agent_url'].rstrip('/')+'/operator',headers=headers)
+deadline=time.monotonic()+5
+while True:
+ with urllib.request.urlopen(q,timeout=1) as f:d=json.load(f)
+ policy=d.get('motion_policy',{})
+ if policy.get('quiet') or policy.get('privacy_all') or policy.get('motor_enabled') is not True:raise RuntimeError('Operator blocks wake')
+ if d.get('microphone_enabled') is True and d.get('microphone_owner_id') is not None:break
+ if time.monotonic()>=deadline:raise RuntimeError('Device owner did not become ready for wake')
+ time.sleep(.05)
+q=urllib.request.Request(c['network']['hub_url'].rstrip('/')+'/actions/wake',data=b'{}',headers=headers)
+with urllib.request.urlopen(q,timeout=15) as f:d=json.load(f)
+print(json.dumps({'ok':d.get('ok') is True,'completion_observed':d.get('completion_observed') is True}))
+"""
+    result=command('ssh','-o','BatchMode=yes','-o','ConnectTimeout=5','reachy-hub',
+                   'python3 -c '+shlex.quote(code))
+    receipt=json.loads(result.stdout)
+    if receipt.get('ok') is not True or receipt.get('completion_observed') is not True:
+        raise RuntimeError('Wake completion unknown; do not retry automatically')
+    if robot_state().get('control_mode')!='enabled':raise RuntimeError('Motors not enabled after wake')
+    return True
+
+
+def stop_services():
+    errors=[]
+    for host,service in [('reachy-hub','reachy-production'),('reachy-mini','reachy-production-audio')]:
+        try:command('ssh','-o','BatchMode=yes','-o','ConnectTimeout=5',host,'sudo -n systemctl stop '+service)
+        except (OSError,subprocess.SubprocessError) as exc:errors.append(host+':'+type(exc).__name__)
+    if errors:raise RuntimeError('Stop incomplete: '+', '.join(errors))
+
+
+def process_identity(pid):
+    result=command('ps','-p',str(pid),'-o','lstart=','-o','stat=',check=False)
+    value=result.stdout.strip()
+    if result.returncode or not value or value.split()[-1].startswith('Z'):return None
+    return ' '.join(value.split()[:-1])
+
+
+def mac_owned_processes(domain):
+    """Track only these launchd jobs and their existing children, with PID reuse fences."""
+    roots=set()
+    for name in labels():
+        result=command('launchctl','print',domain+'/local.reachy.'+name,check=False)
+        match=re.search(r'^\s*pid = (\d+)\s*$',result.stdout,re.M)
+        if result.returncode==0 and match and int(match.group(1))>1:roots.add(int(match.group(1)))
+    if not roots:return {}
+    result=command('ps','-axo','pid=,ppid=')
+    tree=[tuple(map(int,line.split())) for line in result.stdout.splitlines() if len(line.split())==2]
+    owned=set(roots)
+    while True:
+        children={pid for pid,parent in tree if parent in owned}
+        if children<=owned:break
+        owned.update(children)
+    return {pid:identity for pid in owned if (identity:=process_identity(pid)) is not None}
+
+
+def stop_mac():
+    domain='gui/%s'%os.getuid();owned=mac_owned_processes(domain);errors=[]
+    for name in labels():
+        target=domain+'/local.reachy.'+name
+        try:
+            # Disabling is persistent; start explicitly enables the job again.
+            command('launchctl','disable',target)
+            result=command('launchctl','print',target,check=False)
+            if not result.returncode:command('launchctl','bootout',target)
+        except (OSError,subprocess.SubprocessError) as exc:errors.append(name+':'+type(exc).__name__)
+    def remaining():return {pid:identity for pid,identity in owned.items() if process_identity(pid)==identity}
+    for sig,grace in ((signal.SIGTERM,5),(signal.SIGKILL,2)):
+        for pid in remaining():
+            try:os.kill(pid,sig)
+            except ProcessLookupError:pass
+        deadline=time.monotonic()+grace
+        while remaining() and time.monotonic()<deadline:time.sleep(.1)
+    if remaining():errors.append('owned_processes_still_running')
+    for name in labels():
+        if command('launchctl','print',domain+'/local.reachy.'+name,check=False).returncode==0:
+            errors.append(name+':still_loaded')
+    if errors:raise RuntimeError('Mac shutdown incomplete: '+', '.join(errors))
+
+
+def shutdown():
+    errors=[]
+    for action in (stop_services,stop_mac):
+        try:action()
+        except (OSError,subprocess.SubprocessError,RuntimeError) as exc:errors.append(str(exc))
+    if errors:raise RuntimeError('; '.join(errors))
 
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('action',choices=('start','stop','status'))
+    parser.add_argument('action',choices=('start','stop','shutdown','restart','status'))
+    parser.add_argument('--json',action='store_true',help='Full content-free diagnostics as JSON')
     args=parser.parse_args()
     domain='gui/%s'%os.getuid()
-    if args.action=='start':
-        for name in LABELS:
+    if args.action in ('start','restart'):
+        if args.action=='restart':stop_services()
+        for name in labels():
             label='local.reachy.'+name
+            command('launchctl','enable',domain+'/'+label)
             if command('launchctl','print',domain+'/'+label,check=False).returncode:
-                command('launchctl','bootstrap',domain,str(Path.home()/'Library/LaunchAgents'/(label+'.plist')))
+                command('launchctl','bootstrap',domain,str(MAC_AGENTS/(label+'.plist')))
             else:command('launchctl','kickstart',domain+'/'+label)
         deadline=time.monotonic()+180
         while not all(health().values()):
@@ -72,26 +196,40 @@ def main():
             time.sleep(1)
         active=command('ssh','reachy-hub','systemctl is-active reachy-production',check=False)
         state=session()
-        if active.stdout.strip()=='active' and state.get('stage') in ('WITHDRAWN','STOPPED'):
+        motors=robot_state()
+        if active.stdout.strip()!='active' or state.get('stage')!='ACTIVE' or (motors['motion_required'] and motors.get('control_mode')!='enabled'):
             # This explicit start authorizes a fresh session; a withdrawn owner
             # is never reused or restarted by a background watchdog.
-            command('ssh','reachy-hub','sudo -n systemctl stop reachy-production')
-            command('ssh','reachy-mini','sudo -n systemctl stop reachy-production-audio')
+            stop_services()
             active=command('ssh','reachy-hub','systemctl is-active reachy-production',check=False)
         if active.stdout.strip()!='active':
-            command('ssh','reachy-mini','sudo -n systemctl start reachy-production-audio')
-            command('ssh','reachy-hub','sudo -n systemctl start reachy-production')
+            try:
+                command('ssh','reachy-mini','sudo -n systemctl start reachy-production-audio')
+                if ensure_robot_awake():
+                    # Wake may consume most of the initial controller admission
+                    # window. After known completion, start a fresh device owner
+                    # before the hub binds; never extend/revive the old lease.
+                    command('ssh','reachy-mini','sudo -n systemctl restart reachy-production-audio')
+                command('ssh','reachy-hub','sudo -n systemctl start reachy-production')
+            except (OSError,subprocess.SubprocessError,RuntimeError,ValueError):
+                stop_services()
+                raise
         deadline=time.monotonic()+15
         while True:
             state=session()
             if state.get('stage')=='ACTIVE' and state.get('listening_ready'):break
             if state.get('stage')=='WITHDRAWN' or time.monotonic()>=deadline:
-                raise RuntimeError('Audio owner is not ready; run stop, inspect logs, then explicitly start')
+                stop_services()
+                raise RuntimeError('Audio owner did not become ready; both services stopped. Inspect status before restart')
             time.sleep(.2)
     elif args.action=='stop':
-        command('ssh','reachy-hub','sudo -n systemctl stop reachy-production')
-        command('ssh','reachy-mini','sudo -n systemctl stop reachy-production-audio')
-    status()
+        stop_services()
+    elif args.action=='shutdown':
+        shutdown()
+        if args.json:status(True)
+        else:print('Reachy выключен. Вычисления Mac остановлены; базовые службы устройств работают.')
+        return
+    status(args.json)
 
 
 if __name__=='__main__':main()

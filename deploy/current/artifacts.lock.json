@@ -1,0 +1,114 @@
+{
+  "version": 1,
+  "artifacts": [
+    {
+      "path": "@@HOME@@/.llama-app/unzstd",
+      "sha256": "339d223ca355ce33711d13d1352979168e4bf8cccb1399e2614417dc07b6ddd6",
+      "bytes": 102952,
+      "url": "https://huggingface.co/buckets/ggml-org/install.sh/resolve/b11941/aarch64/macos/unzstd",
+      "executable": true,
+      "license": "BSD-3-Clause / GPL-2.0",
+      "version": "llama installer b11941"
+    },
+    {
+      "path": "@@HOME@@/.local/bin/llama",
+      "sha256": "1ba1c2bbf942e0da9dea164a21dd3f2c334fd8fc97cb580d2d37ca3703a01e91",
+      "bytes": 24523576,
+      "url": "https://huggingface.co/buckets/ggml-org/install.sh/resolve/b11941/aarch64/macos/metal/m1/llama-app.zst",
+      "compression": "zstd",
+      "archive_sha256": "7ffb38e57ae2737b8fd0cc8a642c02bbed84ee9a4276dfe65875c438034a3488",
+      "decompressor": "@@HOME@@/.llama-app/unzstd",
+      "version": "b11941 / 19ff817fb / 0.7.0-dev",
+      "license": "MIT"
+    },
+    {
+      "path": "models/qwen3.5-9b/Qwen3.5-9B-Q4_K_M.gguf",
+      "sha256": "03b74727a860a56338e042c4420bb3f04b2fec5734175f4cb9fa853daf52b7e8",
+      "bytes": 5680522464,
+      "url": "https://huggingface.co/unsloth/Qwen3.5-9B-GGUF/resolve/3885219b6810b007914f3a7950a8d1b469d598a5/Qwen3.5-9B-Q4_K_M.gguf",
+      "license": "Apache-2.0"
+    },
+    {
+      "path": "models/Qwen3.5-0.8B-Q8_0.gguf",
+      "sha256": "75526add2fec8543a78d412a5546dd1c13dcf1ade237b245915d0f12dd43bb3d",
+      "bytes": 811843488,
+      "url": "https://huggingface.co/ggml-org/Qwen3.5-0.8B-GGUF/resolve/254a41c7119dcb8a1e37af87cd0b4ee499fdcfa7/Qwen3.5-0.8B-Q8_0.gguf",
+      "license": "Apache-2.0"
+    },
+    {
+      "path": "models/smolvlm2-500m/SmolVLM2-500M-Video-Instruct-Q8_0.gguf",
+      "sha256": "6f67b8036b2469fcd71728702720c6b51aebd759b78137a8120733b4d66438bc",
+      "bytes": 436808704,
+      "url": "https://huggingface.co/ggml-org/SmolVLM2-500M-Video-Instruct-GGUF/resolve/ccd7aae53bcb1997355c2f094959e72b3642ce17/SmolVLM2-500M-Video-Instruct-Q8_0.gguf",
+      "license": "Apache-2.0"
+    },
+    {
+      "path": "models/smolvlm2-500m/mmproj-SmolVLM2-500M-Video-Instruct-Q8_0.gguf",
+      "sha256": "921dc7e259f308e5b027111fa185efcbf33db13f6e35749ddf7f5cdb60ef520b",
+      "bytes": 108785184,
+      "url": "https://huggingface.co/ggml-org/SmolVLM2-500M-Video-Instruct-GGUF/resolve/ccd7aae53bcb1997355c2f094959e72b3642ce17/mmproj-SmolVLM2-500M-Video-Instruct-Q8_0.gguf",
+      "license": "Apache-2.0"
+    },
+    {
+      "path": "models/whisper-medium/model.bin",
+      "sha256": "9b45e1009dcc4ab601eff815b61d80e60ce3fd8c74c1a14f4a282258286b51ae",
+      "bytes": 1527906378,
+      "url": "https://huggingface.co/Systran/faster-whisper-medium/resolve/08e178d48790749d25932bbc082711ddcfdfbc4f/model.bin",
+      "license": "MIT"
+    },
+    {
+      "path": "models/whisper-medium/config.json",
+      "sha256": "3622a2ddc41ec0e0fd4e68c13c6830f03b90c38d89aaad184de02c8c642cf807",
+      "bytes": 2257,
+      "url": "https://huggingface.co/Systran/faster-whisper-medium/resolve/08e178d48790749d25932bbc082711ddcfdfbc4f/config.json",
+      "license": "MIT"
+    },
+    {
+      "path": "models/whisper-medium/tokenizer.json",
+      "sha256": "fb7b63191e9bb045082c79fd742a3106a12c99513ab30df4a0d47fa6cb6fd0ab",
+      "bytes": 2203239,
+      "url": "https://huggingface.co/Systran/faster-whisper-medium/resolve/08e178d48790749d25932bbc082711ddcfdfbc4f/tokenizer.json",
+      "license": "MIT"
+    },
+    {
+      "path": "models/whisper-medium/vocabulary.txt",
+      "sha256": "34ce3fe1c5041027b3f8d42912270993f986dbc4bb34cf27f951e34a1e453913",
+      "bytes": 459861,
+      "url": "https://huggingface.co/Systran/faster-whisper-medium/resolve/08e178d48790749d25932bbc082711ddcfdfbc4f/vocabulary.txt",
+      "license": "MIT"
+    },
+    {
+      "path": "models/ru_RU-ruslan-medium.onnx",
+      "sha256": "72a5f88e0b20928064eb45d88e1daa21f8af62d18613580d32cbb4aed48dcf7f",
+      "bytes": 63201294,
+      "url": "https://huggingface.co/rhasspy/piper-voices/resolve/6b9cfaacb4fb2e02a9621227e3c1a48bec9710c3/ru/ru_RU/ruslan/medium/ru_RU-ruslan-medium.onnx",
+      "license": "See upstream model card"
+    },
+    {
+      "path": "models/ru_RU-ruslan-medium.onnx.json",
+      "sha256": "706a4fb17bc304abd07809b552deae615e64dcbffbfbd09854ba37ca59e88117",
+      "bytes": 4882,
+      "url": "https://huggingface.co/rhasspy/piper-voices/resolve/6b9cfaacb4fb2e02a9621227e3c1a48bec9710c3/ru/ru_RU/ruslan/medium/ru_RU-ruslan-medium.onnx.json",
+      "license": "See upstream model card"
+    },
+    {
+      "path": "models/yolox/object_detection_yolox_2022nov.onnx",
+      "sha256": "c5c2d13e59ae883e6af3b45daea64af4833a4951c92d116ec270d9ddbe998063",
+      "bytes": 35858002,
+      "url": "https://media.githubusercontent.com/media/opencv/opencv_zoo/0b263e423d012606b83d1f81238d11c177da2b9c/models/object_detection_yolox/object_detection_yolox_2022nov.onnx",
+      "license": "Apache-2.0",
+      "revision": "0b263e423d012606b83d1f81238d11c177da2b9c"
+    },
+    {
+      "path": "@@HOME@@/.local/bin/sox",
+      "sha256": "cc83485a1cdba813f1454a80983526e607cb38ab228c69c64a70de7b704d9f9c",
+      "bytes": 631632,
+      "url": null,
+      "repository_file": "deploy/current/vendor/macos-arm64/sox",
+      "version": "unverified (installed --version reports only SoX v)",
+      "license": "GPL-2.0-or-later",
+      "source_url": "https://downloads.sourceforge.net/project/sox/sox/14.4.2/sox-14.4.2.tar.gz",
+      "build_provenance": "Exact observed binary retained. Original build command/version unavailable. Upstream 14.4.2 source is a reference, not a proven matching source build."
+    }
+  ]
+}

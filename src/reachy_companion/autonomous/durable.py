@@ -15,6 +15,9 @@ from datetime import datetime, timezone
 import hashlib
 import hmac
 import re
+import http.client
+import threading
+from urllib.error import HTTPError
 from .contracts import decode, uid, validate
 from .state import utc
 
@@ -124,10 +127,19 @@ class DurableStore:
         row = self.db.execute('SELECT id,body FROM outbox WHERE '+destination+'=0 ORDER BY rowid LIMIT 1').fetchone()
         return None if row is None else (row[0],decode(row[1]))
 
+    def pending_batch(self,destination,limit=32):
+        if destination not in ('s3','vps') or type(limit) is not int or not 1<=limit<=32:
+            raise ValueError('Delivery batch bound')
+        rows=self.db.execute('SELECT id,body FROM outbox WHERE '+destination+'=0 ORDER BY rowid LIMIT ?',(limit,)).fetchall()
+        return [(row[0],decode(row[1])) for row in rows]
+
     def ack(self, destination, event_id):
+        self.ack_many(destination,[event_id])
+
+    def ack_many(self,destination,event_ids):
         if destination not in ('s3','vps'):raise ValueError('Unknown destination')
         with self.db:
-            self.db.execute('UPDATE outbox SET '+destination+'=1 WHERE id=?',(event_id,))
+            self.db.executemany('UPDATE outbox SET '+destination+'=1 WHERE id=?',[(i,) for i in event_ids])
             self.db.execute('DELETE FROM outbox WHERE s3=1 AND vps=1')
 
     def close(self):
@@ -141,23 +153,44 @@ class Delivery:
         if destination=='s3' and settings.get('bucket'):
             if not re.fullmatch(r'[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]',settings['bucket']) or not re.fullmatch(r'[a-z0-9-]{1,32}',settings.get('region','')):
                 raise ValueError('S3 bucket/region required')
-            self.opener=build_opener(ProxyHandler({}));return
+            if settings.get('endpoint'):
+                endpoint=urlsplit(settings['endpoint'])
+                if (endpoint.scheme!='https' or not endpoint.hostname or endpoint.username or endpoint.password
+                        or endpoint.path not in ('','/') or endpoint.query or endpoint.fragment):
+                    raise ValueError('S3 endpoint must be an HTTPS origin')
+            self.opener=build_opener(ProxyHandler({}))
+            self.s3_connection=None
+            self.s3_lock=threading.Lock()
+            return
         url = settings['url']
         parts = urlsplit(url)
-        if (parts.scheme != 'https' or not parts.hostname or parts.username or parts.password):
+        local_relay=(destination=='s3' and settings.get('relay') is True and parts.scheme=='http'
+                     and parts.hostname in ('localhost','127.0.0.1','::1'))
+        if ((parts.scheme != 'https' and not local_relay) or not parts.hostname or parts.username or parts.password
+                or parts.fragment):
             raise ValueError('Export requires HTTPS')
         if destination=='s3' and '{id}' not in url:raise ValueError('S3 URL must contain stable {id} object key')
         self.opener=build_opener(ProxyHandler({}))
 
     def s3_request(self,event_id,body):
-        access=os.environ.get(self.settings.get('access_key_env','AWS_ACCESS_KEY_ID'),'')
-        secret=os.environ.get(self.settings.get('secret_key_env','AWS_SECRET_ACCESS_KEY'),'')
-        session=os.environ.get(self.settings.get('session_token_env','AWS_SESSION_TOKEN'),'')
+        def credential(name,default):
+            path=self.settings.get(name+'_file')
+            if path:
+                with Path(path).open() as source:value=source.read(4097).strip()
+                if len(value)>4096 or any(c.isspace() for c in value):raise ValueError('Invalid S3 credential file')
+                return value
+            return os.environ.get(self.settings.get(name+'_env',default),'')
+        access=credential('access_key','AWS_ACCESS_KEY_ID')
+        secret=credential('secret_key','AWS_SECRET_ACCESS_KEY')
+        session=credential('session_token','AWS_SESSION_TOKEN')
         if not access or not secret:raise ValueError('S3 credentials not configured')
         region=self.settings['region'];bucket=self.settings['bucket']
         host=f'{bucket}.s3.{region}.amazonaws.com'
         prefix=self.settings.get('prefix','reachy').strip('/')
         path='/'+quote((prefix+'/' if prefix else '')+event_id+'.json',safe='/~')
+        if self.settings.get('endpoint'):
+            host=urlsplit(self.settings['endpoint']).netloc
+            path='/'+bucket+path
         payload=json.dumps(body,ensure_ascii=False,separators=(',',':')).encode()
         digest=hashlib.sha256(payload).hexdigest()
         now=datetime.now(timezone.utc);stamp=now.strftime('%Y%m%dT%H%M%SZ');day=now.strftime('%Y%m%d')
@@ -177,19 +210,44 @@ class Delivery:
 
     def __call__(self, event_id, body):
         if self.destination=='s3' and self.settings.get('bucket'):
-            with self.opener.open(self.s3_request(event_id,body),timeout=5) as response:
-                if not 200<=response.status<300:raise OSError('S3 write rejected')
-            return event_id
+            # The relay sends frequent small batches. Reuse TLS rather than
+            # opening a new TCP connection for every batch. A failed connection
+            # can retry the same immutable object key/body once; an unknown
+            # result never acknowledges the durable outbox.
+            with self.s3_lock:
+                for attempt in range(2):
+                    request=self.s3_request(event_id,body)
+                    endpoint=urlsplit(request.full_url)
+                    try:
+                        if self.s3_connection is None:
+                            self.s3_connection=http.client.HTTPSConnection(endpoint.hostname,endpoint.port,timeout=5)
+                        self.s3_connection.request('PUT',request.selector,body=request.data,
+                            headers=dict(request.header_items()))
+                        response=self.s3_connection.getresponse()
+                        receipt=response.read(4097)
+                        if len(receipt)>4096:raise ValueError('S3 response bound')
+                        if not 200<=response.status<300:
+                            raise HTTPError(request.full_url,response.status,'S3 write rejected',response.headers,None)
+                        if response.will_close:
+                            self.s3_connection.close();self.s3_connection=None
+                        return event_id
+                    except Exception as exc:
+                        if self.s3_connection is not None:self.s3_connection.close()
+                        self.s3_connection=None
+                        if attempt or isinstance(exc,HTTPError) or not isinstance(exc,(OSError,http.client.HTTPException)):
+                            raise
         token = os.environ.get(self.settings.get('token_env',''),'')
         headers={'Content-Type':'application/json'}
-        if self.destination=='vps' and not token:raise ValueError('VPS credentials not configured')
+        if (self.destination=='vps' or self.settings.get('relay')) and not token:raise ValueError('Delivery credentials not configured')
         if token:headers['Authorization']='Bearer '+token
         url=self.settings['url'].replace('{id}',event_id)
         request=Request(url,data=json.dumps(body).encode(),headers=headers,
             method='PUT' if self.destination=='s3' else 'POST')
-        with self.opener.open(request,timeout=5) as response:
+        # The local S3 relay may reconnect once before returning its receipt.
+        timeout=12 if self.destination=='s3' and self.settings.get('relay') else 5
+        with self.opener.open(request,timeout=timeout) as response:
             if not 200 <= response.status < 300:raise OSError('Delivery rejected')
-            if self.destination=='vps':
+            if self.destination=='vps' or self.settings.get('relay'):
                 receipt=decode(response.read(4097))
                 if receipt != dict(accepted=True,id=event_id):raise ValueError('Durable receipt required')
         return event_id

@@ -1,0 +1,166 @@
+apk-mbedtls-3.0.5-r3 - apk package manager (mbedtls)
+attendedsysupgrade-common-10 - Common files needed for the attendedsysupgrade tool. Manages dependencies and brings settings used by clients. UCI options include defining the URL of a compatible upgrade server, requesting an image even if there’s no new release but new package upgrades are available, offering advanced options like editing packages before a request and displaying additional information, and instructing the client to automatically search for upgrades.
+base-files-1718~981c978eff - This package contains a base filesystem and system scripts for OpenWrt.
+busybox-1.37.0-r6 - The Swiss Army Knife of embedded Linux. It slices, it dices, it makes Julian Fries.
+ca-bundle-20260816-r1 - System CA certificates as a bundle
+cgi-io-2026.07.21~31cb3c89-r1 - This package contains an cgi utility that is useful for up/downloading files
+dnsmasq-2.93-r1 - It is intended to provide coupled DNS and DHCP service to a LAN.
+dropbear-2025.89-r3 - A small SSH2 server/client designed for small memory environments.
+firewall4-2025.03.17~b6e51575-r2 - This package provides an nftables-based implementation of the UCI firewall sharing the same configuration format.
+fstools-2026.05.23~16718b6e-r1 - OpenWrt filesystem tools
+fwtool-2025.10.03~04cd252e-r1 - Utility for appending and extracting firmware metadata and signatures
+getrandom-2025.10.30~6f78fa49-r1 - OpenWrt getrandom system helper
+hostapd-common-2025.08.26~ca266cc2-r6 - hostapd/wpa_supplicant common support files
+iw-6.17-r1 - cfg80211 interface configuration utility
+jansson4-2.14.1-r1 - Jansson is a C library for encoding, decoding and manipulating JSON data
+jshn-2026.06.19~7dd12784-r1 - Library for parsing and generating JSON from shell scripts
+jsonfilter-2026.03.16~b9034210-r1 - OpenWrt JSON filter utility
+kernel-6.12.112~aa81475ddbdbcc69877f69037ae40cd8-r1 - Virtual kernel package
+kmod-cfg80211-6.12.112.6.18.55-r2 - cfg80211 is the Linux wireless LAN (802.11) configuration API.
+kmod-crypto-aead-6.12.112-r1 - CryptoAPI AEAD support
+kmod-crypto-authenc-6.12.112-r1 - Combined mode wrapper for IPsec
+kmod-crypto-ccm-6.12.112-r1 - Support for Counter with CBC MAC (CCM)
+kmod-crypto-cmac-6.12.112-r1 - Support for Cipher-based Message Authentication Code (CMAC)
+kmod-crypto-crc32c-6.12.112-r1 - CRC32c CRC module
+kmod-crypto-ctr-6.12.112-r1 - Counter Mode CryptoAPI module
+kmod-crypto-des-6.12.112-r1 - DES/3DES cipher CryptoAPI module
+kmod-crypto-gcm-6.12.112-r1 - GCM/GMAC CryptoAPI module
+kmod-crypto-geniv-6.12.112-r1 - CryptoAPI Shared IV generator
+kmod-crypto-gf128-6.12.112-r1 - GF(2^128) multiplication functions CryptoAPI module
+kmod-crypto-ghash-6.12.112-r1 - GHASH digest CryptoAPI module
+kmod-crypto-hash-6.12.112-r1 - CryptoAPI hash support
+kmod-crypto-hmac-6.12.112-r1 - HMAC digest CryptoAPI module
+kmod-crypto-hw-eip93-6.12.112-r1 - Kernel module to enable EIP-93 Crypto engine as found in the Mediatek MT7621 SoC. It enables DES/3DES/AES ECB/CBC/CTR and IPSEC offload with authenc(hmac(sha1/sha256), aes/cbc/rfc3686)
+kmod-crypto-manager-6.12.112-r1 - CryptoAPI algorithm manager
+kmod-crypto-md5-6.12.112-r1 - MD5 digest CryptoAPI module
+kmod-crypto-null-6.12.112-r1 - Null CryptoAPI module
+kmod-crypto-rng-6.12.112-r1 - CryptoAPI random number generation
+kmod-crypto-seqiv-6.12.112-r1 - CryptoAPI Sequence Number IV Generator
+kmod-crypto-sha1-6.12.112-r1 - SHA1 digest CryptoAPI module
+kmod-crypto-sha256-6.12.112-r1 - SHA224 SHA256 digest CryptoAPI module
+kmod-crypto-sha3-6.12.112-r1 - SHA3 digest CryptoAPI module
+kmod-crypto-sha512-6.12.112-r1 - SHA512 digest CryptoAPI module
+kmod-gpio-button-hotplug-6.12.112-r5 - This is a replacement for the following in-kernel drivers: 1) gpio_keys (KEYBOARD_GPIO) 2) gpio_keys_polled (KEYBOARD_GPIO_POLLED) Instead of generating input events (like in-kernel drivers do) it generates uevent-s and broadcasts them. This allows disabling input subsystem which is an overkill for OpenWrt simple needs.
+kmod-hwmon-core-6.12.112-r1 - Kernel modules for hardware monitoring
+kmod-i2c-core-6.12.112-r1 - Kernel modules for I2C support
+kmod-leds-gpio-6.12.112-r1 - Kernel module for LEDs on GPIO lines
+kmod-lib-crc-ccitt-6.12.112-r1 - Kernel module for CRC-CCITT support
+kmod-lib-crc32c-6.12.112-r1 - Kernel module for CRC32 support
+kmod-mac80211-6.12.112.6.18.55-r2 - Generic IEEE 802.11 Networking Stack (mac80211)
+kmod-mt76-connac-6.12.112.2026.03.19~39c960c3-r3 - MediaTek MT7615/MT79xx wireless driver common code
+kmod-mt76-core-6.12.112.2026.03.19~39c960c3-r3 - MediaTek MT76xx wireless driver
+kmod-mt7603-6.12.112.2026.03.19~39c960c3-r3 - MediaTek MT7603 wireless driver
+kmod-mt7615-common-6.12.112.2026.03.19~39c960c3-r3 - MediaTek MT7615 wireless driver common code
+kmod-mt7615e-6.12.112.2026.03.19~39c960c3-r3 - MediaTek MT7615e wireless driver
+kmod-mt7663-firmware-ap-6.12.112.2026.03.19~39c960c3-r3 - MediaTek MT7663e firmware (optimized for AP)
+kmod-nf-conntrack-6.12.112-r1 - Netfilter connection tracking
+kmod-nf-conntrack6-6.12.112-r1 - Netfilter IPv6 connection tracking
+kmod-nf-flow-6.12.112-r1 - Netfilter flowtable support
+kmod-nf-log-6.12.112-r1 - Netfilter Logging
+kmod-nf-log6-6.12.112-r1 - Netfilter IPV6 Logging
+kmod-nf-nat-6.12.112-r1 - Netfilter NAT
+kmod-nf-reject-6.12.112-r1 - Netfilter IPv4 reject support
+kmod-nf-reject6-6.12.112-r1 - Netfilter IPv6 reject support
+kmod-nfnetlink-6.12.112-r1 - Kernel modules support for a netlink-based userspace interface
+kmod-nft-core-6.12.112-r1 - Kernel module support for nftables
+kmod-nft-fib-6.12.112-r1 - Netfilter nf_tables fib support
+kmod-nft-nat-6.12.112-r1 - Netfilter nf_tables NAT support
+kmod-nft-offload-6.12.112-r1 - Netfilter nf_tables routing/NAT offload support
+kmod-ppp-6.12.112-r1 - Kernel modules for PPP support
+kmod-pppoe-6.12.112-r1 - Kernel module for PPPoE (PPP over Ethernet) support
+kmod-pppox-6.12.112-r1 - Kernel helper module for PPPoE and PPTP support
+kmod-slhc-6.12.112-r1 - Serial Line Header Compression
+libblobmsg-json20260213-2026.06.19~7dd12784-r1 - blobmsg <-> json conversion library
+libc-1.2.5-r5 - C library
+libgcc1-14.3.0-r5 - GCC support library
+libiwinfo-data-2026.05.26~66bdd1a0-r1 - libiwinfo Lua binding
+libiwinfo20230701-2026.05.26~66bdd1a0-r1 - Wireless information library with simplified API for nl80211 and wext driver interfaces.
+libjson-c5-0.18-r1 - This package contains a library for javascript object notation backends.
+libjson-script20260213-2026.06.19~7dd12784-r1 - Minimalistic JSON based scripting engine
+liblucihttp-ucode-2023.03.15~9b5b683f-r1 - ucode binding for the LuCI HTTP utility library
+liblucihttp0-2023.03.15~9b5b683f-r1 - LuCI HTTP utility library
+libmbedtls21-3.6.7-r1 - The aim of the mbedtls project is to provide a quality, open-source cryptographic library written in C and targeted at embedded systems. This package contains the mbedtls library.
+libmnl0-1.0.5-r1 - libmnl is a minimalistic user-space library oriented to Netlink developers. There are a lot of common tasks in parsing, validating, constructing of both the Netlink header and TLVs that are repetitive and easy to get wrong. This library aims to provide simple helpers that allows you to re-use code and to avoid re-inventing the wheel. The main features of this library are: . * Small: the shared library requires around 30KB for an x86-based computer. . * Simple: this library avoids complexity and elaborated a
+libnftnl11-1.3.1-r1 - libnftnl is a userspace library providing a low-level netlink programming interface (API) to the in-kernel nf_tables subsystem.
+libnl-tiny1-2025.12.02~40493a65-r1 - This package contains a stripped down version of libnl
+libubox20260213-2026.06.19~7dd12784-r1 - Basic utility library
+libubus20251202-2026.06.28~24864e78-r2 - OpenWrt RPC client library
+libuci20250120-2025.12.02~66127cd7-r1 - C library for the Unified Configuration Interface (UCI)
+libuclient20201210-2026.06.07~daad21fa-r1 - HTTP/1.1 client library
+libucode20230711-2026.01.16~85922056-r2 - The libucode package provides the shared runtime library for the ucode interpreter.
+libudebug-2026.01.16~875e1a7a - udebug client library
+libustream-mbedtls20201210-2026.03.01~99f1c0db-r1 - ustream SSL Library (mbedtls)
+logd-2025.10.30~6f78fa49-r1 - OpenWrt system log implementation
+luci-26.288.56989~75a306d - Standard OpenWrt set including package management and attended sysupgrades support
+luci-app-attendedsysupgrade-26.288.56989~75a306d - LuCI support for attended sysupgrades
+luci-app-firewall-26.288.56989~75a306d - Firewall and port forwarding application
+luci-app-package-manager-26.288.56989~75a306d - Package management application
+luci-base-26.288.56989~75a306d - LuCI core runtime
+luci-lib-uqr-26.288.56989~75a306d - µQR - micro QR: SVG QRcode generator JS library
+luci-light-26.288.56989~75a306d - Light OpenWrt set including admin support and the default Bootstrap theme
+luci-mod-admin-full-26.288.56989~75a306d - LuCI Administration - full-featured for full control
+luci-mod-network-26.288.56989~75a306d - LuCI Network Administration
+luci-mod-status-26.288.56989~75a306d - LuCI Status Pages
+luci-mod-system-26.288.56989~75a306d - LuCI Administration - Global System Settings
+luci-proto-ipv6-26.288.56989~75a306d - Support for DHCPv6/6in4/6to4/6rd/DS-Lite/IPIP6
+luci-proto-ppp-26.288.56989~75a306d - Support for PPP/PPPoE/PPPoA/PPtP
+luci-ssl-26.288.56989~75a306d - LuCI with HTTPS support (mbedtls as SSL backend)
+luci-theme-bootstrap-26.288.56989~75a306d - Bootstrap Theme (default)
+mtd-27 - This package contains an utility useful to upgrade from other firmware or older OpenWrt releases.
+netifd-2026.02.26~cbb83a18-r2 - OpenWrt Network Interface Configuration Daemon
+nftables-json-1.1.6-r2 - nftables userspace utility with JSON support
+odhcp6c-2026.06.27~10a52220-r3 - Embedded DHCPv6-client for OpenWrt
+odhcpd-ipv6only-2026.06.29~5d7be43f-r1 - odhcpd is a daemon for serving and relaying IP management protocols to configure clients and downstream routers. It tries to follow the RFC 6204 requirements for IPv6 home routers. This is a variant with support for RA and DHCPv6. It can also be used to relay RA, DHCPv6 and NDP messages between routed (non-bridged) interfaces in case no delegated prefixes are available.
+openwrt-keyring-2025.12.10~f0670054-r1 - The keyring of with the developer using and gpg public keys.
+owut-2026.08.30~9b51eeec-r1 - The OpenWrt Upgrade Tool (owut) is a command line program that checks for new packages, package build breakages, generates sysupgrade images containing installed packages and installs images. It is written in ucode for easy end-user customization. Documentation is available at https://openwrt.org/docs/guide-user/installation/sysupgrade.owut
+ppp-2.5.2-r4 - This package contains the PPP (Point-to-Point Protocol) daemon.
+ppp-mod-pppoe-2.5.2-r4 - This package contains a PPPoE (PPP over Ethernet) plugin for ppp.
+procd-2026.03.13~58eb263d-r1 - OpenWrt system process manager
+procd-seccomp-2026.03.13~58eb263d-r1 - OpenWrt process seccomp helper + utrace
+procd-ujail-2026.03.13~58eb263d-r1 - OpenWrt process jail helper
+px5g-mbedtls-11 - Px5g is a tiny standalone X.509 certificate generator. It suitable to create key files and certificates in DER and PEM format for use with stunnel, uhttpd and others.
+rpcd-2026.10.04~d99f703e-r1 - This package provides the UBUS RPC backend server to expose various functionality to frontend programs via JSON-RPC.
+rpcd-mod-file-2026.10.04~d99f703e-r1 - Provides ubus calls for file and directory operations.
+rpcd-mod-iwinfo-2026.10.04~d99f703e-r1 - Provides ubus calls for accessing iwinfo data.
+rpcd-mod-luci-20240305-r1 - Provides LuCI backend ubus RPC operations.
+rpcd-mod-rpcsys-2026.10.04~d99f703e-r1 - Provides ubus calls for sysupgrade and password changing.
+rpcd-mod-rrdns-20170710 - Provides rapid mass reverse DNS lookup functionality.
+rpcd-mod-ucode-2026.10.04~d99f703e-r1 - Allows implementing plugins using ucode scripts.
+ubi-utils-2.3.0-r1 - Utilities for manipulating memory technology devices.
+ubox-2025.10.30~6f78fa49-r1 - OpenWrt system helper toolbox
+ubus-2026.06.28~24864e78-r2 - OpenWrt RPC client utility
+ubusd-2026.06.28~24864e78-r2 - OpenWrt RPC daemon
+uci-2025.12.02~66127cd7-r1 - Utility for the Unified Configuration Interface (UCI)
+uclient-fetch-2026.06.07~daad21fa-r1 - Tiny wget replacement using libuclient
+ucode-2026.01.16~85922056-r2 - ucode is a tiny script interpreter featuring an ECMAScript oriented script language and Jinja-inspired templating.
+ucode-mod-digest-2026.01.16~85922056-r2 - The digest module allows ucode scripts to use libmd digests.
+ucode-mod-fs-2026.01.16~85922056-r2 - The filesystem plugin module allows interaction with the local file system.
+ucode-mod-html-1 - ucode HTML utility library
+ucode-mod-log-2026.01.16~85922056-r2 - The log plugin module provides access to the syslog and libubox ulog APIs.
+ucode-mod-math-2026.01.16~85922056-r2 - The math plugin provides access to various <math.h> procedures.
+ucode-mod-nl80211-2026.01.16~85922056-r2 - The nl80211 plugin provides access to the Linux wireless 802.11 netlink API.
+ucode-mod-rtnl-2026.01.16~85922056-r2 - The rtnl plugin provides access to the Linux routing netlink API.
+ucode-mod-ubus-2026.01.16~85922056-r2 - The ubus module allows ucode template scripts to enumerate and invoke ubus procedures.
+ucode-mod-uci-2026.01.16~85922056-r2 - The uci module allows templates to read and modify uci configuration.
+ucode-mod-uclient-2026.06.07~daad21fa-r1 - ucode uclient module
+ucode-mod-uloop-2026.01.16~85922056-r2 - The uloop module allows ucode scripts to interact with OpenWrt uloop event loop implementation.
+uhttpd-2026.08.24~373145f7-r1 - uHTTPd is a tiny single threaded HTTP server with TLS, CGI and Lua support. It is intended as a drop-in replacement for the Busybox HTTP daemon.
+uhttpd-mod-ubus-2026.08.24~373145f7-r1 - The ubus plugin adds a HTTP/JSON RPC proxy for ubus and publishes the session.* namespace and procedures.
+urandom-seed-3 - /etc/urandom.seed handling for OpenWrt
+urngd-2025.10.03~f17e33d9-r1 - urngd is OpenWrt's micro non-physical true random number generator based on timing jitter. Using the Jitter RNG core, the rngd provides an entropy source that feeds into the Linux /dev/random device if its entropy runs low. It updates the /dev/random entropy estimator such that the newly provided entropy unblocks /dev/random. The seeding of /dev/random also ensures that /dev/urandom benefits from entropy. Especially during boot time, when the entropy of Linux is low, the Jitter RNGd provides a source of suf
+usign-2025.10.03~c4c72b1b-r1 - OpenWrt signature verification utility
+wifi-scripts-1.0-r1 - A set of scripts that handle setup and configuration of Wi-Fi devices.
+wireless-regdb-2026.09.03-r1 - Wireless Regulatory Database
+wpad-basic-mbedtls-2025.08.26~ca266cc2-r6 - This package contains a basic IEEE 802.1x/WPA Authenticator and Supplicant with WPA-PSK, SAE (WPA3-Personal), 802.11r and 802.11w support.
+zlib-1.3.1-r1 - zlib is a lossless data-compression library. This package includes the shared library.
+# add your custom package feeds here
+#
+# http://www.example.com/path/to/files/packages.adb
+https://downloads.openwrt.org/releases/25.12.6/targets/ramips/mt7621/packages/packages.adb
+https://downloads.openwrt.org/releases/25.12.6/packages/mipsel_24kc/base/packages.adb
+https://downloads.openwrt.org/releases/25.12.6/targets/ramips/mt7621/kmods/6.12.112-1-aa81475ddbdbcc69877f69037ae40cd8/packages.adb
+https://downloads.openwrt.org/releases/25.12.6/packages/mipsel_24kc/luci/packages.adb
+https://downloads.openwrt.org/releases/25.12.6/packages/mipsel_24kc/packages/packages.adb
+https://downloads.openwrt.org/releases/25.12.6/packages/mipsel_24kc/routing/packages.adb
+https://downloads.openwrt.org/releases/25.12.6/packages/mipsel_24kc/telephony/packages.adb
+https://downloads.openwrt.org/releases/25.12.6/packages/mipsel_24kc/video/packages.adb

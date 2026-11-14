@@ -192,6 +192,15 @@ def caption_checked(config, deadline, question, check, *, question_only=False):
     its exact ON/listening owner binding instead. Neither callback grants ON.
     """
     global PHASE
+    from reachy_companion.camera_permission import read_permission
+    permission_path=Path(config.get('camera_permission_path',Path(config.get('paths',{}).get('data_dir','data'))/'camera-state.json'))
+    initial_permission=read_permission(permission_path)
+    original_check=check
+    def check():
+        permission=read_permission(permission_path)
+        need(permission['enabled'] and not permission['error'] and permission==initial_permission)
+        return original_check()
+    check()
     need(type(question) is str and 1<=len(question)<=256)
     PHASE='model_inventory'
     address=native_address(config)

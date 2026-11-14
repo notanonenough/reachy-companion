@@ -1,0 +1,5 @@
+#!/bin/sh
+case "$2" in pre-up|up|pre-down|down|reapply|dhcp4-change|dhcp6-change) ;; *) exit 0 ;; esac
+export REACHY_FIREWALL_IFACE="$1" REACHY_FIREWALL_ACTION="$2"
+export PYTHONPATH=@@ROOT@@/src
+/usr/bin/python3 -m reachy_companion --config @@ROOT@@/config.local.json firewall recovery-sync

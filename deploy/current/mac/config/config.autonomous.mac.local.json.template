@@ -1,0 +1,170 @@
+{
+  "version": 1,
+  "actuators": "simulated",
+  "export_enabled": false,
+  "period_s": 1,
+  "fast_deadline_s": 5,
+  "http_timeout_s": 90,
+  "task_timeout_s": 90,
+  "proposal_ttl_s": 30,
+  "ledger_cap": 256,
+  "sensor_cap": 12,
+  "task_cap": 8,
+  "candidate_cap": 8,
+  "gateway": {
+    "bind": "127.0.0.1",
+    "port": 8097,
+    "client_url": "http://127.0.0.1:8097",
+    "token_env": "REACHY_SHADOW_TOKEN",
+    "log_s3": {
+      "bucket": "reachy-s3",
+      "region": "ru-central1",
+      "endpoint": "https://storage.yandexcloud.net",
+      "prefix": "reachy/events",
+      "access_key_file": "secrets/yacloud.s3.key.pub",
+      "secret_key_file": "secrets/yacloud.s3.key.priv"
+    },
+    "vision": {
+      "enabled": true,
+      "camera_url": "http://127.0.0.1:18794/frame",
+      "camera_token_file": "secrets/token",
+      "model_url": "http://127.0.0.1:18099",
+      "poll_s": 0.5,
+      "interval_s": 2,
+      "ttl_s": 20,
+      "timeout_s": 25,
+      "detector_model": "@@ROOT@@/models/yolox/object_detection_yolox_2022nov.onnx"
+    }
+  },
+  "models": {
+    "fast": {
+      "id": "reachy-fast",
+      "base_url": "http://127.0.0.1:18098",
+      "completion_path": "/completion",
+      "tokenize_path": "/tokenize",
+      "tokenize_content_key": "content",
+      "api_key_env": "",
+      "context_tokens": 4096,
+      "input_cap_tokens": 3000,
+      "template_cap_tokens": 256,
+      "output_tokens": 96,
+      "reserve_tokens": 256,
+      "message_template": "<|im_start|>{role}\n{content}<|im_end|>\n",
+      "assistant_prefix": "<|im_start|>assistant\n<think>\n\n</think>\n\n",
+      "stop": [
+        "<|im_end|>",
+        "<|im_start|>"
+      ],
+      "temperature": 0,
+      "audit": {
+        "verified": true,
+        "device": "metal_mac",
+        "runtime_build": "b11941-19ff817fb",
+        "weight_sha256": "75526add2fec8543a78d412a5546dd1c13dcf1ade237b245915d0f12dd43bb3d",
+        "template_sha256": "f50c7efd8d78a4ee6b970da63f5f8c21ff0b106e3f974798efbc387834861d2a",
+        "tokenizer_sha256": "75526add2fec8543a78d412a5546dd1c13dcf1ade237b245915d0f12dd43bb3d",
+        "runtime_context_tokens": 4096
+      },
+      "completion_backend": "llama_native",
+      "admission_context_tokens": 4096,
+      "direct_speech": false
+    },
+    "main": {
+      "id": "reachy-main9b",
+      "base_url": "http://127.0.0.1:18097",
+      "completion_path": "/completion",
+      "tokenize_path": "/tokenize",
+      "tokenize_content_key": "content",
+      "api_key_env": "",
+      "context_tokens": 8192,
+      "input_cap_tokens": 3000,
+      "template_cap_tokens": 256,
+      "output_tokens": 256,
+      "reserve_tokens": 256,
+      "message_template": "<|im_start|>{role}\n{content}<|im_end|>\n",
+      "assistant_prefix": "<|im_start|>assistant\n<think>\n\n</think>\n\n",
+      "stop": [
+        "<|im_end|>",
+        "<|im_start|>"
+      ],
+      "temperature": 0.2,
+      "audit": {
+        "verified": true,
+        "device": "metal_mac",
+        "runtime_build": "b11941-19ff817fb",
+        "weight_sha256": "03b74727a860a56338e042c4420bb3f04b2fec5734175f4cb9fa853daf52b7e8",
+        "template_sha256": "da8586387961d27cf1f580f825cde64cae3eeacf407c27362d19a5390a60cc23",
+        "tokenizer_sha256": "03b74727a860a56338e042c4420bb3f04b2fec5734175f4cb9fa853daf52b7e8",
+        "runtime_context_tokens": 8192
+      },
+      "completion_backend": "llama_native",
+      "admission_context_tokens": 8192,
+      "structured_reply": true
+    }
+  },
+  "optional_vps": {
+    "enabled": false,
+    "endpoint": null,
+    "credential_env": "REACHY_ANALYSIS_TOKEN",
+    "candidate_ram_mb": 4096,
+    "candidate_vcpus": 4
+  },
+  "workflows": {
+    "enabled": false,
+    "broker_url": null,
+    "token_env": "REACHY_WORKFLOW_TOKEN",
+    "http_timeout_s": 2,
+    "poll_s": 0.1
+  },
+  "context": {
+    "enabled": false,
+    "mode": "camera_memory",
+    "memory_path": "data/n0-normal-context.sqlite3",
+    "namespaces": [
+      "normal"
+    ],
+    "refresh_s": 0.5,
+    "video_url": null,
+    "video_token_env": "REACHY_VIDEO_TOKEN",
+    "video_poll_s": 0.5
+  },
+  "motion": {
+    "enabled": false,
+    "hub_config_path": "config.local.json",
+    "agent_url": "http://127.0.0.1:8775",
+    "cooldown_s": 4,
+    "heartbeat_s": 0.04
+  },
+  "speech": {
+    "enabled": false,
+    "backend": "alsa",
+    "device": null,
+    "companion_config_path": null,
+    "sample_rate": 16000,
+    "max_seconds": 30,
+    "chunk_frames": 1600,
+    "stop_timeout_s": 0.3
+  },
+  "production": {
+    "state_path": "data/companion-state.sqlite3",
+    "overload_latency_s": 45,
+    "overload_queue": 6,
+    "memory_refresh_s": 120,
+    "character_refresh_s": 3600,
+    "outbox_cap": 10000,
+    "sensors": {},
+    "tools": {},
+    "delivery": {
+      "s3": {
+        "enabled": false,
+        "url": null
+      },
+      "vps": {
+        "enabled": false,
+        "url": null,
+        "token_env": "REACHY_ANALYSIS_TOKEN"
+      }
+    },
+    "stt_deadline_s": 8
+  }
+}

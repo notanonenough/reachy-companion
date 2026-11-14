@@ -1,0 +1,21 @@
+[connection]
+id=Wired connection 1
+uuid=24137d7c-6c4a-39a4-a099-e9a6c6ae726c
+type=ethernet
+autoconnect=false
+autoconnect-priority=-999
+interface-name=eth0
+timestamp=1794610356
+
+[ethernet]
+
+[ipv4]
+dhcp-client-id=mac
+method=auto
+route-metric=10
+
+[ipv6]
+addr-gen-mode=default
+method=auto
+
+[proxy]

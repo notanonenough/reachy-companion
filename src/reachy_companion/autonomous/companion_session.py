@@ -6,6 +6,8 @@ Finite mode retains the 180s lifetime and 32-stream budget.
 import argparse
 import json
 import math
+from http.client import HTTPException
+from urllib.error import HTTPError
 import os
 from pathlib import Path
 import signal
@@ -18,10 +20,25 @@ from .audio_session_control import create_server
 from .config import load
 from .lease_datagram import DatagramRenewal
 from .motion_adapter import MotionAdapter
+from .network_observation import NetworkObservation
 from .playback import Playback
 from .runtime import Job,RemoteGateway,Scheduler
 from .speech_adapter import SpeechAdapter,HttpTTS
 from .voice_chain import check_context_task,check_context_view,context_binding
+
+
+class SessionFailure(RuntimeError):
+    """Stable diagnostic code, without dialogue or remote exception text."""
+    def __init__(self,code):
+        self.code=code
+        super().__init__(code)
+
+
+def read_speech_operator(hub):
+    # The operator receipt lasts only 300 ms. A general-purpose 10 s HTTP
+    # wait occupies the sole refresh slot long after that receipt expires.
+    # Fail this read promptly; the next scheduled read obtains new authority.
+    return hub.agent('/operator', timeout=.1, max_bytes=8192)
 
 
 class ContextGateway(RemoteGateway):
@@ -82,7 +99,9 @@ def run_session(scheduler,poller,lease,client,stop_client,source,stop,duration,p
     startup=PeerStartup(source);peer_job=health_job=stop_job=None
     retire_job=None;media_close_job=None;retiring_terminal=None;next_retire=0;peer_receipt=None
     next_peer=next_health=next_publish=0;started=time.monotonic();last_health=last_operator=started
-    reason='duration';errors=[];ready_seen=False
+    reason='duration';failure_code=None;errors=[];ready_seen=False
+    health_errors=0;network=NetworkObservation()
+    health_timeout=scheduler.config.get('production',{}).get('compute_health_timeout_s',3) if scheduler.production else .5
     report=dict(mode='normal_joined_companion',continuous=lifetime=='lease',continuous_acceptance=False,lifetime=lifetime,accepted=False,
         device_lifetime_cap_s=180 if lifetime=='finite' else None,device_stream_cap=32 if lifetime=='finite' else 1,raw_audio_retained=False,
         transcripts_retained=False,speaker_identity='unknown',automatic_microphone_activation=False,
@@ -97,23 +116,36 @@ def run_session(scheduler,poller,lease,client,stop_client,source,stop,duration,p
         while not stop.is_set() and (lifetime=='lease' or time.monotonic()-started<duration):
             now=time.monotonic()
             if peer_job and peer_job.future.done():
+                peer_ok=False
                 try:
                     peer_receipt=peer_job.future.result()
                     if lifetime=='lease' and (peer_receipt.get('lifetime')!='lease'
                             or lease_authority(peer_receipt.get('lease_binding'))!=lease.authority):
                         raise RuntimeError('Current peer lease authority changed')
                     startup.observe(peer_receipt,lease.last_accepted is not None)
+                    peer_ok=True
                 except Exception as exc:peer_receipt=None;startup.failure(type(exc).__name__)
+                network.observe('robot',peer_job.started,now,peer_ok)
+                if scheduler.production:scheduler.ingest(network.event(now),now)
                 peer_job=None
             if startup.advance()=='WITHDRAWN' and not scheduler.production:reason=startup.reason;break
             if not peer_job and now>=next_peer:
                 peer_job=Job((status_transport or client).call,'/status');next_peer=now+.1
             if health_job and health_job.future.done():
-                health=health_job.future.result();health_job=None
-                if health.get('compute_boot_id')!=scheduler.state.authority.compute_boot_id or health.get('quarantined'):
-                    raise RuntimeError('Compute owner changed or completion unknown; no automatic reconnect')
-                last_health=now
-            if now-last_health>=.5:raise RuntimeError('Compute health expired; occupied calls retained')
+                try:
+                    health=health_job.future.result()
+                except (OSError,HTTPException) as exc:
+                    if isinstance(exc,HTTPError) and exc.code in (401,403):raise SessionFailure('compute_auth_rejected')
+                    health_errors+=1
+                    network.observe('compute',health_job.started,now,False)
+                else:
+                    if health.get('compute_boot_id')!=scheduler.state.authority.compute_boot_id or health.get('quarantined'):
+                        raise SessionFailure('compute_owner_changed_or_quarantined')
+                    last_health=now
+                    network.observe('compute',health_job.started,now,True)
+                if scheduler.production:scheduler.ingest(network.event(now),now)
+                health_job=None
+            if now-last_health>=health_timeout:raise SessionFailure('compute_health_expired')
             if lifetime=='lease' and lease.status()['withdrawn'] and not scheduler.production:raise RuntimeError('Lease withdrawal is latched')
             if not health_job and now>=next_health:
                 health_job=Job(scheduler.gateway.call,'/health');next_health=now+.2
@@ -123,7 +155,7 @@ def run_session(scheduler,poller,lease,client,stop_client,source,stop,duration,p
                 last_operator=now
                 if motion_identity is not None and operator['binding'][0]!=motion_identity['agent_boot_id']:
                     raise RuntimeError('Speaker and motor belong to different physical operator boots')
-            if now-last_operator>=.5:raise RuntimeError('Local operator receipt expired; no automatic recovery')
+            if now-last_operator>=.5:raise SessionFailure('operator_receipt_expired')
             if stop.is_set():reason='controller_stop';break
             if scheduler.production and startup.phase!='ACTIVE':scheduler.advance()
             if startup.phase=='ACTIVE':
@@ -131,7 +163,7 @@ def run_session(scheduler,poller,lease,client,stop_client,source,stop,duration,p
                     backend=scheduler.speech_adapter.playback.backend
                     if (scheduler.speech_adapter.playback.status()['quarantined']
                             or scheduler.speech_adapter.playback.status()['terminal_unknown'] or backend.withdrawn):
-                        raise RuntimeError('Unknown audio completion blocks lease output')
+                        raise SessionFailure('audio_completion_unknown')
                     if retire_job and retire_job.future.done():
                         if retire_job.future.result() and not scheduler.speech_adapter.playback.retire_terminal(
                                 retiring_terminal['stream_id'],retiring_terminal['generation']):
@@ -175,6 +207,9 @@ def run_session(scheduler,poller,lease,client,stop_client,source,stop,duration,p
                     motion=dict(allowed=scheduler.state.motion_allowed,receipts=list(scheduler.motion_adapter.receipts)[-4:],
                         **scheduler.motion_adapter.status()) if scheduler.motion_adapter else None,
                     speech=scheduler.speech_adapter.status(),
+                    runtime=dict(latency_s=dict(scheduler.latencies),compute_health_age_s=round(now-last_health,4),
+                        compute_health_errors=health_errors,compute_health_timeout_s=health_timeout,
+                        network=network.status(now),pressure=scheduler.pressure_status(now)),
                     cycle_phase=scheduler.state.overload,background=scheduler.services.status() if scheduler.services else None,
                     listening_ready=startup.phase=='ACTIVE' and scheduler.audio_adapter.allowed
                         and scheduler.speech_adapter.operator_view() is not None,
@@ -184,9 +219,12 @@ def run_session(scheduler,poller,lease,client,stop_client,source,stop,duration,p
     except BaseException as exc:
         import logging
         logging.getLogger(__name__).exception('Production session failed')
-        reason='runtime_error';errors.append(type(exc).__name__)
+        reason='runtime_error';failure_code=getattr(exc,'code',type(exc).__name__);errors.append(type(exc).__name__)
     finally:
         stop.set();startup.close()
+        # Send explicit withdrawal before local cleanup can outlast the device's
+        # short controller lease. Keep its real transport slot until terminal.
+        stop_job=Job(lambda:stop_client.call('/stop',source_boot=source))
         # Attempt every owner withdrawal, retaining all actual job references.
         actions=[lease.close,poller.close,scheduler.close]
         if scheduler.motion_adapter:actions.append(scheduler.motion_adapter.close)
@@ -204,7 +242,6 @@ def run_session(scheduler,poller,lease,client,stop_client,source,stop,duration,p
                 finally:status_transport.close()
             return True
         media_close_job=Job(close_media)
-        stop_job=Job(lambda:stop_client.call('/stop',source_boot=source))
         deadline=time.monotonic()+1
         while time.monotonic()<deadline and any(occupied(scheduler,poller,lease,peer_job,health_job,stop_job,retire_job,media_close_job).values()):
             time.sleep(.005)
@@ -212,7 +249,7 @@ def run_session(scheduler,poller,lease,client,stop_client,source,stop,duration,p
         if stop_job.future.done():
             try:peer_stop=stop_job.future.result()
             except Exception as exc:errors.append(type(exc).__name__)
-        report.update(reason=reason,errors=errors,elapsed_s=time.monotonic()-started,
+        report.update(reason=reason,failure_code=failure_code,errors=errors,elapsed_s=time.monotonic()-started,
             background=scheduler.services.status() if scheduler.services else None,
             listening_ready_seen=ready_seen,
             counts=dict(scheduler.state.counts),peer_stop=peer_stop,
@@ -237,11 +274,18 @@ def run_session(scheduler,poller,lease,client,stop_client,source,stop,duration,p
             report.get('context_terminal_revoke',{}).get('output',{}).get('terminal') is True
             and report.get('context_terminal_revoke',{}).get('output',{}).get('revoked') is True)
         motion_ok=not scheduler.motion_adapter or scheduler.motion_adapter.status()['stop_known'] is True
+        report['motion_after']=scheduler.motion_adapter.status() if scheduler.motion_adapter else None
+        report['cleanup_issues']=['busy:'+name for name,busy in report['execution_busy'].items() if busy]
+        if not motion_ok:report['cleanup_issues'].append('motion_stop_unknown')
+        if not context_ok:report['cleanup_issues'].append('context_revoke_unknown')
+        if not report['speech_stop_known']:report['cleanup_issues'].append('speech_stop_unknown')
+        if not isinstance(peer_stop,dict) or peer_stop.get('stop_known') is not True:
+            report['cleanup_issues'].append('peer_stop_unknown')
         report['cleanup_verified']=(not errors and not any(report['execution_busy'].values()) and context_ok and motion_ok
             and report['speech_stop_known'] is True and isinstance(peer_stop,dict)
             and peer_stop.get('stop_known') is True and peer_stop.get('execution_busy') is False)
         report['accepted']=ready_seen and report['cleanup_verified'] and reason in ('duration','controller_stop','finite_stream_budget')
-        publish(dict(stage='STOPPED',reason=reason,execution_busy=report['execution_busy'],cleanup_verified=report['cleanup_verified']))
+        publish(dict(stage='STOPPED',reason=reason,failure_code=failure_code,execution_busy=report['execution_busy'],cleanup_verified=report['cleanup_verified']))
     return report
 
 
@@ -311,29 +355,31 @@ def main():
             if cfg['actuators']=='bounded_stock':
                 from .stock_motion_adapter import StockMotionAdapter
                 motor_hub.stock_dependencies()
-                motion=StockMotionAdapter(motor_hub,cooldown_s=native['cooldown_s'])
+                motion=StockMotionAdapter(motor_hub,cooldown_s=native['cooldown_s'],follow_person=native.get('follow_person',False))
             else:
                 motion=MotionAdapter(motor_hub,cooldown_s=native['cooldown_s'],heartbeat_s=native['heartbeat_s'])
                 current=motor_hub.agent('/status');actor=current['motion_actor']
                 if (not isinstance(actor.get('hold'),dict) or actor['hold'].get('verified') is not True
                         or actor['hold'].get('trajectory_updates_after_hold')!=0):raise ValueError('Current physical hold proof required')
-            if not motion.refresh()['motion_allowed']:raise ValueError('Current bounded motor owner not ready')
+            ready=motion.refresh()
+            if not (ready['motion_allowed'] or ready.get('tracking_ready')):raise ValueError('Current bounded motor owner not ready')
         stt_deadline=cfg.get('production',{}).get('stt_deadline_s',2)
-        audio=AudioAdapter(HttpSTT(companion['network']['compute_url'],companion.token,timeout=stt_deadline),
+        audio=AudioAdapter(HttpSTT(companion['network']['compute_url'],companion.token,timeout=stt_deadline,
+            diagnostics=cfg.get('production',{}).get('stt_diagnostics',False)),
             result_ttl_s=stt_deadline,
             **({'continuous_input':True} if cfg.get('production') else {}))
         pcm=Playback(RemotePCM(client,stop_port=args.peer_stop_port,source_boot=args.source_boot,
             max_streams=32 if args.lifetime=='finite' else None,lifetime=args.lifetime),chunk_frames=4096,
             motion=motion if cfg['actuators']!='bounded_stock' else None)
         speech=SpeechAdapter(pcm,HttpTTS(companion['network']['voice_url'],companion.token,
-            gain=cfg.get('speech',{}).get('tts_gain',1)),lambda:hub.agent('/operator'))
+            gain=cfg.get('speech',{}).get('tts_gain',1)),lambda:read_speech_operator(hub))
         poller=AudioPolling(client,audio,args.source_boot,persistent=True)
         scheduler=Scheduler(cfg,gateway,motion,speech,audio)
         from .production import attach
         if cfg.get('production'):
             attach(scheduler,args.config)
         datagram=DatagramRenewal(client,args.source_boot,args.lease_datagram_port,authority=authority,
-            retries=1 if cfg.get('production') else 0) if args.lease_datagram_port is not None else None
+            retries=2 if cfg.get('production') else 0) if args.lease_datagram_port is not None else None
         lease=PeerLease(client,datagram=datagram,progress_timeout_s=args.lease_progress_s,
             **({'source_boot':args.source_boot,'authority':authority} if authority is not None else {}))
         report=run_session(scheduler,poller,lease,client,stop_client,args.source_boot,stop,args.duration,publish,lifetime=args.lifetime,status_transport=PersistentPeer(client))
@@ -385,7 +431,8 @@ def main():
             report['control_cleanup_errors']=final_errors;report['accepted']=report['cleanup_verified']=False
     report.update(server.session_binding if server is not None else dict(controller=args.controller))
     with args.output.open('x') as file:json.dump(report,file,ensure_ascii=False,indent=2)
-    print(json.dumps(report,ensure_ascii=False))
+    from reachy_companion.production_logs import report_summary
+    print(json.dumps(report_summary(report) if args.lifetime=='lease' else report,ensure_ascii=False),flush=True)
     return 0 if report['accepted'] else 2
 
 

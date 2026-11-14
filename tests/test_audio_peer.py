@@ -18,6 +18,17 @@ class Backend(ReplayPCM):
 
 
 class PeerTests(unittest.TestCase):
+    def test_shutdown_waits_for_idle_keepalive_handler_without_forgetting_it(self):
+        peer,_=self.setup_peer();server=create_server(peer,'t'*32,port=0,stop_port=0)
+        worker=threading.Thread(target=server.serve_forever,kwargs={'poll_interval':.01},daemon=True);worker.start()
+        self.addCleanup(server.server_close);self.addCleanup(server.shutdown)
+        client=PersistentPeer(PeerClient('http://127.0.0.1:'+str(server.server_address[1]),'t'*32,'controller'))
+        self.addCleanup(client.close);client.call('/status')
+        server.shutdown();server.server_close();worker.join(1)
+        self.assertGreater(server.transport_status()['media_handlers'],0)
+        self.assertGreater(server.wait_transport_closed(timeout=0)['media_handlers'],0)
+        self.assertFalse(any(server.wait_transport_closed().values()))
+
     def test_stale_level_during_playback_is_omitted_from_observation(self):
         peer,_=self.setup_peer()
         self.call(peer,'/lease')

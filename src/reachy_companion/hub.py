@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Small Reachy Mini scenario router; Python standard library only."""
 import hmac
+import http.client
 import json
 import logging
 import math
@@ -10,6 +11,7 @@ import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.request import Request, build_opener, ProxyHandler
 from urllib.error import HTTPError
+from urllib.parse import urlsplit
 
 LOG = logging.getLogger("reachy-hub")
 
@@ -106,6 +108,10 @@ class Hub:
             self.stock_scope.observed=0
 
     def stock_end(self):
+        connection=getattr(self.stock_scope,'factory_connection',None)
+        if connection is not None:
+            connection.close();self.stock_scope.factory_connection=None
+        self.stock_scope.follow_body=False
         self.stock_scope.binding=None
         self.stock_scope.expression_version=None
 
@@ -253,6 +259,8 @@ class Hub:
         request = Request(self.config['network']['robot_url'] + path, data=data,
                           headers={'Content-Type': 'application/json'})
         try:
+            if getattr(self.stock_scope,'follow_body',False):
+                return self.follow_factory_request(path,data)
             with self.http.open(request, timeout=self.config['timeouts']['robot']) as response:
                 return json.load(response)
         except HTTPError as exc:
@@ -262,6 +270,33 @@ class Hub:
             current = self.factory('/api/apps/current-app-status')
             return {'state': 'free' if current is None else 'locked', 'app': current}
 
+    def follow_factory_request(self,path,data):
+        """One connection within an owned follow expression; no response cache/retry.
+
+        All readiness, ownership, pose and UUID checks still make fresh requests.
+        stock_end closes the connection before this background job exits.
+        """
+        endpoint=urlsplit(self.config['network']['robot_url'])
+        connection=getattr(self.stock_scope,'factory_connection',None)
+        if connection is None:
+            cls={'http':http.client.HTTPConnection,'https':http.client.HTTPSConnection}.get(endpoint.scheme)
+            if cls is None:raise ValueError('Factory HTTP transport required')
+            connection=cls(endpoint.hostname,endpoint.port,timeout=self.config['timeouts']['robot'])
+            self.stock_scope.factory_connection=connection
+        try:
+            connection.request('GET' if data is None else 'POST',endpoint.path.rstrip('/')+path,
+                body=data,headers={'Content-Type':'application/json'})
+            response=connection.getresponse();raw=response.read(1048577)
+            if len(raw)>1048576:raise ValueError('Factory response bound')
+            if not 200<=response.status<300:
+                raise HTTPError(self.config['network']['robot_url']+path,response.status,response.reason,response.headers,None)
+            return json.loads(raw)
+        except HTTPError:raise
+        except BaseException:
+            connection.close();self.stock_scope.factory_connection=None
+            # A dropped POST may have reached the robot: never replay it.
+            raise
+
     def robot(self, path, payload=None):
         if payload is not None and self.stock_selected():
             if path not in ('/api/move/goto','/api/move/play/wake_up','/api/move/play/goto_sleep','/api/motors/set_mode/enabled'):
@@ -270,7 +305,10 @@ class Hub:
             if path=='/api/move/goto':
                 # The REST schema's null means leave an axis unchanged. Never
                 # inherit an SDK default body yaw of zero for an antenna gesture.
-                payload=dict(payload,body_yaw=None)
+                if getattr(self.stock_scope,'follow_body',False):
+                    from .motion_limits import validate_follow_step
+                    validate_follow_step(payload,self.factory('/api/state/full'))
+                else:payload=dict(payload,body_yaw=None)
                 payload.setdefault('head_pose',None)
             try:return self.factory(path,payload)
             except BaseException:self.stock_unknown=True;raise
@@ -370,16 +408,18 @@ class Hub:
 
     def panel_control(self,payload):
         if type(payload) is not dict or payload.get('action') not in (
-                'microphone_on','microphone_off','automatic_on','automatic_off','stop','mode_normal','mode_alice_test'):
+                'microphone_on','microphone_off','automatic_on','automatic_off','stop','mode_normal','mode_alice_test','motion_on','motion_off','camera_on','camera_off'):
             raise ValueError('Exact panel action required')
-        positive=payload['action'] in ('microphone_on','automatic_on')
+        positive=payload['action'] in ('microphone_on','automatic_on','motion_on','camera_on')
         mode_action=payload['action'] in ('mode_normal','mode_alice_test')
-        if set(payload)!=({'action','binding','mode_generation'} if mode_action else {'action','binding'} if positive else {'action'}):
+        if set(payload)!=({'action','binding','camera_generation'} if payload['action']=='camera_on' else {'action','binding','mode_generation'} if mode_action else {'action','binding'} if positive else {'action'}):
             raise ValueError('Exact panel action fields required')
         if (positive or mode_action) and type(payload['binding']) is not dict:
             raise ValueError('Panel binding required')
         if mode_action and (type(payload['mode_generation']) is not int or not 0<=payload['mode_generation']<2**63):
             raise ValueError('Conversation mode generation required')
+        if payload['action']=='camera_on' and (type(payload['camera_generation']) is not int or not 0<=payload['camera_generation']<2**63):
+            raise ValueError('Camera generation required')
         value=self.agent('/panel-control',payload,timeout=self.config['timeouts']['http'],max_bytes=16384)
         if (type(value) is not dict or value.get('accepted') is not True
                 or value.get('action')!=payload['action'] or type(value.get('state')) is not dict):
@@ -408,16 +448,22 @@ class Hub:
         if time.monotonic()-began>.3:raise TimeoutError('Operator read expired')
         return value,began
 
-    def expression(self, payload):
+    def expression(self, payload, *, follow=False):
         from .motion_limits import validate_steps
         settings = self.config['conversation'].get('expressions', {})
         if not settings.get('enabled', False):
             return {'ok': True, 'skipped': 'expressions_disabled'}
-        steps = validate_steps(payload['steps'], settings)
+        if follow:
+            from .motion_limits import validate_follow_step
+            if not self.stock_selected() or len(payload['steps'])!=1 or 'operator_binding' not in payload:
+                raise ValueError('Internal bound stock follow requires one step')
+            steps=[validate_follow_step(payload['steps'][0])]
+        else:steps = validate_steps(payload['steps'], settings)
         if not self.lock.acquire(blocking=False):
             raise RuntimeError('Hub is busy')
         try:
             self.stock_begin()
+            self.stock_scope.follow_body=follow
             if self.stock_selected() and 'operator_binding' in payload:
                 binding=payload['operator_binding']
                 if (type(binding) is not dict or set(binding)!={'agent_boot_id','microphone_epoch',

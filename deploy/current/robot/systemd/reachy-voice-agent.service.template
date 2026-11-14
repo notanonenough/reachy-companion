@@ -1,0 +1,25 @@
+[Unit]
+Description=Reachy Companion agent
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User=pollen
+WorkingDirectory=@@ROOT@@
+Environment="PYTHONPATH=@@SOURCE_ROOT@@/src"
+Environment="OMP_NUM_THREADS=2"
+ExecStart=@@ROOT@@/.venv/bin/python -B -m reachy_companion --config @@ROOT@@/config.local.json agent serve
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=@@ROOT@@/data
+UMask=0077
+KillMode=control-group
+LogRateLimitIntervalSec=30s
+LogRateLimitBurst=200
+
+[Install]
+WantedBy=multi-user.target

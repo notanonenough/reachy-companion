@@ -1,0 +1,11 @@
+{
+  "package": "reachy_mini",
+  "version": "1.2.11",
+  "python": "3.12.12",
+  "wheel_sha256": "17b8a0fe7c9c9d0d186304f4dc4346b721a7c0e2779dc639cd414ad1cb82772e",
+  "patch": "reachy-mini-1.2.11-live-status.patch",
+  "patch_sha256": "00c2f7d15e4d6a7abfa82f1eda398901a0dd6513869a3b0e7e22efdc6ad5f640",
+  "target": "reachy_mini/daemon/backend/robot/backend.py",
+  "preimage_sha256": "3cf3fe176b6903dc09411b1f68c118db0e609617ca0c58fabc65415bf2fdc2eb",
+  "installed_sha256": "73c1230be84bc93cd8ebd797cc208913709f6f3e3f36af02f267fd7476896c0f"
+}

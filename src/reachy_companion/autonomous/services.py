@@ -13,6 +13,7 @@ class Services:
         self.polls={};self.next_poll={};self.exports={};self.next_export={}
         self.tool_jobs={};self.maintenance=None;self.next_memory=0;self.next_character=0
         self.errors={};self.latency={};self.closed=False
+        self.outbox_summary={}
         self.update_reader=None;self.update_job=None;self.next_update=0
         self.reload()
         now=time.monotonic();settings=scheduler.config.get('production',{})
@@ -25,14 +26,25 @@ class Services:
         state.revision+=1
 
     def status(self):
-        if not self.closed:self.last_depth=self.store.db.execute('SELECT count(*) FROM outbox').fetchone()[0]
-        return dict(execution_busy=bool(self.busy()),outbox_depth=self.last_depth,
+        if not self.closed:
+            self.last_depth=self.store.db.execute('SELECT count(*) FROM outbox').fetchone()[0]
+            self.outbox_summary=dict(retained=self.last_depth,
+                pending_s3=self.store.db.execute('SELECT count(*) FROM outbox WHERE s3=0').fetchone()[0],
+                pending_vps=self.store.db.execute('SELECT count(*) FROM outbox WHERE vps=0').fetchone()[0],
+                export_enabled=self.scheduler.config['export_enabled'],cap=self.store.cap)
+        state=self.scheduler.state
+        sensors={name:{key:value for key,value in sensor.view(time.monotonic(),state.muted).items()
+                       if key in ('state','age_ms','source_id','ttl_ms')}
+                 for name,sensor in state.sensors.items()}
+        return dict(execution_busy=bool(self.busy()),outbox_depth=self.last_depth,outbox=dict(self.outbox_summary),sensors=sensors,
             delivery={name:('configured' if name in self.deliveries else 'unconfigured') for name in ('s3','vps')},
             errors=dict(self.errors),unresolved_tools=dict(self.unresolved),latency_s=dict(self.latency),state_revision=self.scheduler.state.durable_revision)
 
     def log(self,event):
         if not self.scheduler.state.privacy:
-            self.store.append(event, destinations=('s3','vps') if self.scheduler.config['export_enabled'] else ())
+            settings=self.scheduler.config.get('production',{}).get('delivery',{})
+            destinations=tuple(name for name in ('s3','vps') if settings.get(name,{}).get('enabled'))
+            self.store.append(event, destinations=destinations if self.scheduler.config['export_enabled'] else ())
 
     def busy(self):
         jobs=list(self.polls.values())+list(self.exports.values())+list(self.tool_jobs.values())
@@ -82,6 +94,7 @@ class Services:
                 event['age_ms']=event.get('age_ms',0)+max(0,int((now-started)*1000))
                 self.scheduler.ingest(event,now)
                 self.latency[name]=now-started
+                self.errors.pop(name,None)
             except Exception as exc:self.errors[name]=type(exc).__name__
             del self.polls[name]
         for name,(job,started,authority) in list(self.tool_jobs.items()):
@@ -97,11 +110,13 @@ class Services:
                     state.record('tool_completed')
             except Exception as exc:self.errors['tool:'+name]=type(exc).__name__
             self.latency['tool:'+name]=now-started;del self.tool_jobs[name]
-        for destination,(job,started,event_id) in list(self.exports.items()):
+        for destination,(job,started,receipt) in list(self.exports.items()):
             if not job.future.done():continue
+            self.latency['delivery:'+destination]=now-started
+            event_id,event_ids=receipt if isinstance(receipt,tuple) else (receipt,[receipt])
             try:
                 if job.future.result()!=event_id:raise ValueError('Wrong export acknowledgement')
-                self.store.ack(destination,event_id);self.errors.pop(destination,None)
+                self.store.ack_many(destination,event_ids);self.errors.pop(destination,None)
             except Exception as exc:self.errors[destination]=type(exc).__name__
             del self.exports[destination];self.next_export[destination]=now+(2 if destination in self.errors else 0)
         if self.maintenance and self.maintenance[0].future.done():
@@ -132,16 +147,31 @@ class Services:
         if self.closed or state.privacy or state.stopped:return
         if self.update_reader and not self.update_job and now>=self.next_update and state.overload=='ACTIVE':
             self.update_job=(Job(self.update_reader),now,state.authority)
-        for name,(poll,period,source) in (self.sensors.items() if state.overload=='ACTIVE' else ()):
+        # Perception continues while outputs drain. Each reader still has one
+        # occupied slot, so a stalled read cannot accumulate replacement jobs.
+        for name,(poll,period,source) in self.sensors.items():
             if state.muted and name.startswith('audio'):continue
             if name not in self.polls and now>=self.next_poll.get(name,0):
                 self.polls[name]=(Job(poll),now,state.authority);self.next_poll[name]=now+period
         for destination,send in self.deliveries.items():
             if destination not in self.exports and now>=self.next_export.get(destination,0):
-                item=self.store.pending(destination)
-                if item:self.exports[destination]=(Job(send,*item),now,item[0])
+                if getattr(send,'settings',{}).get('relay'):
+                    from uuid import uuid5,NAMESPACE_URL
+                    rows=self.store.pending_batch(destination)
+                    if rows:
+                        ids=[row[0] for row in rows]
+                        identity=str(uuid5(NAMESPACE_URL,'reachy-log-batch:'+':'.join(ids)))
+                        body=dict(id=identity,events=[row[1] for row in rows])
+                        self.exports[destination]=(Job(send,identity,body),now,(identity,ids))
+                else:
+                    item=self.store.pending(destination)
+                    if item:self.exports[destination]=(Job(send,*item),now,item[0])
         if (state.overload!='ACTIVE' or self.maintenance or self.scheduler.main_job
                 or any(not k.startswith('autonomous:') for k in state.candidates) or any(t.status=='ready' for t in state.tasks.values())):return
+        last_dialogue=self.scheduler.last_dialogue_at
+        if last_dialogue is not None and now-last_dialogue<self.scheduler.config.get('production',{}).get('maintenance_idle_s',10):return
+        speech=self.scheduler.speech_adapter
+        if speech and speech.status().get('execution_busy'):return
         character=now>=self.next_character
         if not character and now<self.next_memory:return
         if character:self.next_character=now+self.scheduler.config.get('production',{}).get('character_refresh_s',3600)

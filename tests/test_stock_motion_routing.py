@@ -302,5 +302,39 @@ class StockMotionTests(unittest.TestCase):
             self.assertIsNone(self.writes[0][1]['body_yaw'])
         finally:server.shutdown();server.server_close();thread.join(2)
 
+    def test_follow_reuses_connection_for_fresh_checks_but_never_replays_post(self):
+        requests=[]
+        class Handler(BaseHTTPRequestHandler):
+            protocol_version='HTTP/1.1'
+            def log_message(self,*args):pass
+            def do_GET(self):self.reply()
+            def do_POST(self):
+                self.rfile.read(int(self.headers['Content-Length']));self.reply()
+            def reply(self):
+                requests.append((self.command,self.path,self.client_address[1]))
+                if self.path=='/drop':self.close_connection=True;return
+                status=404 if self.path=='/api/daemon/robot-app-lock-status' else 200
+                value=None if self.path=='/api/apps/current-app-status' else {'request':len(requests)}
+                raw=json.dumps(value).encode()
+                self.send_response(status);self.send_header('Content-Length',str(len(raw)))
+                self.end_headers();self.wfile.write(raw)
+        server=ThreadingHTTPServer(('127.0.0.1',0),Handler)
+        thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
+        self.config.data['network']['robot_url']='http://127.0.0.1:'+str(server.server_port)
+        hub=Hub(self.config);hub.stock_scope.follow_body=True
+        try:
+            self.assertEqual(hub.factory('/api/daemon/robot-app-lock-status')['state'],'free')
+            a=hub.factory('/api/state/full');b=hub.factory('/api/state/full')
+            self.assertGreater(b['request'],a['request']) # Never reuse a snapshot.
+            self.assertEqual(len({r[2] for r in requests}),1)
+            with self.assertRaises(ConnectionError):hub.factory('/drop',{'test':True})
+            self.assertEqual(sum(r[:2]==('POST','/drop') for r in requests),1)
+            self.assertIsNone(hub.stock_scope.factory_connection)
+            hub.factory('/api/state/full')
+            self.assertEqual(len({r[2] for r in requests}),2)
+        finally:
+            hub.stock_end();server.shutdown();server.server_close();thread.join(2)
+        self.assertIsNone(hub.stock_scope.factory_connection)
+
 
 if __name__ == '__main__': unittest.main()

@@ -7,6 +7,7 @@ import json
 import time
 from .contracts import Authority, Binding, Sensor, Task, uid, validate
 from .voice_chain import checked_final,speech_main
+from .visual_attention import VisualAttention
 
 
 def utc():
@@ -46,6 +47,7 @@ class State:
         self.production=False;self.stopped=False;self.overload='ACTIVE'
         self.character={};self.durable_revision=-1;self.services=None
         self.tool_results={};self.working={};self.log_sink=None;self.dialogue_at=None
+        self.visual=VisualAttention()
 
     @property
     def privacy(self):return self._privacy
@@ -63,6 +65,7 @@ class State:
             self.candidates.clear();self.candidate_kinds.clear();self.current_utterance=''
             self.speech_proposals.clear()
             self.tool_results.clear();self.working.clear()
+            if hasattr(self,'visual'):self.visual.event=None
 
     def set_speech_operator(self,receipt):
         signature=(tuple(receipt['binding']),receipt['microphone_enabled'],receipt['quiet'],receipt['privacy_all'])
@@ -269,6 +272,7 @@ class State:
                 del self.tasks[key]
 
     def snapshot(self, now):
+        self.visual.refresh(self,now)
         self.collect(now)
         pending, ready = [], []
         for task in self.tasks.values():
@@ -321,15 +325,19 @@ class State:
         ready = tuple(t.task_id for t in self.tasks.values() if t.status == 'ready')[:4]
         return Binding(uid(), self.authority, self.revision, now + timeout,
                        candidates, ready, (),
-                       tuple((alias, self.dependency_digest(alias, now)) for alias in candidates + ready),durable_revision=self.durable_revision)
+                       tuple((alias, self.dependency_digest(alias, now)) for alias in candidates + ready),durable_revision=self.durable_revision,
+                       visual_target=self.visual.target(self,now))
 
     def apply(self, value, binding, now):
+        self.visual.refresh(self,now)
         validate('FastChoice', value)
         if self.stopped or self.overload!='ACTIVE' or (self.production and binding.durable_revision!=self.durable_revision) or binding.authority != self.authority or now > binding.deadline:
             self.record('decision_stale', request_id=binding.request_id); return None
         if binding.request_id in self.consumed:
             self.record('decision_duplicate'); return None
         motion=value.get('motion')
+        if motion and binding.visual_target and binding.visual_target!=self.visual.target(self,now):
+            self.record('visual_motion_stale');return None
         if motion and (motion!='attentive' or not self.motion_allowed or now>=self.actor_deadline or self.quiet or self.privacy
                 or not self.actor_binding or (not self.production and (value.get('start') or value.get('commit')))):
             self.record('motion_capability_rejected');return None
@@ -382,8 +390,13 @@ class State:
         self.focus = focus
         self.record('decision_accepted', request_id=binding.request_id, activity=value['a'])
         if motion:
-            self.motion_proposals.append(dict(motion=motion,request_id=binding.request_id,authority=binding.authority,
-                actual_binding=dict(self.actor_binding),deadline=min(binding.deadline,now+.5)))
+            proposal=dict(motion=motion,request_id=binding.request_id,authority=binding.authority,
+                actual_binding=dict(self.actor_binding),deadline=min(binding.deadline,now+.5))
+            if binding.visual_target:
+                identity,side=binding.visual_target
+                proposal['gaze_side']=side;self.visual.moved.append(identity)
+                self.record('visual_motion_proposed')
+            self.motion_proposals.append(proposal)
             self.record('motion_proposed',request_id=binding.request_id)
         if commit:
             task = self.tasks.get(commit)

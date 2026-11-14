@@ -1,0 +1,12 @@
+[Unit]
+Description=Collect Wi-Fi boot diagnostics without secrets
+After=NetworkManager.service
+Wants=NetworkManager.service
+RequiresMountsFor=/boot/firmware
+
+[Service]
+Type=simple
+ExecStart=/usr/local/sbin/pi-wifi-diagnostics
+
+[Install]
+WantedBy=multi-user.target

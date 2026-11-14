@@ -1,0 +1,17 @@
+[Unit]
+Description=Reachy inbound access policy
+DefaultDependencies=no
+Wants=network-pre.target
+After=local-fs.target
+Before=network-pre.target shutdown.target reachy-voice-agent.service
+Conflicts=shutdown.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+Environment="PYTHONPATH=@@SOURCE_ROOT@@/src"
+ExecStart=/usr/bin/python3 -m reachy_companion --config @@ROOT@@/config.local.json firewall apply
+ExecStop=/usr/bin/python3 -m reachy_companion --config @@ROOT@@/config.local.json firewall remove
+
+[Install]
+WantedBy=multi-user.target

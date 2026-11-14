@@ -131,7 +131,7 @@ class CapturePhaseTests(unittest.TestCase):
         self.assertEqual(vision.PHASE,'capture');self.camera.close.assert_called_once()
         self.camera.pipeline.get_state.assert_called_once_with(1_000_000_000)
 
-    def test_capture_diagnostics_and_nullable_owner_are_only_changes_from_historical_pins(self):
+    def test_historical_guards_survive_diagnostics_nullable_owner_and_camera_permission(self):
         for path,sha,skip in (
                 ('deploy/autonomous/demo_vision.py','1bd06dec8f941a78f0519e090e3a54cbc5816f5485fbb83ddd348e1830d0ef3f','capture_png'),
                 ('src/reachy_companion/spoken_vision.py','242ac03560af18c042ddef39fa2eb0eb343aa4c9dcb13e99a31e5eda3c134c69','ERROR_PHASES')):
@@ -145,6 +145,14 @@ class CapturePhaseTests(unittest.TestCase):
                     b"binding(value)!=expected or type(expected['owner_id']) is not str or not 1<=len(expected['owner_id'])<=128",
                     b"binding(value)!=expected or (expected['owner_id'] is not None\n"
                     b"            and (type(expected['owner_id']) is not str or not 1<=len(expected['owner_id'])<=128))")
+                # The panel now adds an independent camera permission. Normalize
+                # only its exact admission/recheck and path handoff; every other
+                # historical operator, timeout, capture and child guard is pinned.
+                source=source.replace(b"    permission=agent.camera_permission.snapshot()\n", b"")
+                source=source.replace(
+                    b"        if not permission['enabled'] or permission['error'] or agent.camera_permission.snapshot()!=permission:\n"
+                    b"            raise RuntimeError('Camera permission changed')\n", b"")
+                source=source.replace(b"config=dict(camera_permission_path=str(agent.camera_permission.path),network=", b"config=dict(network=")
                 tree=ast.parse(source)
                 tree.body=[n for n in tree.body if getattr(n,'name',None)!=skip and not
                     (isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id==skip for t in n.targets))]

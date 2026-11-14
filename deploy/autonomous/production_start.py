@@ -30,6 +30,8 @@ def main():
     root = args.root.resolve()
     companion = root / 'config.local.json'
     cfg = Config(companion)
+    from reachy_companion.production_logs import prune_reports
+    prune_reports(root / 'data', apply=True)
     run = root / 'data' / ('production-' + uuid.uuid4().hex)
     run.mkdir(mode=0o700)
     if args.role == 'device':

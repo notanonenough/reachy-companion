@@ -468,7 +468,7 @@ class Initiative:
     def dispatch(self, generation):
         a=self.agent
         info=self.inspect();guard(info['operator'],self.expected,self.deadline,processing=True)
-        packet=dict(config=dict(network=dict(llm_base_url=a.config['network']['llm_base_url']),llm=dict(model=a.config['llm']['model'])),
+        packet=dict(config=dict(camera_permission_path=str(a.camera_permission.path),network=dict(llm_base_url=a.config['network']['llm_base_url']),llm=dict(model=a.config['llm']['model'])),
                     port=a.config['servers']['agent']['port'],token=a.config.token,expected=self.expected,
                     deadline=self.deadline,generation=generation)
         process=subprocess.Popen(['/venvs/mini_daemon/bin/python',str(Path(__file__).resolve()),'--snapshot-child'],

@@ -126,11 +126,14 @@ class WhisperCacheIntegrityTests(unittest.TestCase):
         self.cache();recognition.prepare(self.config)
         model=Mock();model.transcribe.side_effect=lambda *args,**kwargs:(iter(()),None)
         constructor=Mock(return_value=model)
+        class Model:
+            def __init__(self,*args,**kwargs):constructor(*args,**kwargs)
+            def transcribe(self,*args,**kwargs):return model.transcribe(*args,**kwargs)
         class Samples:
             def astype(self,*args):return self
             def __truediv__(self,*args):return self
         numpy=types.SimpleNamespace(float32=object(),zeros=Mock(return_value=Samples()),frombuffer=Mock(return_value=Samples()))
-        with patch.dict(sys.modules,{'faster_whisper':types.SimpleNamespace(WhisperModel=constructor),'numpy':numpy}):
+        with patch.dict(sys.modules,{'faster_whisper':types.SimpleNamespace(WhisperModel=Model),'numpy':numpy}):
             recognizer=recognition.Recognizer(self.config)
             constructor.assert_called_once_with(str(self.target),device=self.settings['device'],compute_type=self.settings['compute_type'],
                                                 cpu_threads=self.settings['cpu_threads'],local_files_only=True)

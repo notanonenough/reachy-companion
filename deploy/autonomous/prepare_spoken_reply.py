@@ -10,6 +10,7 @@ import subprocess
 ROOT=Path(__file__).resolve().parents[2]
 BASE='049083a878280ed23e3732a1881354db37d0eb84'
 LEGACY='94fd73d906e75d90829562f58a7f62c83d7e4ff8'
+FEATURE='3bde07799a16cd3e83e85854a201b98f64c5b981'
 PREFIX='src/reachy_companion/'
 PREIMAGES={'voice.py':'95be315c7ed0af376fd9fc9dd6fb319f90776d10b2df04507b5daa0addd5e3c2',
            'brains.py':'9c69d27979dce500148c06ee8d1dc58e90aabae3e5a2b1d3fc8edfb9e754642d'}
@@ -22,9 +23,10 @@ def git_file(commit,name):
 
 
 def overlay_voice():
-    # Transfer ONLY this feature's exact-source edits; omit intervening STT diagnostics.
+    # Transfer the reviewed feature revision, never unrelated current-worker
+    # changes such as remote STT ownership into this legacy three-file bundle.
     baseline=git_file(BASE,'voice.py').decode().splitlines(keepends=True)
-    updated=(ROOT/PREFIX/'voice.py').read_text().splitlines(keepends=True)
+    updated=git_file(FEATURE,'voice.py').decode().splitlines(keepends=True)
     legacy=git_file(LEGACY,'voice.py').decode()
     if sha(legacy.encode())!=PREIMAGES['voice.py']:raise ValueError('Legacy voice preimage mismatch')
     groups=list(difflib.SequenceMatcher(a=baseline,b=updated,autojunk=False).get_grouped_opcodes(2))
@@ -47,7 +49,7 @@ def build(destination,include_decoder=False,include_sdk=False):
     if include_decoder:
         for name in dependencies:files[name]=(ROOT/PREFIX/name).read_bytes()
     for name,data in files.items():compile(data,name,'exec')
-    manifest={'kind':'spoken-reply-overlay-1','preimages':{**PREIMAGES,'spoken_reply.py':None,**({'spoken_reply_sdk.py':None} if include_sdk else {}),**({name:None for name in dependencies} if include_decoder else {})},
+    manifest={'kind':'spoken-reply-overlay-1','voice_feature_revision':FEATURE,'preimages':{**PREIMAGES,'spoken_reply.py':None,**({'spoken_reply_sdk.py':None} if include_sdk else {}),**({name:None for name in dependencies} if include_decoder else {})},
         'required_absent_directory':'autonomous' if include_decoder else None,
         'outputs':{name:sha(data) for name,data in files.items()},
         'required_existing_dependencies':{name:sha((ROOT/PREFIX/name).read_bytes()) for name in dependencies if not include_decoder},

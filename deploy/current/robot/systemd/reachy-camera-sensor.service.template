@@ -1,0 +1,16 @@
+[Unit]
+Description=Reachy camera stream numeric measurements (no raw export)
+After=reachy-voice-agent.service
+PartOf=reachy-production-audio.service
+
+[Service]
+User=pollen
+WorkingDirectory=@@ROOT@@
+Environment="PYTHONPATH=@@SOURCE_ROOT@@/src"
+ExecStart=/venvs/mini_daemon/bin/python -m reachy_companion.autonomous.camera_sensor --config @@ROOT@@/config.local.json
+Restart=no
+UMask=0077
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+TimeoutStopSec=8
