@@ -1,5 +1,8 @@
+# A single leading space on blank context lines is part of unified patch syntax.
+# Preserve historical patch bytes and hashes instead of stripping that space.
+*.patch -whitespace
+
 # Audited configuration/vendor copies retain the installed/upstream bytes.
 deploy/current/**/*.template -whitespace
 deploy/current/robot/factory/bluetooth/commands/*.sh -whitespace
 deploy/current/vendor/SOX-* -whitespace
-deploy/current/robot/vendor/*.patch -whitespace

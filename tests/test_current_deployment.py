@@ -29,7 +29,7 @@ class CurrentDeploymentTests(unittest.TestCase):
                 self.assertNotIn(b'@@', row['data'])
                 if '.json' in row['source']:
                     json.loads(row['data'])
-                if row['kind'] == 'systemd':
+                if row['kind'] == 'systemd' or 'dispatcher.d/' in row['source']:
                     self.assertNotIn(b'releases/ops-', row['data'])
                     self.assertNotIn(b'releases/continuous-', row['data'])
                     if b'PYTHONPATH=' in row['data']:

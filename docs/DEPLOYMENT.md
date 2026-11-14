@@ -85,7 +85,11 @@ Python-кода не требуется.
    Перезапуск network/firewall/DNS выполнять локально после проверки.
 4. На Linux установить network scope инструментом ниже. `nmcli connection reload`
    перечитывает профили; подключение `LinkedList-5GHz` выполняется отдельно.
-   На Hub Ethernet autoconnect выключен; Wi-Fi power saving выключен. На router
+   На роботе создать ссылки
+   `/etc/NetworkManager/dispatcher.d/pre-up.d/70-reachy-firewall` и
+   `pre-down.d/70-reachy-firewall` на
+   `/etc/NetworkManager/dispatcher.d/70-reachy-firewall`. Обработчик использует
+   `ROOT/current/src`. На Hub Ethernet autoconnect выключен; Wi-Fi power saving выключен. На router
    AP 5 GHz channel36/VHT80, 2.4 GHz channel6/HT20, LAN192.168.0.1/24.
 5. Настроить Mac en0: Vuqar 5G, DHCP, MTU1492; ожидаемый адрес192.168.100.31.
    Router WAN ожидается192.168.100.45. Если DHCP другой — согласовать адреса

@@ -360,7 +360,7 @@
       "kind": "network",
       "mode": "0700",
       "scope": "network",
-      "sha256": "a78b3744645bd2a7c20cad33e44beae5cb964edf4ac9aea3a48942b2b56e3d44",
+      "sha256": "0f0cbc5972a09ec86017985b3aca2c938e9329b2ad362235841c4aa957334253",
       "owner": "root"
     },
     {
