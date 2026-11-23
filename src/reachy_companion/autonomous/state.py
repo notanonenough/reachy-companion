@@ -231,6 +231,8 @@ class State:
                 if (task.authority==self.authority and task.kind=='main' and not self.muted and not self.privacy
                         and self.current_utterance and not self.candidates):
                     ref=uid();self.candidates[ref]=self.current_utterance;self.candidate_kinds[ref]='main'
+                    trace=getattr(self,'private_trace',None)
+                    if trace is not None:trace.retry(task.input_ref,ref,self.authority.wire())
                     self.record('memory_retry_candidate')
         self.record('context_updated',memory_revision=self.memory_revision)
         return True

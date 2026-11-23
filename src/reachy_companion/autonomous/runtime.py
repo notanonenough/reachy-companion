@@ -9,6 +9,7 @@ from urllib.error import HTTPError
 from http.client import HTTPException
 from .contracts import decode, uid, validator, validate
 from .state import State
+from ..private_audio_trace import emit,main_call
 
 
 class Job:
@@ -222,6 +223,10 @@ class Scheduler:
 
     def ingest(self, event, now=None):
         if self.closed:return
+        trace=getattr(self,'private_trace',None)
+        if trace is not None:self.state.private_trace=trace
+        if trace is not None and (event.get('type')=='stop' or event.get('type')=='operator' and event.get('privacy_all') is True):
+            trace.disable('privacy' if event.get('privacy_all') is True else 'stop')
         if self.audio_adapter and event.get('type')=='operator':self.audio_adapter.interrupt()
         if self.speech_adapter and event.get('type') in ('operator','utterance'):
             self.speech_adapter.interrupt('human_utterance' if event['type']=='utterance' else 'operator',False)
@@ -230,6 +235,13 @@ class Scheduler:
             self.next_autonomous=self.last_dialogue_at+30
         old_authority=self.state.authority
         self.state.ingest(event, time.monotonic() if now is None else now)
+        if trace is not None and event.get('type')=='utterance' and event.get('audio'):
+            audio=event['audio'];admitted=self.state.authority.interaction_epoch==old_authority.interaction_epoch+1
+            refs=list(self.state.candidates) if admitted else []
+            emit(self,'input_admission',text=event['text'] if admitted else None,
+                input_ref=refs[0] if len(refs)==1 else None,authority=self.state.authority.wire(),
+                lineage_id=audio.get('lineage_id'),source_boot=audio.get('source_boot'),sequence=audio.get('sequence'),
+                disposition='admitted' if admitted else 'blocked')
         if event.get('type')=='operator' and self.state.privacy:self.revoke_context(old_authority)
         if event.get('type')=='stop':
             if self.speech_adapter:self.speech_adapter.interrupt('stop',False)
@@ -349,6 +361,9 @@ class Scheduler:
                         provenance=result.get('completion_provenance'))
             except Exception:
                 self.state.complete(task.task_id, task.attempt_id, task.authority, None, now, error=True)
+            if getattr(self,'private_trace',None) is not None:
+                emit(self,'main_checked',task_id=task.task_id,attempt_id=task.attempt_id,input_ref=task.input_ref,
+                    authority=task.authority.wire(),disposition=task.status,final=task.completion_provenance)
             self.main_job = self.main_task = None
         if self.fast_job and self.fast_job.future.done():
             try:
@@ -378,7 +393,8 @@ class Scheduler:
                     else:self.state.record('motion_execution_busy')
                 if task:
                     self.main_task = task
-                    self.main_job = Job(self.gateway.main, task)
+                    trace=getattr(self,'private_trace',None)
+                    self.main_job = Job(main_call,trace,self.gateway.main,task) if trace is not None else Job(self.gateway.main,task)
             except Exception as exc:
                 self.state.record('fast_failed', error_class=type(exc).__name__)
             self.fast_job = self.binding = None

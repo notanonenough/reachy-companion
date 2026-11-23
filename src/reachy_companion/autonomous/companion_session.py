@@ -126,6 +126,11 @@ def run_session(scheduler,poller,lease,client,stop_client,source,stop,duration,p
     trace=getattr(lease,'reducer_trace',None)
     if trace is None:trace=ReducerTrace();lease.reducer_trace=trace
     trace.bind_current()
+    private_trace=getattr(scheduler,'private_trace',None)
+    if private_trace is not None:
+        private_trace.start(stop,hub_boot_id=scheduler.state.authority.hub_boot_id)
+        for resource in (scheduler.state,scheduler.audio_adapter,scheduler.speech_adapter,scheduler.speech_adapter.playback):
+            resource.private_trace=private_trace
     startup=PeerStartup(source);peer_job=health_job=stop_job=None
     retire_job=None;media_close_job=None;retiring_terminal=None;next_retire=0;peer_receipt=None
     next_peer=next_health=next_publish=0;started=time.monotonic();last_health=last_operator=started
@@ -136,7 +141,7 @@ def run_session(scheduler,poller,lease,client,stop_client,source,stop,duration,p
     health_timeout=scheduler.config.get('production',{}).get('compute_health_timeout_s',3) if scheduler.production else .5
     report=dict(mode='normal_joined_companion',continuous=lifetime=='lease',continuous_acceptance=False,lifetime=lifetime,accepted=False,
         device_lifetime_cap_s=180 if lifetime=='finite' else None,device_stream_cap=32 if lifetime=='finite' else 1,raw_audio_retained=False,
-        transcripts_retained=False,speaker_identity='unknown',automatic_microphone_activation=False,
+        transcripts_retained=private_trace is not None,speaker_identity='unknown',automatic_microphone_activation=False,
         automatic_reconnect=False,source_boot=source,hub_boot_id=scheduler.state.authority.hub_boot_id,
         context_enabled=scheduler.config.get('context',{}).get('enabled',False))
     report['lease_transport']='udp' if lease.datagram is not None else 'tcp'
@@ -269,6 +274,7 @@ def run_session(scheduler,poller,lease,client,stop_client,source,stop,duration,p
         reason='runtime_error';failure_code=getattr(exc,'code',type(exc).__name__);errors.append(type(exc).__name__)
     finally:
         trace.enter('cleanup')
+        if private_trace is not None:private_trace.disable('stop')
         stop.set();startup.close()
         # Send explicit withdrawal before local cleanup can outlast the device's
         # short controller lease. Keep its real transport slot until terminal.
@@ -336,6 +342,9 @@ def run_session(scheduler,poller,lease,client,stop_client,source,stop,duration,p
         report['accepted']=ready_seen and report['cleanup_verified'] and reason in ('duration','controller_stop','finite_stream_budget')
         publish(dict(stage='STOPPED',reason=reason,failure_code=failure_code,first_lease_invalid=invalid_view(),first_reducer_expiry=trace.view(),execution_busy=report['execution_busy'],cleanup_verified=report['cleanup_verified']))
         trace.unbind()
+        if private_trace is not None:
+            if any(report['execution_busy'].values()):private_trace.drop('occupied_at_close')
+            report['private_audio_trace']=private_trace.close()
     return report
 
 
@@ -352,6 +361,8 @@ def main():
     parser.add_argument('--allow-capture-output',action='store_true');parser.add_argument('--allow-bounded-motion',action='store_true')
     parser.add_argument('--allow-camera-context',action='store_true')
     parser.add_argument('--memory-readback',type=Path);parser.add_argument('--memory-readback-sha256')
+    parser.add_argument('--private-audio-trace',type=Path)
+    parser.add_argument('--private-audio-trace-seconds',type=float)
     args=parser.parse_args()
     if args.lifetime=='finite' and args.duration is None:args.duration=60
     if (not args.allow_capture_output or args.output.exists()
@@ -361,6 +372,19 @@ def main():
     if not 1<=len(args.source_boot)<=128 or any(port is not None and not 1<=port<=65535
             for port in (args.status_port,args.peer_stop_port,args.lease_datagram_port)):
         raise ValueError('Explicit source binding and valid transport ports required')
+    if (args.private_audio_trace is None)!=(args.private_audio_trace_seconds is None):
+        parser.error('Private trace requires both explicit path and trace seconds')
+    private_trace=None
+    if args.private_audio_trace is not None:
+        from ..private_audio_trace import PrivateAudioTrace
+        private_trace=PrivateAudioTrace(args.private_audio_trace,seconds=args.private_audio_trace_seconds,
+            forbidden_roots=(args.config.resolve().parent,args.companion_config.resolve().parent))
+    try:return _run_session_cli(args,private_trace)
+    finally:
+        if private_trace is not None:private_trace.close()
+
+
+def _run_session_cli(args,private_trace):
     cfg=load(args.config)
     if cfg.get('speech',{}).get('enabled'):
         raise ValueError('Normal distributed mode uses the explicit remote peer, not the local ALSA speech profile')
@@ -425,6 +449,7 @@ def main():
             gain=cfg.get('speech',{}).get('tts_gain',1)),lambda:read_speech_operator(hub))
         poller=AudioPolling(client,audio,args.source_boot,persistent=True)
         scheduler=Scheduler(cfg,gateway,motion,speech,audio)
+        if private_trace is not None:scheduler.private_trace=private_trace
         from .production import attach
         if cfg.get('production'):
             attach(scheduler,args.config)
@@ -479,6 +504,9 @@ def main():
             except BaseException as exc:final_errors.append(type(exc).__name__)
         if final_errors:
             report['control_cleanup_errors']=final_errors;report['accepted']=report['cleanup_verified']=False
+    if private_trace is not None:
+        report['transcripts_retained']=True
+        report['private_audio_trace']=private_trace.close()
     report.update(server.session_binding if server is not None else dict(controller=args.controller))
     with args.output.open('x') as file:json.dump(report,file,ensure_ascii=False,indent=2)
     from reachy_companion.production_logs import report_summary

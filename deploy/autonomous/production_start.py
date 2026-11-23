@@ -24,7 +24,11 @@ def main():
     parser.add_argument('--listen-device', default='127.0.0.1')
     parser.add_argument('--lease-datagram-port', type=int)
     parser.add_argument('--trusted-private-lan', action='store_true')
+    parser.add_argument('--private-audio-trace', type=Path)
+    parser.add_argument('--private-audio-trace-seconds', type=float)
     args = parser.parse_args()
+    if (args.private_audio_trace is None)!=(args.private_audio_trace_seconds is None) or (args.private_audio_trace is not None and args.role!='hub'):
+        parser.error('One explicit Hub trace path and trace seconds required')
     from reachy_companion.config import Config
     from reachy_companion.autonomous.audio_peer import PeerClient
     root = args.root.resolve()
@@ -88,6 +92,9 @@ def main():
                 '--peer-url', client.url, '--peer-stop-port', str(args.peer_stop_port),
                 '--source-boot', peer['source_boot'], '--lifetime', 'lease',
                 '--allow-capture-output', '--status-port', '8791', '--lease-progress-s', '.2']
+    if args.private_audio_trace is not None:
+        sys.argv += ['--private-audio-trace',str(args.private_audio_trace),
+                     '--private-audio-trace-seconds',str(args.private_audio_trace_seconds)]
     if json.loads(args.config.read_text()).get('motion',{}).get('enabled'):
         sys.argv.append('--allow-bounded-motion')
     if args.lease_datagram_port:

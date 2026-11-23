@@ -12,6 +12,7 @@ import threading
 import time
 from urllib.request import Request, build_opener, ProxyHandler
 from .contracts import decode,Authority
+from ..private_audio_trace import emit
 
 
 class HttpSTT:
@@ -118,6 +119,10 @@ class AudioAdapter:
             return True
 
     def _withdraw(self):
+        if self.result and getattr(self,'private_trace',None) is not None:
+            observation=self.result[0]
+            emit(self,'stt_disposition',lineage_id=observation['lineage_id'],
+                source_boot=observation['source_boot'],sequence=observation['sequence'],disposition='withdrawn')
         self.generation += 1
         self.pending = self.result = None
         self.level=None
@@ -144,7 +149,11 @@ class AudioAdapter:
                 result, self.result = self.result, None
                 if result:
                     observation, generation, text, error = result
-                    if self._fresh(observation, generation):
+                    fresh_for_admission=self._fresh(observation,generation)
+                    if getattr(self,'private_trace',None) is not None:
+                        emit(self,'stt_disposition',lineage_id=observation['lineage_id'],source_boot=observation['source_boot'],
+                            sequence=observation['sequence'],disposition='fresh' if fresh_for_admission else 'stale')
+                    if fresh_for_admission:
                         if error or not text.strip():
                             self.counts['no_response'] += 1
                             if not error:self.counts['empty'] += 1
@@ -182,6 +191,13 @@ class AudioAdapter:
                             del pcm
                         with self.lock:
                             fresh = self._fresh(observation, generation)
+                            if getattr(self,'private_trace',None) is not None:
+                                emit(self,'stt_result',text=text if not error else None,lineage_id=observation['lineage_id'],
+                                    source_boot=observation['source_boot'],sequence=observation['sequence'],
+                                    audio_s=observation['audio_s'],pcm_sha256=observation['pcm_sha256'],
+                                    captured_end=observation['captured_end'],capture_basis='hub_monotonic_conservative_mapping',
+                                    started_at=started,ended_at=self.clock(),authority=observation['authority'].wire() if isinstance(observation['authority'],Authority) else None,
+                                    disposition='stale' if not fresh else 'error' if error else 'recognized' if text.strip() else 'empty',error_kind=error)
                             if error:
                                 self.counts['errors'] += 1
                                 if error in ('TimeoutError','socket.timeout'):self.counts['timeouts'] += 1
