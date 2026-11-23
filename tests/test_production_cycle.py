@@ -516,18 +516,36 @@ class CycleTests(unittest.TestCase):
         self.scheduler.audio_adapter=SimpleNamespace(status=lambda:dict(execution_busy=False,source_boot=None),advance=lambda a,r,**kw:None,close=lambda:None,allowed=False)
         self.model.call=lambda path:dict(compute_boot_id=self.model.boot_id,quarantined=[])
         poller=SimpleNamespace(status=lambda:dict(execution_busy=False),close=lambda:None)
-        lease=SimpleNamespace(source_boot='source',authority=dict(agent_boot_id='agent',microphone_epoch=0,policy_epoch=0),
+        lease=SimpleNamespace(source_boot='source',authority=dict(agent_boot_id='agent',microphone_epoch=0,policy_epoch=0,owner_sha256='0'*64),
             last_accepted=None,armed=True,datagram=None,status=lambda:dict(execution_busy=False,withdrawn=True),
             close=lambda:None,tick=lambda *a:renewals.append(a))
         def peer_call(path,**kw):
             if path=='/stop':return dict(stop_known=True,execution_busy=False)
             return dict(source_boot='source',closed=True,permitted=False,operator_ready=False,lifetime='lease',lease_binding=lease.authority)
         client=SimpleNamespace(call=peer_call)
-        # Binding check rejects this withdrawn peer; the independent clock still runs.
-        timer=threading.Timer(.06,stop.set);timer.start()
-        try:report=run_session(self.scheduler,poller,lease,client,client,'source',stop,None,lambda value:None,lifetime='lease')
-        finally:timer.join()
+        # Observe withdrawal before counting continued model calls. A fixed
+        # 60ms window races SQLite/Job scheduling rather than testing the clock.
+        withdrawn=threading.Event();withdrawal_reasons=[];completed_calls=[];original_fast=self.model.fast
+        def publish(value):
+            if value.get('stage')=='WITHDRAWN' and not withdrawn.is_set():
+                withdrawal_reasons.append(value['peer']['reason']);withdrawn.set()
+        def fast(*args):
+            after_withdrawal=withdrawn.is_set()
+            time.sleep(.04) # Controlled model work exceeds the former 60ms/3-call window.
+            result=original_fast(*args)
+            if after_withdrawal:
+                completed_calls.append(True)
+                if len(completed_calls)>=3:stop.set()
+            return result
+        self.model.fast=fast
+        watchdog=threading.Timer(3,stop.set);watchdog.start()
+        try:report=run_session(self.scheduler,poller,lease,client,client,'source',stop,None,publish,lifetime='lease')
+        finally:
+            watchdog.cancel();watchdog.join();self.model.fast=original_fast
         self.assertEqual(report['errors'],[],report)
+        self.assertTrue(withdrawn.is_set())
+        self.assertEqual(withdrawal_reasons,['device_closed'])
+        self.assertGreaterEqual(len(completed_calls),3)
         self.assertGreaterEqual(len(self.model.views),3)
         self.assertEqual(report['reason'],'controller_stop')
         self.assertFalse(renewals)
