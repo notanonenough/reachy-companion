@@ -116,8 +116,8 @@ class BaselineTests(unittest.TestCase):
         with self.assertRaises(ValueError):b.parse_proc_stat(raw,pid=42,start_ticks=999,host_boot='boot',at=1,user_hz=100,page_size=4096)
         rows=[dict(sample,node='hub'),dict(sample,node='hub',at=2,cpu_s=2),dict(sample,node='hub',at=3,cpu_s=8,start_ticks=222)]
         result=b.analyze_resources(rows)
-        self.assertEqual(result['hub']['cpu_percent_one_core']['max'],50)
-        self.assertEqual(result['hub']['cpu_percent_one_core']['n'],1)
+        self.assertEqual(result['hub']['instances'][0]['cpu_percent_one_core']['max'],50)
+        self.assertEqual(result['hub']['instances'][0]['cpu_percent_one_core']['n'],1)
         self.assertEqual(result['mac']['state'],'missing')
 
     def test_dry_run_never_reads_inputs_or_starts_network_process(self):

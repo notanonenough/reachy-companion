@@ -187,14 +187,20 @@ start_ticks, host boot; смена → sample unknown. Linux USER_HZ через
 RSS=pages×page_size; CPU=(utime+stime)/USER_HZ. Не фиксировать100Hz/4096bytes
 как универсальные. Сохранить host-local monotonic timestamp.
 
-Optional `--resources FILE` принимает JSONL из `parse_proc_stat` плюс
-`node=hub|robot|mac`. CPU delta разрешена только одной PID instance/host boot/clock
-при возрастающем local time и неубывающем CPU. Результат `% одного core` может
-превышать100% на multicore. RSS — snapshot distribution, не allocation rate.
-Reset/missing/unsupported не превращается в CPU0. Mac parser пока unsupported:
-значения null/missing до отдельно проверенного `ps` observer с process-start
-identity, явными units и без command args. Этот PR проверяет единицы и reset на
-синтетических `/proc` fixtures; executable observer не запускался и не заявлен.
+Optional `--resources FILE` принимает legacy Linux `start_ticks` rows и новый
+platform-neutral формат OBSERVE-01 с role, process_start_identity/identity_basis,
+probe interval, cumulative CPU/RSS, units и explicit sample state. Новый producer
+и concrete integration описаны в [RESOURCE-OBSERVER.md](RESOURCE-OBSERVER.md).
+Mac поддержан через проверенные SDK/libproc ABI, Mach timebase conversion и
+собственный controlled child; lifetime `%CPU` не используется. Linux units
+по-прежнему проверяются через чистый parser и реальный child на Linux.
+
+CPU deltas/distributions разделены по role/process instance/host boot/basis;
+разные workers не смешиваются. `% одного core` может превышать100%. RSS —
+snapshot, не allocation rate и не суммарная unique memory. Missing/error/reset
+не превращается в0; footer incomplete/отсутствие footer нового формата сохраняет
+incomplete. Для legacy rows completion unknown. Три узла должны дать пригодное
+покрытие до признания joint-load baseline; unsupported никогда не задерживает STOP.
 
 Acoustic latency/stop deadline требуют независимых совместно привязанных
 событий с оценкой clock error; пока такого инструмента нет, output — missing.
