@@ -25,6 +25,7 @@ from .playback import Playback
 from .runtime import Job,RemoteGateway,Scheduler
 from .speech_adapter import SpeechAdapter,HttpTTS
 from .voice_chain import check_context_task,check_context_view,context_binding
+from ..lease_diagnostics import project_first_lease_invalid
 
 
 class SessionFailure(RuntimeError):
@@ -32,6 +33,32 @@ class SessionFailure(RuntimeError):
     def __init__(self,code):
         self.code=code
         super().__init__(code)
+
+
+def first_lease_invalid_record(peer,current,status_at,authority,now,started,phase,lease):
+    """Project only the captured gate inputs, before close. Never inhibit close."""
+    try:
+        present=peer is not None;has_current=current is not None;seen=status_at is not None
+        predicates=dict(peer_receipt_present=present,
+            operator_ready=peer.get('operator_ready') is True if present else None,
+            status_seen=seen,status_fresh=now-status_at<.3 if seen else None,
+            current_present=has_current,current_fresh=now<current['valid_until'] if has_current else None,
+            microphone_enabled=current['microphone_enabled'] is True if has_current else None,
+            not_quiet=current['quiet'] is False if has_current else None,
+            not_privacy=current['privacy_all'] is False if has_current else None,
+            binding_matches=tuple(current['binding'])==(authority['agent_boot_id'],authority['microphone_epoch'],authority['policy_epoch']) if has_current else None)
+        with lease.lock:
+            timing=lease._timing(now)
+            timing.update(progress_timeout_ms=lease.progress_timeout_s*1000,max_call_ms=lease.max_call_ms)
+            closed=lease.closed;prior=lease.withdrawal_reason
+        value=dict(cause='invalid_complete_authority',predicates=predicates,elapsed_ms=(now-started)*1000,
+            startup_phase=phase,peer_status_age_ms=(now-status_at)*1000 if seen else None,
+            operator_valid_remaining_ms=(current['valid_until']-now)*1000 if has_current else None,
+            lease_already_withdrawn=closed,prior_withdrawal_reason=prior,lease_timing=timing)
+        return json.dumps(project_first_lease_invalid(value),allow_nan=False)
+    except Exception:
+        # Unknown diagnostic data is not a reason to change the withdrawal path.
+        return json.dumps(project_first_lease_invalid(dict(cause='invalid_complete_authority',diagnostic_unavailable=True)))
 
 
 def read_speech_operator(hub):
@@ -100,6 +127,8 @@ def run_session(scheduler,poller,lease,client,stop_client,source,stop,duration,p
     retire_job=None;media_close_job=None;retiring_terminal=None;next_retire=0;peer_receipt=None
     next_peer=next_health=next_publish=0;started=time.monotonic();last_health=last_operator=started
     reason='duration';failure_code=None;errors=[];ready_seen=False
+    first_lease_invalid=None
+    def invalid_view():return json.loads(first_lease_invalid) if first_lease_invalid is not None else None
     health_errors=0;network=NetworkObservation()
     health_timeout=scheduler.config.get('production',{}).get('compute_health_timeout_s',3) if scheduler.production else .5
     report=dict(mode='normal_joined_companion',continuous=lifetime=='lease',continuous_acceptance=False,lifetime=lifetime,accepted=False,
@@ -191,18 +220,25 @@ def run_session(scheduler,poller,lease,client,stop_client,source,stop,duration,p
                 with scheduler.speech_adapter.lock:
                     current=scheduler.speech_adapter.operator_receipt
                     current=dict(current) if current else None
-                valid=(peer_receipt is not None and peer_receipt.get('operator_ready') is True
-                    and startup.last_status is not None and now-startup.last_status<.3
+                captured_peer=dict(peer_receipt) if peer_receipt is not None else None
+                status_at=startup.last_status
+                captured_authority=lease.authority
+                valid=(captured_peer is not None and captured_peer.get('operator_ready') is True
+                    and status_at is not None and now-status_at<.3
                     and current is not None and now<current['valid_until'] and current['microphone_enabled'] is True
                     and current['quiet'] is False and current['privacy_all'] is False
-                    and tuple(current['binding'])==(lease.authority['agent_boot_id'],lease.authority['microphone_epoch'],lease.authority['policy_epoch']))
+                    and tuple(current['binding'])==(captured_authority['agent_boot_id'],captured_authority['microphone_epoch'],captured_authority['policy_epoch']))
                 if valid:lease.tick(lease.authority)
                 elif lease.armed:
+                    if first_lease_invalid is None:
+                        first_lease_invalid=first_lease_invalid_record(captured_peer,current,status_at,captured_authority,
+                            now,started,startup.phase,lease)
                     lease.close()
                     if not scheduler.production:raise RuntimeError('Fresh complete lease authority required')
             if now>=next_publish:
                 next_publish=now+.05
                 publish(dict(stage=startup.phase,elapsed_s=now-started,counts=dict(scheduler.state.counts),
+                    first_lease_invalid=invalid_view(),
                     audio=scheduler.audio_adapter.status(),peer_poll=poller.status(),lease=lease.status(),
                     motion=dict(allowed=scheduler.state.motion_allowed,receipts=list(scheduler.motion_adapter.receipts)[-4:],
                         **scheduler.motion_adapter.status()) if scheduler.motion_adapter else None,
@@ -250,6 +286,7 @@ def run_session(scheduler,poller,lease,client,stop_client,source,stop,duration,p
             try:peer_stop=stop_job.future.result()
             except Exception as exc:errors.append(type(exc).__name__)
         report.update(reason=reason,failure_code=failure_code,errors=errors,elapsed_s=time.monotonic()-started,
+            first_lease_invalid=invalid_view(),
             background=scheduler.services.status() if scheduler.services else None,
             listening_ready_seen=ready_seen,
             counts=dict(scheduler.state.counts),peer_stop=peer_stop,
@@ -285,7 +322,7 @@ def run_session(scheduler,poller,lease,client,stop_client,source,stop,duration,p
             and report['speech_stop_known'] is True and isinstance(peer_stop,dict)
             and peer_stop.get('stop_known') is True and peer_stop.get('execution_busy') is False)
         report['accepted']=ready_seen and report['cleanup_verified'] and reason in ('duration','controller_stop','finite_stream_budget')
-        publish(dict(stage='STOPPED',reason=reason,failure_code=failure_code,execution_busy=report['execution_busy'],cleanup_verified=report['cleanup_verified']))
+        publish(dict(stage='STOPPED',reason=reason,failure_code=failure_code,first_lease_invalid=invalid_view(),execution_busy=report['execution_busy'],cleanup_verified=report['cleanup_verified']))
     return report
 
 
