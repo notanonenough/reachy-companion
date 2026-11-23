@@ -15,6 +15,11 @@ class ControlTests(unittest.TestCase):
         entered=threading.Event();release=threading.Event();out=[]
         def status():entered.set();release.wait(2);return dict(stage='fixture')
         server=create_server('t'*32,'controller','source',threading.Event(),status,port=0)
+        handler_done=threading.Event();handle=server.process_request_thread
+        def handle_and_signal(*args):
+            try:handle(*args)
+            finally:handler_done.set()
+        server.process_request_thread=handle_and_signal
         listener=threading.Thread(target=server.serve_forever,daemon=True);listener.start()
         client=SessionClient('http://127.0.0.1:'+str(server.server_address[1]),'t'*32,'controller',timeout=2)
         worker=threading.Thread(target=lambda:out.append(client.status()));worker.start()
@@ -22,6 +27,8 @@ class ControlTests(unittest.TestCase):
             self.assertTrue(entered.wait(1));server.shutdown();server.server_close()
             self.assertEqual(server.transport_status(),dict(execution_busy=True,handlers=1))
             release.set();worker.join(1);listener.join(1)
+            # Receiving the reply does not prove that the server handler has exited.
+            self.assertTrue(handler_done.wait(1))
             self.assertFalse(worker.is_alive());self.assertEqual(server.transport_status(),dict(execution_busy=False,handlers=0))
         finally:release.set();server.shutdown();server.server_close();worker.join(1)
 
