@@ -128,4 +128,3 @@ class FollowPreflightTests(unittest.TestCase):
                 self.assertEqual([p for p,_ in f.writes],[GOTO,'/api/move/stop'])
                 self.assertEqual(f.writes[-1][1],{'uuid':stock_fixture.OWN})
                 self.assertEqual(f.hub.stock_unknown,stop_fails)
-

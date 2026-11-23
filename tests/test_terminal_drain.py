@@ -132,4 +132,3 @@ class TerminalDrainTests(unittest.TestCase):
             self.assertNotIn('PRIVATE',json.dumps(projected));self.assertIsNone(projected['remaining'][0]['age_s'])
             json.dumps(projected,allow_nan=False)
         finally:release.set();job.thread.join(1)
-
