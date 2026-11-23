@@ -57,183 +57,48 @@ STT-end→first-TTS-PCM11.209s по Hub clock; main client interval7.650s не �
 
 | Карточка | Статус, владелец и ревьюер | Следующий шаг и контакт |
 |---|---|---|
-| [PERF-01, Issue #30](https://github.com/notanonenough/reachy-companion/issues/30) | Диагностика PR #38 принята; выбран общий candidate `3aea1cd42d0e13b396766bea3bfd4659d698eef5` для #30/#35. Автор `/root/implementer`, reviewer `/root/reviewer` | Единственное **install-only окно24.11 01:20–01:40 Asia/Baku**, owner `/root/implementer`: fresh stopped/free preflight, backup текущегоfc554, один archive/wheel, package126/top61/21configs/profile proof. Production/motion/mic/camera start не назначен. Контроль **01:30**, раньше result/failure; общий quiet trial после independent installation review отдельным решением. |
-| [MODEL-TIMING-01, Issue #35](https://github.com/notanonenough/reachy-companion/issues/35) | Software PR #36 принят, автор `/root/ci_implementer`, reviewer `/root/reviewer`; карточка открыта для normal-chain evidence | Диагностика #30 принята, включена вместе с #35 в candidate3aea. Ожидает installation review и отдельный общий quiet hardware window одного владельца. После него автор проверяет same-call model stage/usage/provenance receipts offline. Новых starts/tests/builds в аппаратном окне не выполняет. Контроль вместе с #30 **24.11 01:30**. |
+| [PERF-01, Issue #30](https://github.com/notanonenough/reachy-companion/issues/30) | Диагностика PR #38 принята; выбран общий candidate `3aea1cd42d0e13b396766bea3bfd4659d698eef5` для #30/#35. Автор `/root/implementer`, reviewer `/root/reviewer` | Установка3aea завершена и независимо принята, окно освобождено **01:23**. Автор исправляет offline reader mapping по замечанию reviewer; затем отдельное quiet90s окно. Production/motion start пока не назначен. Контроль **01:30**, раньше result/failure. |
+| [MODEL-TIMING-01, Issue #35](https://github.com/notanonenough/reachy-companion/issues/35) | Software PR #36 принят, автор `/root/ci_implementer`, reviewer `/root/reviewer`; карточка открыта для normal-chain evidence | Диагностика #30 принята, включена вместе с #35 в candidate3aea. Установка принята; ожидает отдельный общий quiet hardware window одного владельца. После него автор проверяет same-call model stage/usage/provenance receipts offline. Новых starts/tests/builds в аппаратном окне не выполняет. Контроль вместе с #30 **24.11 01:30**. |
 | [BASELINE-02, Issue #26](https://github.com/notanonenough/reachy-companion/issues/26) | Протокол прерванной реплики принят через PR #31; владелец `/root/ci_implementer`, reviewer `/root/reviewer`; baseline неполон, карточка открыта и ожидает зависимость | Штатный cleanup независимо подтверждён, окно освобождено **24.11 00:22:24**. Полный resource baseline ждёт отложенной OBSERVE-02; по новому указанию владельца приоритет #30. Автор #26 завершил текущий шаг, новых starts/probes/observer edits нет. Следующая сверка зависимости с ведущим при контроле #30 **01:30**. |
 
-PR #38 принят: exact `8e03fbf5423d93ef91da2ba6a0f83b7e263affff`,
-[independent APPROVED](https://github.com/notanonenough/reachy-companion/pull/38#pullrequestreview-6029645032),
-98 targeted и independent8-scenario RPC/order/outcome parity PASS;
-full1924/26 skipped PASS, CI45267350563/45267367605 SUCCESS.
-Merge `3aea1cd42d0e13b396766bea3bfd4659d698eef5` подтверждён в origin/main
-и выбран общим кандидатом #30/#35; remote branch удалена. Package126/top61
-включает nested stock_diagnostics и top-level model_timing. Это диагностическая
-версия, не установленная причина или исправление motion_stop_unknown.
+Установка exact `3aea1cd42d0e13b396766bea3bfd4659d698eef5` завершена 24.11 около 01:23,
+окно освобождено. Все три узла: source696/package126/top61, один Linux wheel,
+21 configs/profile/full state body без изменений, backup252 files×2 и SQLite OK.
+Factory/Bluetooth/tunnel не менялись; production/mic/camera/motion не запускались.
+Final stopped/free и установка независимо приняты. Runner/readers проходят review; найдено и исправляется неверное поле source_boot в одном terminal reader.
+Private installation manifest: `c708ad513e76420878ff9caeaa231d59008d58071ae6fa47f3032cd315c4c835`,
+46 files; ведущий сверил hashes/sizes. Контроль **01:30 Asia/Baku**.
 
-Pinned SDK1.2.11/e25d28a52f657354716b693ca6d557fe3595702a audit сохраняется private:
-command/state XYZRPY radians/xyz, head matrix/body_yaw раздельны, FK даёт
-T_world_platform. Дополнительное вычитание body yaw для сравнения не обосновано;
-GotoMove UUID/task end не ждёт FK target tolerance. Cause yaw residual неизвестен.
-Future fixed-target+hold опыт только предложен, сейчас не назначен.
+| Принятое изменение | Точная проверенная версия и результат |
+|---|---|
+| PERF software [PR #32](https://github.com/notanonenough/reachy-companion/pull/32) | `7b6020b7ab4df8067721e8a0073e983feb18059e`, independent review6029112603; full1903/26skip, CI45261110258/45261118794 PASS; mergefc554. Reactive wake устраняет измеренный idlewait0.98s, survey duration0.8→0.35s для типового малого шага. Физический эффект ещё проверяется. |
+| Model audit [PR #34](https://github.com/notanonenough/reachy-companion/pull/34) | `72aefec1fe1af65bdf00ec6ebb228c43e9f7a144`, review6029300494, CI45262760006/45262805137 PASS; merge342aa4c, #33 closed. [Модельный путь](MODEL-LATENCY-01.md): две tokenize RPC и один completion, Qwen3.5-9B-Q4_K_M, Metal b11941; main client6.69–7.83s не равен generation time. |
+| Model timing [PR #36](https://github.com/notanonenough/reachy-companion/pull/36) | `56ccc9d89a1c1e340ec9f53e2d70db24df0bae99`, review6029554003; full1915/26skip, CI45266022580/45266035147 PASS; merge698d803. Same-call stages/usage/native reported timings без extra RPC или изменения controls. #35 ждёт реального receipt. |
+| Failed trial protocol [PR #37](https://github.com/notanonenough/reachy-companion/pull/37) | `4bad6963de9d0206d4001c15f1e2c634a11754b8`, review6029550149, CI45266207900/45266242171 PASS; mergec995820. [Протокол fc554](releases/2026-11-24-fc5546066881-performance.md) принят как запись неудачной проверки, не как release. |
+| Stock diagnostics [PR #38](https://github.com/notanonenough/reachy-companion/pull/38) | `8e03fbf5423d93ef91da2ba6a0f83b7e263affff`, review6029645032; full1924/26skip, independent8-case RPC/order/outcome parity, CI45267350563/45267367605 PASS; merge3aea. Immutable firstfailure + separately observed stop по ownedUUID, без новых RPC/guard changes. Причина прошлого сбоя пока неизвестна. |
 
-PR #36 software принят: exact `56ccc9d89a1c1e340ec9f53e2d70db24df0bae99`,
-[independent APPROVED](https://github.com/notanonenough/reachy-companion/pull/36#pullrequestreview-6029554003),
-local full1915/26 skipped PASS, CI45266022580/45266035147 SUCCESS;
-merge `698d8032af5c1effb6be35905ac8c9526fb62a9b` подтверждён в origin/main,
-remote branch удалена. Actual caller/late422/malformed metadata defects исправлены.
-Новый canonical scope61, полный package identity включает nested modules.
-Аппаратный model-stage receipt ещё не получен; #35 не закрыта.
+В опыте fc554 00:52–00:54 полный контрольный вопрос дал правильный TTS4,
+8359 frames consumed, но слышимость владельцем не подтверждена. Main6.939s;
+admission→main4.922s включает3.848s предыдущего вызова и1.073s после его возврата.
+23 motion receipts duration0.35–0.425s, client dispatch0.984–1.357s; направление
+движения видно, но yaw target near≤1° two-samples0/23. Не считать это физическим
+временем начала или доказанным достижением цели. STOP дал motion_stop_unknown:
+production/device jobs завершены, poststop poses стабильны; исходного stock ACK
+и причины не осталось. Новые diagnostics нужны для различающего опыта.
+Поздние22s опыта пересеклись с Python tests другого автора на том же Mac;
+причина сбоя этим не доказана. Следующее измерительное окно **тихое на Mac**:
+никаких project tests/builds/benchmarks/второго inference у всех участников.
 
-[Протокол fc554](releases/2026-11-24-fc5546066881-performance.md) принят PR #37:
-exact `4bad6963de9d0206d4001c15f1e2c634a11754b8`, independent APPROVED6029550149,
-CI45266207900/45266242171 SUCCESS; merge
-`c995820a45fd260245731d31e7fa1bda529d23cd` подтверждён в origin/main,
-remote branch удалена. Принята правдивая запись неудачной приёмки, не новый release.
-Дополнительный offline target audit: yaw near≤1° two-samples0/23, pitch17/23,
-body23/23; sampled yaw−target +1.66…+6.20° (median+5.91°).
-Причина (FK/lag/calibration/coordinates) не установлена, offset не меняется.
-Raw audit/extractor остаются private; #30 проверяет точный factory contract offline.
+Pinned SDK1.2.11/e25d28a contract audit: head matrix и body_yaw раздельны,
+FK даёт T_world_platform; дополнительно вычитать body_yaw не обосновано.
+UUID/task end не означает FK arrival. Future fixed-target+hold опыт предложен,
+но отдельно не назначен; offset/calibration не менялись.
 
-MODEL-LATENCY-01 #33 закрыта после [PR #34](https://github.com/notanonenough/reachy-companion/pull/34):
-exact `72aefec1fe1af65bdf00ec6ebb228c43e9f7a144`,
-independent APPROVED6029300494, CI45262760006/45262805137 SUCCESS;
-merge `342aa4ceb996f264714c075d4b2b222b5c912e5b` подтверждён в origin/main,
-remote branch удалена. [Аудит](MODEL-LATENCY-01.md) подтверждает два existing
-tokenizer RPC и missing per-request native timings/token/cache data для717.
-Main client6.7–7.8s не объявлен compute-only. Следующий #35 готовит числовую
-диагностику existing calls; отдельный normal-chain опыт будет назначен позже.
-
-PR #32 принят: exact reviewed `7b6020b7ab4df8067721e8a0073e983feb18059e`,
-[independent APPROVED](https://github.com/notanonenough/reachy-companion/pull/32#pullrequestreview-6029112603),
-56 targeted + independent production/trace checks, full1903/26 skipped PASS,
-CI45261110258/45261118794 SUCCESS. Merge `fc55460668816122f1a2062e499f77a943965078`
-подтверждён в origin/main и выбран точным кандидатом; remote branch удалена.
-Программно event→fast wait .98s→0 в controlled production case; survey5°/4°
-commanded duration .8→.35, following прежний. Physical/ear effect пока не принят.
-
-Installation24.11 00:48 independently ACCEPTED: exactfc554 на Mac/Hub/robot,
-60 modules и124 package files на каждом совпадают с source; один archive688files,
-content `d30a403cac67d806e90671eb19b4d8a5c0732e17e9a2068740135828ba667149`,
-archive `8ba12b6b33018d180d673240b7f953888b0b14347950dc65bd5831fbe30a9929`,
-wheel `29b5c244bfb361054bff6632f67d1d8d20e0638f5136c20712a67bd22a2868f4`.
-21configs/profile unchanged, backup717252files×2/SQLiteOK, project base services
-перезапущены, factory/Bluetooth/tunnel прежние. Stopped/free/miccameraoff/no moves.
-Evidence `~/reachy-release-backups/20261124-fc5546066881`,38-file manifest
-`136e4e2a40ccaf9b471911187bb9d9895df5d8db217d8dd1cd957a3a2daf2538`.
-Reviewer сверил все688archive/124wheel/60module/config/terminal receipts локально.
-Generated untracked Mac egg-info обратимо перенесён в verified backup; canonical
-metadata/.pth/modules сохранены, singlemetadata/import подтверждены. Это установка,
-не physical acceptance. Условия TV/расположения пока не подтверждены владельцем.
-
-PERF trial001: launch00:52:31, ACTIVE00:52:50.619, stimulus00:52:58.654–00:53:02.968.
-90s bound STOP00:54:21.761, known Hub47055 exitrc2 at00:54:22.793,
-shutdown00:54:24.565/cameraoff00:54:25.226. По авторским receipts trace65records
-complete/drop0, no first invalid/expiry, runtime jobs false/handlers0/listener
-closed/peerstop known; accepted=false/cleanup=false из-за motion_stop_unknown.
-Independent final показывает0moves/miccameraoff/PIDs0/Macjobs0/portsclosed;
-это не заменяет отсутствующее stop confirmation. Физическая приёмка не выполнена,
-повтора нет. Reviewer подтвердил failed gate; first stock cause/stop request/ownedUUID не retained,
-existing log markers отсутствуют. Hardware окно освобождено00:57, дальнейшая работа offline.
-Evidence `~/reachy-release-backups/20261124-fc5546066881/performance-trial-001`.
-
-Дополнительный terminal evidence:8 поз за1.168s после STOP, yaw range.05936°,
-pitch.05577°,body0;0moves. Это наблюдаемая стационарность, не восстановленный original
-STOP ACK. Device final accepted/capture closed/mic restored/playback stop known.
-Voice: первый numeric input имеет unknown origin; второй содержит полный
-controlled2+2, main response4, единственный TTS8359frames fully consumed/stop known.
-Main2 wait4.921520s = previous-call overlap3.848087s + after-return1.073433s;
-main6.938974s, checked→speech.811926s, firstPCM.404888s. Эти n1 intervals не
-доказывают общее ускорение в быту; owner audibility confirmation пока не получена.
-23 unique accepted survey commands: duration.35–.425s, dispatch client.984–1.357s;
-один terminal dispatch failed. Source motion_after busy=false/closed=true/
-stop_known=false показывает unknown latch, не продолжающийся Job.
-
-Confound: разрешённый offline targeted61 suite #35 работал на том же Mac примерно
-00:53:58–00:54:30, перекрыв последние22s trial. Voice chain завершилась раньше,
-поздние motion/STOP не isolated; cause unknown нагрузке не приписывается.
-**Будущие measurement окна исключают также project test/build/CPU workloads
-на общем Mac**: ведущий ждёт завершения suite до start. Лёгкое offline чтение/
-редактирование допустимо; ни второго hardware owner, ни параллельных benchmarks.
-
-Принятый private rollout snapshot:
-`~/reachy-release-backups/20261124-performance-offline-prep`,
-manifest `37f92188f8682221e9840c8039cb37f991c42440d6b5ba1828125c1a768aead7`.
-Reviewer проверил date-only backup delta, ведущий5 files/hashes/modes;
-backup helper `c44c83cf2ff6f402075c3ac16fe138e1c5d35edf0501c40c2b3fe7a357378bf3`.
-Original44ee0 trace harness остаётся будущим owner, observerv3 не требуется.
-Pose criterion для будущего опыта:1° плюс2 последовательных samples в направлении
-target; при stationary jitter≥1° результат unavailable. Это sampling bracket
-с неизвестным FK age, не exact physical onset; у717 absolute dispatch anchor нет.
-
-PR #27 принят: exact reviewed `a5a296061a51cf45dd5a8af42493bb45133bea40`,
-30 независимых целевых/negative/parity checks; local full1866/26 skipped PASS,
-CI45252465406/45252477590 SUCCESS. Merge `cab202eb5db52e4e7f9b9678d32f9e3b652d232f`
-подтверждён в origin/main, remote branch удалена. Приняты только offline collector
-и план, не выполненный hardware baseline. Предложенные3×120s — отдельные будущие
-реплики с остановкой серии при первом отказе, не доказательство долгой автономности.
-
-OBSERVE-01 #28 закрыта после PR #29: exact reviewed `ae581296dc628c2016d2046a98e5d02b37bcbf4c`,
-[независимое APPROVED](https://github.com/notanonenough/reachy-companion/pull/29#pullrequestreview-6028717357),
-37 целевых проверок, immutable full1886/26 skipped PASS; оба CI45256580573/45256591707
-SUCCESS. Merge `dab21fc09b8a32ebb7cd8698a66ba56eeb1ecec4` подтверждён в origin/main;
-remote branch удалена. Lifecycle finish и Mac runner blockers исправлены и
-перепроверены. Это подготовка observer, не измеренное покрытие трёх узлов.
-
-Ведущий — `reachy-development-map`; автор #30 использует clean detached source
-для exact candidate и новую ветку протокола после software merge; автор #35 —
-отдельную `reachy-model-timing`; reviewer — `/tmp/reachy-review-map`. #26 ожидает
-зависимость, её завершённая рабочая ветка слита/удалена. Одновременных редакторов
-одного модуля и владельцев стенда нет; #35 выполняется только offline.
-Production checkout `reachy-companion` переводится сfc554 только на exact3aea в назначенном install-only окне; для разработки его не используют.
-Read-only readiness независимо принята; одна назначенная120s реплика досрочно завершена. Stopped
-workers не дают positive acquisition receipts; полнота после старта потребует
-реальных process instances/CPU deltas/status gauges, трёх успешных footer и terminal
-receipts. Pre-stimulus automatic coverage gate отсутствует; observed failure
-прерывает серию, safety STOP не ждёт observer. Автоматических повторов нет.
-
-Readiness24.11 00:17 PASS: installed717/60modules×3 и runtime config8+7+6
-равны accepted717; Linux archive673 проверен; production/PID0, manual owners0,
-ports closed, mic capture closed/off, camera off/unitPID0, running_moves0.
-Evidence `~/reachy-release-backups/20261124-baseline02-readiness-001`,
-manifest `4da25840fff4f62163a45cdc8da8f6d1981554df1b7382ef5556d729c9152902`;
-reviewer сверил9 evidence files, expected anchors и v3 hashes. Это point-in-time
-readiness: actual worker coverage и новая motion-envelope certification не заявлены.
-
-Реплика001: local start00:21:28, ACTIVE00:21:45, observed Mac acquisition_failed
-→ адресный SIGINT supervisor00:22:17 → authSTOP00:22:19, known Hub exit0,
-terminal00:22:24. По авторским receipts Hub elapsed34.074s accepted/cleanup true,
-busy false, no first invalid/expiry; trace36records complete; Hub/robot observers
-32ticks complete, Mac acquisition failed. Независимая проверка результатов завершена; это неполный baseline и основание прекратить серию, не новый выпуск.
-Evidence `~/reachy-release-backups/20261124-baseline02-replica-001`,
-own-supervisor receipts `20261124-baseline02-runner-001`. Точный исторический exception/count Mac не сохранён. Offline воспроизведена
-несовместимость healthy topology: шесть logger+worker пар дают≥12 targets при cap8;
-это конкретный defect, но не доказательство первого exception в том опыте.
-
-[Протокол replica001](releases/2026-11-24-baseline02-replica-001.md) принят через
-PR #31: exact `8907e639f134f1ff452f50a52a1b9a90ea2e569e`,
-independent APPROVED6029004224; CI45259964117/45259978521 SUCCESS,
-merge `66af447fda03c530a70b318c71c26c17c80126db` подтверждён в origin/main.
-Remote branch удалена; #26 остаётся OPEN. Final private replica manifest
-`e4c2ead91259583011e4b1b654699483c0491fafbc1e4669909532dc09163f21`.
-Пригодные paired voice/motion intervals переданы #30; raw evidence не публикуется.
-
-Принятый observer snapshot v3 сохранён в
-`~/reachy-release-backups/20261124-observer-harness-review-v3`; все10 файлов и
-private modes0700/0600 сверены независимо и ведущим. Manifest SHA256
-`a53af67437d6335b7194981ca24295eb6e8d559c00cf89aaa88a7670ef04cc67`,
-local harness `1b82ff08da41faa5e7265dfabb7e2244c7b83d7ed23757096fd326109a25b180`,
-runner `ecd3d3744fb34a2574e5df0e11154696fd367e4220592cf8be9af40f3b99c8cd`.
-Предыдущие v1/v2 для аппаратного запуска не использовать.
-
-Одобренный односеансовый harness сохранён вне Git в закрытом
-`~/reachy-release-backups/20261123-private-trace-harness-approved`.
-Manifest SHA-256 `7f81c398a93619f4eaa2329b6870cbdcfd9214fb2bcb6b08456d6d083c66ec36`;
-ведущий проверил hashes/private modes8 files. Reviewed helper SHA-256:
-local `44ee0de5f498a4dcdd3f4da25dbf5eb55f8952f8b663e32f0b7be7eb790486bc`,
-remote `aa2310807750870c8c2bc3cf205f046e122e3404de40d4cc2999885daac3298d`.
-Семь independent fault/positive сценариев и zero-IO dry-run прошли.
-Любая последующая правка требует delta review. Private717 evidence находится в
-`~/reachy-release-backups/20261123-717a6577a9f7`, содержимое в Git не переносится.
+BASELINE-02 #26: prep PR #27 и observer PR #29 приняты; protocol PR #31
+exact8907e639, review6029004224, CI45259964117/45259978521 PASS, merge66af447.
+Реплика завершена штатно, но Mac acquisition неполон. Известная offline проблема:
+v3 считает logger+compute processes вместе и превышает cap8. OBSERVE-02 отложена
+ради #30; v3 не используется как gate следующего PERF опыта.
 
 ## Ближайшая очередь и препятствия
 
@@ -307,8 +172,9 @@ Asia/Baku; раньше — при готовности текущего вып�
 испытанного candidate и Release со ссылкой на принятый протокол/ограничения/откат.
 Неуспешная проверка ведёт к конкретному исправлению или следующему различающему
 опыту. Если новых изменений для установки нет, пустой релиз не создаётся.
-Сейчас новых принятых продуктовых изменений после717 нет; следующая готовая
-работа — baseline #26, затем обоснованный контракт/сравнение одного dialogue backend.
+Сейчас приняты PERF и diagnostic changes после717; установлен тестовый3aea.
+Новый tag ждёт фактическую приёмку #30 и принятый протокол. Следующий доступный
+шаг — совместный quiet trial #30/#35 после независимой проверки установки.
 
 ## Карточки
 
@@ -408,7 +274,7 @@ Code PR не принимает persona proposal. Установленный п�
 | 34 | Исследование завершено; перенос Г | [docs/REACHY-ECOSYSTEM-RESEARCH.md](REACHY-ECOSYSTEM-RESEARCH.md); [emotion_library.py](../src/reachy_companion/emotion_library.py); [assets/pollen-emotions-v1.json](../src/reachy_companion/assets/pollen-emotions-v1.json); [speech_clock.py](../src/reachy_companion/speech_clock.py); [autonomous/stock_motion_adapter.py](../src/reachy_companion/autonomous/stock_motion_adapter.py) | Есть закреплённые emotion assets и часть timing; не единая локальная композиция primary/idle/gaze/speech. Совместимость новых apps не равна совместимости 1.2.11. | 11,12,14,29,33 | Начать с одного executor/generations; три жеста из ненулевой позы без sidecar sound, consumed PCM sync, отмена; версия/license каждого донора. |
 | 35 | Т; частота/хранилище Г; reflection П | [autonomous/runtime.py:Scheduler.advance](../src/reachy_companion/autonomous/runtime.py); [autonomous/state.py:snapshot](../src/reachy_companion/autonomous/state.py); [autonomous/services.py:update,advance](../src/reachy_companion/autonomous/services.py); [autonomous/durable.py](../src/reachy_companion/autonomous/durable.py); [tests/test_production_cycle.py](../tests/test_production_cycle.py) | Тишина, TTL, goal CAS, background IO и overload уже есть. Fast/main ещё две модели. CHAR-01 принята через PR #3: прямое применение профиля моделью закрыто, отдельный proposal→GitHub PR без auto reviewer→owner acceptance→apply реализован программно. Код установлен на принятом stand-2026-11-23.1 (exact717); реальный профиль не изменился, bounded аппаратная приёмка #9 завершена. | 23,30,31,36; запрет auto-character независим | Программно доказать регулярную итерацию в тишине/stale context/разные goals; запретить прямую model/background character mutation; проверить отдельный proposal→PR→owner acceptance→apply и owner update; device acceptance отдельная. |
 | 36 | Т редактируемой памяти; recognition П/Г | [autonomous/memory.py:MemoryStore.commit,recall](../src/reachy_companion/autonomous/memory.py); [autonomous/context.py:ContextProvider](../src/reachy_companion/autonomous/context.py); [autonomous/durable.py](../src/reachy_companion/autonomous/durable.py) memory string; [tests/test_memory_context.py](../tests/test_memory_context.py) | Provenance/CAS/forget для записей есть отдельно от character summary. Готового знакомства/связывания лица/голоса с записью нет. | 9,28,30,35 | Owner confirmation→recall→correction/delete; спорное сходство не перезаписывает личность, слова не приписываются присутствующему автоматически. |
-| 37 | Действующее разрешение | [docs/REVIEW-NOTES.md](REVIEW-NOTES.md) §37; [scripts/factory_ssh.py](../scripts/factory_ssh.py); [scripts/production-control](../scripts/production-control); [deploy/current/release.py](../deploy/current/release.py); [deploy/autonomous/robot_inventory.py](../deploy/autonomous/robot_inventory.py) | Доступ разрешён владельцем; #8 зафиксировала фактические узлы, #9 проверила direct strict SSH и установленный candidate362. Занятость стенда ведётся отдельно. | Координация ведущего | Перед каждым опытом узел/версия/занятость; не повторное согласование разрешённого опыта. |
+| 37 | Действующее разрешение | [docs/REVIEW-NOTES.md](REVIEW-NOTES.md) §37; [scripts/factory_ssh.py](../scripts/factory_ssh.py); [scripts/production-control](../scripts/production-control); [deploy/current/release.py](../deploy/current/release.py); [deploy/autonomous/robot_inventory.py](../deploy/autonomous/robot_inventory.py) | Доступ разрешён владельцем; #8 зафиксировала фактические узлы, #9 проверила direct strict SSH и выпуск717; текущая тестовая установка3aea указана выше. Занятость стенда ведётся отдельно. | Координация ведущего | Перед каждым опытом узел/версия/занятость; не повторное согласование разрешённого опыта. |
 | 38 | Действующий процесс | [AGENTS.md](../AGENTS.md); [docs/REVIEW-NOTES.md](REVIEW-NOTES.md) §38; git baseline | MAP-01 принята в origin/main, роли и CHAR-01 назначены; процесс каждого следующего изменения проверяется отдельно. | MAP-01, reviewer | По каждому diff base/head/checks/reviewer verdict, свежий main; только ведущий merge и карта, автор исправляет замечания. |
 
 ## Воспроизведённые проверки
