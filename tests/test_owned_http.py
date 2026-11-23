@@ -11,7 +11,7 @@ import unittest
 from urllib.request import Request
 
 from reachy_companion import owned_http, provisional_stt as partial
-from test_provisional_stt import answer, payload, PCM, wait_for
+from test_provisional_stt import answer, payload, PCM, TEMP_ROOT, wait_for
 
 
 class OwnedHttpTests(unittest.TestCase):
@@ -113,7 +113,7 @@ class OwnedHttpTests(unittest.TestCase):
                 finally: handler.close_connection=True
             server=self.server(handle); url='http://127.0.0.1:'+str(server.server_port)
             class Config(dict): token='fixture'
-            with tempfile.TemporaryDirectory(dir='/private/tmp') as directory:
+            with tempfile.TemporaryDirectory(dir=TEMP_ROOT) as directory:
                 owner=SimpleNamespace(config=Config(network=dict(voice_url=url)))
                 latch=partial.IntentLatch(Path(directory)/'intent')
                 pump=SimpleNamespace(binding=('fixture',1,2),generation=1)

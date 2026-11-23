@@ -23,6 +23,8 @@ from test_stream_cleanup_overlay import load as load_voice
 import test_capture_pump as s1
 
 ROOT = Path(__file__).resolve().parents[1]
+# IntentLatch rejects symlinks in every parent component, including OS temp aliases.
+TEMP_ROOT = Path(tempfile.gettempdir()).resolve()
 PCM = bytes(partial.MIN_FRAMES*2)
 spec = importlib.util.spec_from_file_location('s2_builder', ROOT/'deploy/autonomous/prepare_provisional_stt.py')
 builder = importlib.util.module_from_spec(spec); spec.loader.exec_module(builder)
@@ -110,7 +112,7 @@ class S2Tests(unittest.TestCase):
         self.assertEqual(builder.digest(self.before['voice']), 'bbdb7be523946396cedd16a2f629caabdb54bf3d9979bfd5e7403f2730995764')
         self.assertEqual(builder.digest(self.before['agent']), 'cf50c54680d8e30fb97090e80d0e687a9dad903159f464d2211414aefcaca069')
         self.assertEqual(builder.digest(self.before['capture']), 'b7b1ffa551d8b3ad4346cc2920f0e17d04e37c2300d8583abf336ea90fb9e5b0')
-        with tempfile.TemporaryDirectory(dir='/private/tmp') as directory:
+        with tempfile.TemporaryDirectory(dir=TEMP_ROOT) as directory:
             target = Path(directory)/'bundle'; manifest = builder.build(target)
             self.assertFalse(manifest['default_enabled']); self.assertFalse(manifest['partial_acceptance'])
             with self.assertRaises(FileExistsError): builder.build(target)
@@ -279,7 +281,7 @@ class S2Tests(unittest.TestCase):
         self.assertEqual(transport.call_count,1)
 
     def test_marker_durable_before_post_removed_only_after_bound_completion(self):
-        with tempfile.TemporaryDirectory(dir='/private/tmp') as directory:
+        with tempfile.TemporaryDirectory(dir=TEMP_ROOT) as directory:
             path=Path(directory)/'intent.json'; latch=partial.IntentLatch(path,clock=lambda:100.)
             def transport(request,deadline):
                 self.assertTrue(path.exists()); self.assertEqual(path.stat().st_mode&0o777,0o600)
@@ -290,7 +292,7 @@ class S2Tests(unittest.TestCase):
             wait_for(lambda:client.latest is not None); self.assertFalse(path.exists())
 
     def test_intent_exclusive_reload_no_adoption_symlink_and_replaced_identity(self):
-        with tempfile.TemporaryDirectory(dir='/private/tmp') as directory:
+        with tempfile.TemporaryDirectory(dir=TEMP_ROOT) as directory:
             path=Path(directory)/'intent.json'; first=partial.IntentLatch(path,clock=lambda:100.)
             first.begin(bound(),100,102)
             second=partial.IntentLatch(path,clock=lambda:100.); self.assertTrue(second.exists())
@@ -308,7 +310,7 @@ class S2Tests(unittest.TestCase):
             self.assertEqual(target.read_text(),'fixture')
 
     def test_late_old_response_cannot_remove_replacement_intent_or_publish_text(self):
-        with tempfile.TemporaryDirectory(dir='/private/tmp') as directory:
+        with tempfile.TemporaryDirectory(dir=TEMP_ROOT) as directory:
             path=Path(directory)/'intent'; entered=threading.Event(); release=threading.Event()
             def transport(request,deadline): entered.set(); self.assertTrue(release.wait(1)); return answer(request)
             owner,clock,client=self.client(transport,latch=partial.IntentLatch(path,clock=lambda:100.))
@@ -320,7 +322,7 @@ class S2Tests(unittest.TestCase):
             self.assertEqual(json.loads(path.read_text())['request_id'],'b'*32)
 
     def test_concurrent_exclusive_intents_allow_only_one_post(self):
-        with tempfile.TemporaryDirectory(dir='/private/tmp') as directory:
+        with tempfile.TemporaryDirectory(dir=TEMP_ROOT) as directory:
             path=Path(directory)/'intent'; barrier=threading.Barrier(2)
             entered=threading.Event(); release=threading.Event(); posts=[]
             class Latch(partial.IntentLatch):
@@ -338,7 +340,7 @@ class S2Tests(unittest.TestCase):
             self.assertEqual(len(posts),1)
 
     def test_last_stat_checkpoint_serializes_legitimate_new_intent_and_preserves_it(self):
-        with tempfile.TemporaryDirectory(dir='/private/tmp') as directory:
+        with tempfile.TemporaryDirectory(dir=TEMP_ROOT) as directory:
             path=Path(directory)/'intent'; old=partial.IntentLatch(path,clock=lambda:100.); old.begin(bound(),100,102)
             newer=partial.IntentLatch(path,clock=lambda:100.); attempted=threading.Event(); completed=threading.Event(); errors=[]
             def replace():
@@ -362,7 +364,7 @@ class S2Tests(unittest.TestCase):
             self.assertEqual(sorted(p.name for p in Path(directory).iterdir()),['intent'])  # No replaceable lockfile.
 
     def test_namespace_lock_is_same_directory_inode_across_another_process(self):
-        with tempfile.TemporaryDirectory(dir='/private/tmp') as directory:
+        with tempfile.TemporaryDirectory(dir=TEMP_ROOT) as directory:
             path=Path(directory)/'intent'; latch=partial.IntentLatch(path)
             code='''import os,sys,time
 from reachy_companion.provisional_stt import IntentLatch
@@ -391,7 +393,7 @@ with IntentLatch(sys.argv[1]).namespace(time.monotonic()+2) as descriptor:
 
     def test_namespace_begin_and_completion_wait_only_original_deadline(self):
         for completing in (False,True):
-            with tempfile.TemporaryDirectory(dir='/private/tmp') as directory:
+            with tempfile.TemporaryDirectory(dir=TEMP_ROOT) as directory:
                 path=Path(directory)/'intent'; owner=partial.IntentLatch(path)
                 received=time.monotonic(); deadline=received+.15
                 if completing: owner.begin(bound(),received,deadline)
@@ -417,7 +419,7 @@ with IntentLatch(sys.argv[1]).namespace(time.monotonic()+2) as descriptor:
                 self.assertEqual(path.exists(),completing)
 
     def test_retirement_cancels_lock_wait_and_new_generations_start_no_waiting_workers(self):
-        with tempfile.TemporaryDirectory(dir='/private/tmp') as directory:
+        with tempfile.TemporaryDirectory(dir=TEMP_ROOT) as directory:
             path=Path(directory)/'intent'; held=threading.Event(); release=threading.Event(); attempted=threading.Event()
             def holder():
                 with partial.IntentLatch(path).namespace(time.monotonic()+2):
@@ -452,7 +454,7 @@ with IntentLatch(sys.argv[1]).namespace(time.monotonic()+2) as descriptor:
             self.assertFalse(thread.is_alive())
 
     def test_intent_parent_nofollow_partial_write_and_digest_tamper_fail_closed(self):
-        with tempfile.TemporaryDirectory(dir='/private/tmp') as directory:
+        with tempfile.TemporaryDirectory(dir=TEMP_ROOT) as directory:
             root=Path(directory); parent=root/'real'; parent.mkdir(); link=root/'link'; link.symlink_to(parent,target_is_directory=True)
             with self.assertRaises(OSError): partial.IntentLatch(link/'intent',clock=lambda:100.).exists()
             path=parent/'intent'; latch=partial.IntentLatch(path,clock=lambda:100.)
