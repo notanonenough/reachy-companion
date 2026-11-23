@@ -5,6 +5,7 @@ adapters; only the final scalar projection exercises existing State/Sensor code.
 """
 from collections import deque
 import copy
+import hashlib
 import json
 from pathlib import Path
 import unittest
@@ -51,6 +52,35 @@ def negotiate(capability, supported):
                 minor=minor, blocked=[], reason=None if minor == version['minor'] else 'minor_downgrade')
 
 
+def descriptor_digest(capability):
+    return hashlib.sha256(json.dumps(capability, sort_keys=True, separators=(',', ':'),
+                                     allow_nan=False).encode()).hexdigest()
+
+
+def confirmed_agreement(capability, supported, receiver):
+    """Trusted handshake fixture, not a peer-supplied permission or self-ack."""
+    result = negotiate(capability, supported)
+    return dict(connection_id=receiver['connection_id'], source_boot_id=capability['source_boot_id'],
+                catalog_generation=capability['catalog_generation'], capability_id=capability['id'],
+                semantic=capability['semantic'], major=capability['version']['major'],
+                minor=result['minor'], status=result['status'], descriptor_digest=descriptor_digest(capability))
+
+
+def capability_confirmed(capability, receiver):
+    checked('Capability', capability)
+    agreement = receiver['agreements'].get(capability['id'])
+    expected = confirmed_agreement(capability, receiver['supported'], receiver)
+    return (agreement == expected and expected['status'] in ('supported', 'limited')
+            and capability['catalog_generation'] == receiver['catalog_generation'])
+
+
+def effective_ttl(message, receiver, capability=None):
+    policy = receiver['policy_ttl_ms']
+    if type(policy) is not int or not 1 <= policy <= 60000:
+        raise ValueError('Bounded local policy required')
+    return min(message['ttl_ms'], policy, capability['ttl_ms'] if capability else policy)
+
+
 def upper_age(message, receiver):
     """A causal challenge RTT uses only receiver-local monotonic times."""
     source_boot = message.get('source_boot_id', message.get('authority', {}).get('hub_boot_id'))
@@ -68,6 +98,8 @@ def upper_age(message, receiver):
 def observation_event(message, capability, receiver):
     """Design projection into the existing ingestion shape; not wired to Services."""
     checked('Observation', message)
+    if not capability_confirmed(capability, receiver):
+        raise ValueError('Capability not confirmed for this connection')
     if (message['capability_id'] != capability['id']
             or message['catalog_generation'] != receiver['catalog_generation']
             or capability['catalog_generation'] != receiver['catalog_generation']
@@ -78,7 +110,7 @@ def observation_event(message, capability, receiver):
         raise ValueError('Old or unregistered observation')
     age = upper_age(message, receiver)
     availability = message['availability'] if capability['availability'] == 'available' else capability['availability']
-    ttl = min(message['ttl_ms'], capability['ttl_ms'])
+    ttl = effective_ttl(message, receiver, capability)
     if availability == 'available':
         if message['value'] is None:
             raise ValueError('Available scalar requires a value')
@@ -97,7 +129,8 @@ def command_admitted(command, capability, supported, receiver, authority, permit
     checked('Command', command)
     age = upper_age(command, receiver)
     shape = EXAMPLES['argument_schemas'].get(capability['semantic'], {}).get(command['operation'])
-    return bool(negotiate(capability, supported)['status'] != 'unsupported'
+    return bool(capability_confirmed(capability, receiver)
+                and negotiate(capability, supported)['status'] != 'unsupported'
                 and capability['direction'] == 'executor' and capability['availability'] == 'available'
                 and capability['source_boot_id'] == authority.robot_boot_id
                 and shape is not None and Draft202012Validator(shape).is_valid(command['arguments'])
@@ -107,12 +140,30 @@ def command_admitted(command, capability, supported, receiver, authority, permit
                 and command['authority'] == authority.wire()
                 and command['generation'] == generation
                 and command['operation'] in capability['operations']
-                and age is not None and age < min(command['ttl_ms'], capability['ttl_ms'])
+                and age is not None and age < effective_ttl(command, receiver, capability)
                 and permit and permit['allowed']
                 and permit['capability_id'] == capability['id']
                 and permit['id'] == command['permit_id'] and permit['epoch'] == command['permit_epoch']
                 and permit['generation'] == generation
                 and receiver['received_mono_ms'] < permit['expires_mono_ms'])
+
+
+def owned_control_admitted(command, receiver, authority, owned):
+    """Cancels an authenticated owner's known scope, even after actuation revoke.
+
+    An existing local ownership record is required. No new physical target is
+    admitted and no live movement permit is required for this finite example.
+    """
+    checked('Command', command)
+    age = upper_age(command, receiver)
+    return bool(command['operation'] == 'cancel' and owned
+                and command['arguments'] == {'target_command_id': owned['command_id']}
+                and command['capability_id'] == owned['capability_id']
+                and command['generation'] == owned['generation']
+                and command['authority'] == authority.wire()
+                and owned['authority']['hub_boot_id'] == authority.hub_boot_id
+                and owned['authority']['robot_boot_id'] == authority.robot_boot_id
+                and age is not None and age < effective_ttl(command, receiver))
 
 
 def receipt_replay(original, receipt, repeated):
@@ -125,6 +176,11 @@ class RobotHubContractTests(unittest.TestCase):
     def setUp(self):
         self.values = copy.deepcopy(EXAMPLES)
         self.caps = {c['module']: c for c in self.values['capabilities']}
+        for key in ('receiver', 'command_receiver'):
+            receiver = self.values[key]
+            receiver['supported'] = self.values['hub_supported']
+            receiver['agreements'] = {cap['id']: confirmed_agreement(cap, receiver['supported'], receiver)
+                                      for cap in self.caps.values()}
 
     def test_six_descriptors_and_envelopes_are_bounded_and_valid(self):
         Draft202012Validator.check_schema(SCHEMA)
@@ -161,7 +217,35 @@ class RobotHubContractTests(unittest.TestCase):
         self.assertEqual(view['state'], 'ready')
         self.assertEqual(json.loads(view['summary'])['value'], 22.5)
         self.assertEqual(json.loads(view['summary'])['unit'], 'Cel')
+        projected = next(s for s in state.snapshot(1.050)['sensors'] if s['id'] == cap['id'])
+        self.assertEqual(json.loads(projected['summary'])['value'], 22.5)
         self.assertEqual(sensor.view(3.040, False)['state'], 'stale')
+
+    def test_observations_require_current_confirmed_catalog_not_an_announced_descriptor(self):
+        message, receiver, cap = self.values['observation'], self.values['receiver'], self.caps['metrics']
+        with self.assertRaises(ValueError):
+            observation_event(message, cap, {**receiver, 'agreements': {}})
+        unknown = {**cap, 'semantic': 'unimplemented.scalar'}
+        unsupported = {**receiver, 'agreements': {cap['id']: confirmed_agreement(unknown, receiver['supported'], receiver)}}
+        for current in (receiver, unsupported):
+            with self.assertRaises(ValueError): observation_event(message, unknown, current)
+        for patch in ({'connection_id': 'old-link'}, {'source_boot_id': 'old-boot'},
+                      {'catalog_generation': 2}, {'minor': 99}, {'status': 'unsupported'}):
+            ack = {**receiver['agreements'][cap['id']], **patch}
+            with self.assertRaises(ValueError):
+                observation_event(message, cap, {**receiver, 'agreements': {cap['id']: ack}})
+
+    def test_local_ttl_caps_both_observations_and_new_actions_including_exact_expiry(self):
+        message, receiver, cap = self.values['observation'], self.values['receiver'], self.caps['metrics']
+        for ttl in (50, 62):
+            with self.assertRaises(ValueError):
+                observation_event(message, cap, {**receiver, 'policy_ttl_ms': ttl})
+        event = observation_event(message, cap, {**receiver, 'policy_ttl_ms': 63})
+        self.assertEqual(event['ttl_ms'], 63)
+        command = self.values['command']; authority = Authority(**command['authority'])
+        for ttl in (50, 52):
+            self.assertFalse(command_admitted(command, self.caps['motion'], self.values['hub_supported'],
+                {**self.values['command_receiver'], 'policy_ttl_ms': ttl}, authority, self.values['permit'], 4))
 
     def test_older_hub_reports_unknown_actuator_and_limits_only_its_dependent_mode(self):
         cap = {**self.caps['motion'], 'id': 'fixture.gripper', 'semantic': 'motion.gripper',
@@ -193,6 +277,7 @@ class RobotHubContractTests(unittest.TestCase):
                'challenge_id': 'fresh-boot-challenge'}
         current = {**receiver, 'source_boot_id': 'robot-boot-2', 'catalog_generation': 4, 'last_sequence': -1,
                    'challenge_source_boot_id': 'robot-boot-2', 'challenge_id': 'fresh-boot-challenge'}
+        current['agreements'] = {cap['id']: confirmed_agreement(cap, current['supported'], current)}
         self.assertEqual(observation_event(new, cap, current)['availability'], 'available')
 
     def test_unknown_age_value_and_source_receipt_are_not_fabricated_sample_time(self):
@@ -202,7 +287,10 @@ class RobotHubContractTests(unittest.TestCase):
             state = State(); state.ingest(event, 1.040)
             self.assertEqual(state.sensors['room.temperature'].view(1.040, False)['state'], 'unknown')
             self.assertEqual(state.sensors['room.temperature'].summary, '')
-        offline = observation_event(message, {**self.caps['metrics'], 'availability': 'offline'}, receiver)
+        offline_cap = {**self.caps['metrics'], 'availability': 'offline', 'catalog_generation': 4}
+        offline_receiver = {**receiver, 'catalog_generation': 4}
+        offline_receiver['agreements'] = {offline_cap['id']: confirmed_agreement(offline_cap, receiver['supported'], offline_receiver)}
+        offline = observation_event({**message, 'catalog_generation': 4}, offline_cap, offline_receiver)
         self.assertEqual((offline['availability'], offline['summary']), ('offline', ''))
         unavailable = observation_event({**message, 'availability': 'unknown', 'value': None, 'reason': 'no sample'},
                                         self.caps['metrics'], receiver)
@@ -231,6 +319,26 @@ class RobotHubContractTests(unittest.TestCase):
         self.assertFalse(allowed(c={**command, 'connection_id': 'old-link'}))
         self.assertFalse(allowed(c={**command, 'arguments': {'yaw_rad': 0.4}}))
         self.assertFalse(allowed(c={**command, 'arguments': {'yaw_rad': 0.1, 'execute': True}}))
+
+    def test_owner_cancel_survives_revoke_but_never_crosses_owner_or_action_scope(self):
+        owned = self.values['command']; authority = Authority(**owned['authority'])
+        cancel = {**owned, 'command_id': 'cancel-1', 'operation': 'cancel',
+                  'arguments': {'target_command_id': owned['command_id']},
+                  'permit_id': None, 'permit_epoch': None}
+        receiver = self.values['command_receiver']
+        # Expired/revoked permit blocks a new target, but it is not a cancel prerequisite.
+        revoked = {**self.values['permit'], 'allowed': False, 'expires_mono_ms': 0}
+        self.assertFalse(command_admitted(owned, self.caps['motion'], self.values['hub_supported'],
+                                         receiver, authority, revoked, 4))
+        self.assertTrue(owned_control_admitted(cancel, receiver, authority, owned))
+        self.assertFalse(owned_control_admitted(cancel, receiver, authority, None))
+        for patch in ({'capability_id': 'other.motion'}, {'generation': 5},
+                      {'arguments': {'target_command_id': 'other-command'}}, {'operation': 'target'},
+                      {'authority': {**owned['authority'], 'hub_boot_id': 'other-owner'}}):
+            self.assertFalse(owned_control_admitted({**cancel, **patch}, receiver, authority, owned))
+        foreign = {**owned, 'authority': {**owned['authority'], 'hub_boot_id': 'other-owner'}}
+        self.assertFalse(owned_control_admitted(cancel, receiver, authority, foreign))
+        self.assertFalse(owned_control_admitted(cancel, {**receiver, 'policy_ttl_ms': 10}, authority, owned))
 
     def test_duplicate_unknown_result_is_a_receipt_not_reexecution_or_physical_proof(self):
         command = self.values['command']

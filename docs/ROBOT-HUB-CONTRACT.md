@@ -52,6 +52,13 @@ id означает removal. Повреждённый snapshot не примен
 тот же generation с иным содержимым — conflict. На reconnect заново подтверждается
 текущий snapshot, readiness прежнего connection не переносится автоматически.
 
+Ingress получает доверенное локальное подтверждение согласования, а не только
+объявленный descriptor: connection, source boot, catalog generation, capability id,
+semantic, выбранные major/minor, status и digest полного descriptor. Подтверждение
+должно совпадать с текущим каталогом и локально поддерживаемым типом. Отсутствующее,
+unsupported или старое подтверждение не позволяет сделать observation ready.
+Это отдельный барьер перед State.ingest; модель и источник не выдают его сами.
+
 Для данного проекта envelope ограничен 16 KiB до decode; binary media передаётся
 отдельно. Схема ограничивает имена/массивы/скалярные arguments; semantic handler
 проверяет точный набор, единицы и диапазоны аргументов. Эти ограничения пока
@@ -127,7 +134,8 @@ socket). Это не известное время экспозиции. `unknow
    TTL. Неизвестный/просроченный challenge или отрицательная длительность дают
    unknown, а не нулевой age. При последующем чтении возраст растёт локально.
 
-Применяется минимум TTL сообщения, descriptor и локальной политики. При
+Применяется минимум TTL сообщения, descriptor и локальной политики получателя
+(`policy_ttl_ms` в исполняемом примере); локальный предел обязателен и валидируется. При
 `age >= TTL` наблюдение не используется как свежее. Late/replayed/wrong-boot
 пакет не замещает текущий sample. Unavailable sample имеет null value, состояние
 и причину; ноль — допустимое реальное значение. Disconnected/disabled источник
@@ -187,7 +195,13 @@ provenance; указатель на неё не делает невалидну�
 
 Replace отзывает старую generation до допуска новой. Cancel/revoke доступен
 владельцу области даже после истечения права на новые движения; не требует
-разрешения начать действие. Поздний completion предыдущего поколения может
+разрешения начать действие. Исполняемый пример разделяет `command_admitted`
+для новой цели и `owned_control_admitted` для отмены. Последний требует текущую
+аутентифицированную authority и локальную запись владельца конкретного
+(capability, command id, generation), но не live permit на новую цель. Аргументы
+отмены содержат точный target_command_id; иной владелец, область или поколение
+не допускаются. Ограниченный срок управляющего сообщения сохраняется.
+Поздний completion предыдущего поколения может
 обновить журнал своей команды, но не resurrect старый output или допуск.
 При невозможности подтвердить остановку состояние unknown блокирует новую
 конфликтующую цель. Полный STOP/quiet/privacy/sleep распространяется и на idle.
@@ -204,9 +218,9 @@ Replace отзывает старую generation до допуска новой.
 PYTHONPATH=src:tests .venv-review/bin/python -m unittest test_robot_hub_contract -v
 ```
 
-Проверяются: новый room.temperature без отдельной ветки обработки сенсора;
+Проверяются 13 сценариев: новый room.temperature без отдельной ветки обработки сенсора;
 unsupported gripper на старом Hub и блокировка только grasp; minor downgrade
-и несовместимый major; registration без permit; отзыв permit/смена generation;
+и несовместимый major; обязательное подтверждение support/каталога и локальный TTL; registration без permit; отзыв permit/смена generation и собственная отмена после отзыва;
 stale/replay/reconnect/reboot; unknown age против нуля; accepted/unknown receipt
 без повторного действия; допустимые/лишние/out-of-range arguments; latest-only метрика и независимый control slot.
 Последний trace моделирует политику очередей, не измеряет реальный Scheduler.

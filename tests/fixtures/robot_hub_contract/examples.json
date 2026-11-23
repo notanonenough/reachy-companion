@@ -261,7 +261,8 @@
     "challenge_sent_mono_ms": 1000,
     "received_mono_ms": 1040,
     "clock_error_ms": 2,
-    "challenge_source_boot_id": "robot-boot-1"
+    "challenge_source_boot_id": "robot-boot-1",
+    "policy_ttl_ms": 1000
   },
   "permit": {
     "id": "permit-3",
@@ -280,7 +281,8 @@
     "challenge_sent_mono_ms": 1000,
     "received_mono_ms": 1040,
     "clock_error_ms": 2,
-    "challenge_source_boot_id": "hub-1"
+    "challenge_source_boot_id": "hub-1",
+    "policy_ttl_ms": 1000
   },
   "argument_schemas": {
     "motion.target": {
