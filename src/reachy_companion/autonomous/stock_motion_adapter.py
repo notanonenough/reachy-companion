@@ -22,6 +22,7 @@ class StockMotionAdapter:
         self.next_motion = 0
         self.cached = None
         self.receipts = []
+        self.stock_diagnostic_receipt=None
         self.completed = 0
         self.done = threading.Event()
         self.done.set()
@@ -29,6 +30,24 @@ class StockMotionAdapter:
         self.follow_person=follow_person;self.follower=PersonFollow()
         self.follow_due=0;self.follow_sample=None;self.follow_finished=0;self.follow_error=None
         self.follow_admitted=False
+
+    def diagnostic_token(self):
+        try:return self.hub.stock_diagnostic_token()
+        except BaseException:return None
+
+    def capture_diagnostic(self, before, report):
+        try:
+            after=self.hub.stock_diagnostic_token()
+            if after is None or after is before:return
+            value=self.hub.stock_diagnostic_snapshot(after,scoped=True)
+            if not value or not (value['first_failure'] or value['stop_receipt']):return
+            value=dict(value,request_id=report['request_id'])
+            from .stock_diagnostics import project
+            report['stock_diagnostics']=project(value)
+            if self.stock_diagnostic_receipt is None or self.stock_diagnostic_receipt['first_failure'] is None:
+                self.stock_diagnostic_receipt=value
+        except BaseException:
+            pass
 
     def binding(self, operator):
         return dict(agent_boot_id=operator['agent_boot_id'],
@@ -79,6 +98,7 @@ class StockMotionAdapter:
         with self.lock:
             if self.busy or self.closed or self.failed or not self.follow_admitted:return report
             self.busy=True;self.cancel.clear();self.done.clear()
+        before=self.diagnostic_token()
         began=time.monotonic();moved=False;phase='operator'
         try:
             operator,_=self.hub.operator_proxy();policy=operator['motion_policy']
@@ -118,6 +138,7 @@ class StockMotionAdapter:
                     self.failed=True;self.follower.mode='pose_fault'
             if self.hub.stock_unknown:self.failed=True
         finally:
+            self.capture_diagnostic(before,report)
             with self.lock:
                 self.busy=False
                 if moved:self.follow_finished=time.monotonic()
@@ -136,6 +157,7 @@ class StockMotionAdapter:
             self.done.clear()
         report = dict(accepted=False, request_id=proposal['request_id'], transport='stock',
                       pose_verified=False, hard_stop_certified=False)
+        before=self.diagnostic_token()
         try:
             operator, _ = self.hub.operator_proxy()
             policy = operator['motion_policy']
@@ -169,6 +191,7 @@ class StockMotionAdapter:
             # Unknown output must be reconciled explicitly, never retried.
             if self.hub.stock_unknown: self.failed = True
         finally:
+            self.capture_diagnostic(before,report)
             with self.lock:
                 self.busy = False
                 self.next_motion = time.monotonic() + self.cooldown_s
@@ -187,9 +210,10 @@ class StockMotionAdapter:
         return self.stop()
 
     def status(self):
+        from .stock_diagnostics import project
         with self.lock:
             return dict(execution_busy=self.busy, closed=self.closed,
                         stop_known=not self.busy and not self.hub.stock_unknown,
                         hard_stop_certified=False,tracking_enabled=self.follow_person,
                         tracking_mode=self.follower.mode,tracking_error=self.follow_error,
-                        surveys=self.follower.scans)
+                        surveys=self.follower.scans,stock_diagnostics=project(self.stock_diagnostic_receipt))
