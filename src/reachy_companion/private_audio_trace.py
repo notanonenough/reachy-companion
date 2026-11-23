@@ -11,15 +11,17 @@ import uuid
 from .autonomous.voice_chain import digest
 
 
+from .model_timing import project as project_model_timing
+
 KINDS=('session_begin','stt_result','stt_disposition','input_admission','main_request',
-       'main_result','main_checked','speech_commit','speech_terminal','playback_stop','input_retry')
+       'main_result','main_checked','speech_commit','speech_terminal','playback_stop','input_retry','main_transport')
 FIELDS=('source_boot','sequence','lineage_id','audio_s','pcm_sha256','captured_end',
         'capture_basis','started_at','ended_at','disposition','input_ref','task_id','attempt_id',
         'request_id','parent_input_ref','authority','operator_binding','final','stream_id','generation',
         'tts_frames','tts_complete','cancelled','output_sha256','tts_pcm_sha256','deadline',
         'producer_started_at','producer_elapsed_s','tts_first_pcm_s','error_kind',
         'submitted_frames','written_frames','consumed_frames','stop_known','input_finished','complete','verified',
-        'verified_stopped','provenance','content_suppressed','stop_consumed_frames','device_stream_id')
+        'model_timing','transport_diagnostic_status','verified_stopped','provenance','content_suppressed','stop_consumed_frames','device_stream_id')
 AUTHORITY=('hub_boot_id','compute_boot_id','robot_boot_id','operator_epoch','microphone_epoch','interaction_epoch','speech_epoch')
 FINAL=('kind','role','backend','model_id_sha256','request_sha256','output_sha256','utterance_sha256','memory_projection_sha256')
 
@@ -37,7 +39,8 @@ def project(fields):
     for key in FIELDS:
         if key not in fields:continue
         value=fields[key]
-        if key in ('authority','final'):
+        if key=='model_timing':result[key]=project_model_timing(value)
+        elif key in ('authority','final'):
             keys=AUTHORITY if key=='authority' else FINAL
             result[key]={k:scalar(value[k]) for k in keys if k in value} if type(value) is dict else None
         elif key=='operator_binding':
@@ -179,19 +182,30 @@ def emit(owner,kind,*,text=None,**fields):
     if trace is not None:trace.emit(kind,text=text,**fields)
 
 
-def main_call(trace,function,task):
+def main_call(trace,function,task,transport=None):
     fields=dict(task_id=task.task_id,attempt_id=task.attempt_id,input_ref=task.input_ref,authority=task.authority.wire())
     utterance=task.prompt.get('utterance') if type(task.prompt) is dict else task.prompt
     linked=trace.audio_link(task.input_ref)
     started=time.monotonic();trace.emit('main_request',text=utterance if linked else None,
         disposition='audio_linked' if linked else 'metadata_only',started_at=started,**fields)
+    observed=False
+    def on_transport(receipt,disposition,status):
+        nonlocal observed
+        if observed:return
+        observed=True
+        timing=project_model_timing(receipt,request_id=task.attempt_id,gateway_boot_id=task.authority.compute_boot_id)
+        trace.emit('main_transport',disposition=disposition if disposition in ('execution_unknown','observed_error_receipt','transport_failure') else 'transport_failure',
+            transport_diagnostic_status=status if status in ('verified_receipt','partial_diagnostic','no_response','missing_diagnostic','malformed_diagnostic','identity_mismatch') else 'malformed_diagnostic',
+            model_timing=timing,**fields)
     try:
-        result=function(task)
-    except BaseException:
-        trace.emit('main_result',disposition='transport_error',started_at=started,ended_at=time.monotonic(),**fields);raise
+        result=transport(task,on_transport) if transport is not None else function(task)
+    except BaseException as exc:
+        timing=project_model_timing(getattr(exc,'model_timing',None),request_id=task.attempt_id,gateway_boot_id=task.authority.compute_boot_id)
+        trace.emit('main_result',disposition='transport_error',started_at=started,ended_at=time.monotonic(),model_timing=timing,**fields);raise
     value=result if type(result) is dict else {}
     trace.emit('main_result',text=value.get('output') if linked else None,final=value.get('completion_provenance'),
-        disposition='unchecked',started_at=started,ended_at=time.monotonic(),**fields)
+        disposition='unchecked',started_at=started,ended_at=time.monotonic(),
+        model_timing=project_model_timing(value.get('model_timing'),request_id=task.attempt_id,gateway_boot_id=task.authority.compute_boot_id),**fields)
     return result
 
 

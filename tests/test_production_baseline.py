@@ -42,6 +42,29 @@ def finish(rows):
 
 
 class BaselineTests(unittest.TestCase):
+    def test_nonterminal_transport_receipt_never_completes_chain(self):
+        from reachy_companion.model_timing import Timing,bind,project
+        model={'id':'fixture','completion_backend':'llama_native','audit':dict(runtime_build='fixture',
+            weight_sha256='a'*64,tokenizer_sha256='b'*64,template_sha256='c'*64)}
+        timer=Timing(model);timer.finish(error=RuntimeError())
+        receipt=project(bind(timer.value,'attempt','pc','handler_to_pre_serialize',0,failed=True))
+        rows=trace();original=b.analyze_trace(rows)
+        diagnostic={**rows[3],'kind':'main_transport','at':5,'disposition':'execution_unknown','transport_diagnostic_status':'partial_diagnostic','model_timing':receipt}
+        complete=b.analyze_trace(finish(rows[:-1]+[diagnostic]))
+        self.assertEqual(complete['metrics'],original['metrics'])
+        self.assertEqual(complete['audio_playback_chains'],1)
+        self.assertEqual(complete['state'],'complete')
+        partial=b.analyze_trace(finish(rows[:4]+[diagnostic]))
+        self.assertEqual(partial['state'],'incomplete');self.assertEqual(partial['audio_playback_chains'],0)
+        self.assertEqual(partial['metrics']['main_client_s']['n'],0)
+        for alter,issue in ((lambda r:r['authority'].update(hub_boot_id='foreign'),'invalid_authority'),
+                (lambda r:r['model_timing'].update(request_id='foreign'),'invalid_transport_receipt'),
+                (lambda r:r['model_timing'].update(gateway_boot_id='foreign'),'invalid_transport_receipt'),
+                (lambda r:r.update(attempt_id='foreign'),'invalid_transport_receipt'),
+                (lambda r:r.update(authority={**r['authority'],'operator_epoch':2}),'invalid_transport_join')):
+            bad=copy.deepcopy(diagnostic);alter(bad)
+            self.assertIn(issue,b.analyze_trace(finish(rows[:-1]+[bad]))['issues'])
+
     def test_causal_client_intervals_and_no_sensitive_output(self):
         rows=trace()
         for row in rows:row.update(text='PRIVATE SENTINEL',prompt={'secret':'PRIVATE SENTINEL'},final={'private':'PRIVATE SENTINEL'})
