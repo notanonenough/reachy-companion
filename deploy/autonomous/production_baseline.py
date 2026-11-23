@@ -5,13 +5,14 @@ import json
 import math
 from pathlib import Path
 import statistics
+from reachy_companion.autonomous.contracts import Authority,decode
 from reachy_companion.lease_diagnostics import project_first_lease_invalid,project_first_reducer_expiry
 
 TRACE_KINDS=('session_begin','stt_result','stt_disposition','input_admission','input_retry',
     'main_request','main_result','main_checked','speech_commit','speech_terminal','playback_stop','trace_end')
 COUNTERS=('submitted','overwritten','stale','echo','started','completed','no_response','empty','errors','timeouts')
 METRICS=('stt_client_s','stt_end_to_admission_s','admission_to_main_start_s','main_client_s',
-    'main_end_to_checked_s','checked_to_speech_s','tts_first_pcm_s','tts_producer_s','stt_end_to_playback_stop_s')
+    'main_end_to_checked_s','checked_to_speech_s','tts_first_pcm_s','tts_producer_s','stt_end_to_playback_stop_s','retry_candidate_to_main_start_s')
 
 
 def number(value):
@@ -23,6 +24,12 @@ def identifier(value):
     return type(value) is str and 0<len(value)<=256
 
 
+def valid_authority(value,hub_boot):
+    if type(value) is not dict or set(value)!=set(Authority.__dataclass_fields__):return False
+    return (value.get('hub_boot_id')==hub_boot and all(
+        identifier(v) if k.endswith('boot_id') else type(v) is int and 0<=v<2**63 for k,v in value.items()))
+
+
 def read_rows(path,*,trace=False,final=False):
     if path is None:return None
     cap=1048576 if trace else 33554432
@@ -30,12 +37,12 @@ def read_rows(path,*,trace=False,final=False):
     if len(raw)>cap:raise ValueError('input_size_cap')
     try:
         if final:
-            value=json.loads(raw);rows=value if type(value) is list else [value]
+            value=decode(raw);rows=value if type(value) is list else [value]
         else:
             lines=raw.splitlines()
             if len(lines)>(512 if trace else 10000):raise ValueError('row_cap')
             if any(len(line)>(16384 if trace else 262144) for line in lines):raise ValueError('line_cap')
-            rows=[json.loads(line) for line in lines]
+            rows=[decode(line) for line in lines]
     except (UnicodeError,json.JSONDecodeError,RecursionError):raise ValueError('invalid_json') from None
     if not all(type(row) is dict for row in rows):raise ValueError('object_required')
     return rows
@@ -74,7 +81,10 @@ def analyze_trace(rows):
         clean.update({key:row[key] for key in ('cancelled','tts_complete','stop_known','verified_stopped') if type(row.get(key)) is bool})
         clean['kind']=kind
         clean['disposition']=row.get('disposition') if type(row.get('disposition')) is str and len(row['disposition'])<=64 else None
-        clean['authority']=row.get('authority') if type(row.get('authority')) is dict else None
+        needs_authority=kind in ('stt_result','input_admission','input_retry','main_request','main_result','main_checked','speech_commit','speech_terminal')
+        if needs_authority and not valid_authority(row.get('authority'),identity[1]):
+            issues['invalid_authority']+=1;continue
+        clean['authority']=row.get('authority') if needs_authority else None
         if type(row.get('sequence')) is int and 0<=row['sequence']<2**63:clean['sequence']=row['sequence']
         events.append(clean)
     if counts['session_begin']!=1:issues['session_begin_count']+=1
@@ -102,12 +112,14 @@ def analyze_trace(rows):
     for row in events:
         if row['kind']=='input_retry' and row.get('disposition')=='linked':
             parent=refs.get(row.get('parent_input_ref'));ref=row.get('input_ref')
-            if parent and identifier(ref) and ref not in refs and row.get('authority')==parent.get('authority'):
-                refs[ref]={**parent,'at':row['at']}
+            if (parent and identifier(ref) and ref not in refs and row.get('authority')==parent.get('authority')
+                    and row['at']>=parent.get('retry_candidate_at',parent['at'])):
+                refs[ref]={**parent,'retry_candidate_at':row['at']}
             else:issues['retry_link']+=1
     def interval(name,end,start):
         if number(end) and number(start) and end>=start:metrics[name].append(end-start)
         else:issues['invalid_or_missing_time']+=1
+    def ordered(*values):return all(number(v) for v in values) and all(a<=z for a,z in zip(values,values[1:]))
     chains=0
     for key,request in requests.items():
         if request.get('disposition')!='audio_linked':continue
@@ -118,18 +130,28 @@ def analyze_trace(rows):
             issues['authority_mismatch']+=1;continue
         source=stt.get(tuple(admission.get(k) for k in source_keys))
         if source is None:issues['missing_stt']+=1;continue
+        if not ordered(source.get('started_at'),source.get('ended_at'),source.get('at'),admission.get('at')):
+            issues['admission_time_conflict']+=1;continue
+        if (request.get('started_at')!=result.get('started_at') or not ordered(
+                admission.get('at'),admission.get('retry_candidate_at',admission.get('at')),request.get('started_at'),
+                request.get('at'),result.get('ended_at'),result.get('at'),check.get('at'))):
+            issues['attempt_time_conflict']+=1;continue
         interval('admission_to_main_start_s',request.get('started_at'),admission.get('at'))
+        if 'retry_candidate_at' in admission:interval('retry_candidate_to_main_start_s',request.get('started_at'),admission['retry_candidate_at'])
         interval('main_client_s',result.get('ended_at'),result.get('started_at'))
         interval('main_end_to_checked_s',check.get('at'),result.get('ended_at'))
         commit=commits.get(key)
         if commit is None:continue # rejected/cancelled main attempts need not become speech
-        if check.get('disposition')!='ready' or commit.get('authority')!=admission['authority']:
+        if (check.get('disposition')!='ready' or commit.get('authority')!=admission['authority']
+                or not ordered(check.get('at'),commit.get('at'))):
             issues['unready_speech']+=1;continue
         speech=terminal.get((commit.get('request_id'),));stop=stops.get((commit.get('request_id'),))
         if not speech or not stop:issues['missing_terminal']+=1;continue
         if (tuple(speech.get(k) for k in task_keys)!=key or speech.get('authority')!=admission['authority']
                 or speech.get('stream_id')!=stop.get('stream_id') or source.get('source_boot')!=stop.get('source_boot')):
             issues['terminal_identity']+=1;continue
+        if not ordered(commit.get('at'),speech.get('at')) or not ordered(commit.get('at'),stop.get('at')):
+            issues['terminal_time_conflict']+=1;continue
         interval('checked_to_speech_s',commit.get('at'),check.get('at'))
         for name,field in (('tts_first_pcm_s','tts_first_pcm_s'),('tts_producer_s','producer_elapsed_s')):
             if number(speech.get(field)):metrics[name].append(speech[field])
@@ -142,13 +164,14 @@ def analyze_trace(rows):
     for source in stt.values():
         group=source.get('disposition');group=group if group in stt_groups else 'other';stt_counts[group]+=1
         end,start=source.get('ended_at'),source.get('started_at')
-        if number(end) and number(start) and end>=start:
+        if ordered(start,end,source.get('at')):
             stt_groups[group].append(end-start)
             if group=='recognized':metrics['stt_client_s'].append(end-start)
         else:issues['invalid_or_missing_time']+=1
     for admission in admissions.values():
         source=stt.get(tuple(admission.get(k) for k in source_keys))
-        if source:interval('stt_end_to_admission_s',admission.get('at'),source.get('ended_at'))
+        if source and ordered(source.get('ended_at'),source.get('at'),admission.get('at')):interval('stt_end_to_admission_s',admission.get('at'),source.get('ended_at'))
+        elif source:issues['admission_time_conflict']+=1
         else:issues['missing_stt']+=1
     return dict(state='incomplete' if issues else 'complete',issues=dict(issues),event_counts=dict(counts),
         audio_playback_chains=chains,terminal_outcomes=dict(cancelled=sum(r.get('cancelled') is True for r in terminal.values()),
@@ -166,8 +189,14 @@ def analyze_status(rows):
     if rows is None:return dict(state='missing')
     counters={key:0 for key in COUNTERS};pairs=Counter();previous={};identity=None;segments=0;unknown=0;last_elapsed=None;resets=0
     maxima=[];elapsed=[];rtt=[];progress=[];queue=[];latest={};active=invalid=stale=0
-    first_invalid=first_expiry=None
+    first_invalid=first_expiry=None;poll_outcomes=Counter()
     for row in rows:
+        begin,end=row.get('hub_request_begin'),row.get('hub_request_end')
+        if number(begin) and number(end) and end>=begin:
+            rtt.append(end-begin)
+            outcome='unavailable' if row.get('stage')=='unavailable' or row.get('error_class') is not None else 'response'
+            poll_outcomes[outcome]+=1
+        else:poll_outcomes['missing_interval']+=1
         if row.get('first_reducer_expiry') or row.get('first_lease_invalid'):invalid+=1
         first_invalid=first_invalid or project_first_lease_invalid(row.get('first_lease_invalid'))
         first_expiry=first_expiry or project_first_reducer_expiry(row.get('first_reducer_expiry'))
@@ -195,8 +224,6 @@ def analyze_status(rows):
                 for key in ('fast','main'):
                     if number(latency.get(key)):latest[key]=latency[key]
             if type(pressure) is dict and number(pressure.get('queue_depth')):queue.append(pressure['queue_depth'])
-        begin,end=row.get('hub_request_begin'),row.get('hub_request_end')
-        if number(begin) and number(end) and end>=begin:rtt.append(end-begin)
         values=row.get('audio_counts',row.get('audio',{}).get('counts',{}) if type(row.get('audio')) is dict else {})
         if type(values) is not dict:values={}
         if any(key in previous and type(values.get(key)) is int and values[key]<previous[key] for key in COUNTERS):
@@ -215,7 +242,7 @@ def analyze_status(rows):
         sampled_progress_age_ms=dict(n=len(progress),max=max(progress,default=None)),
         sampled_queue_depth=dict(n=len(queue),max=max(queue,default=None)),
         sampled_session_elapsed_max_s=max(elapsed,default=None),max_tick_gap_ms=max(maxima,default=None),
-        max_tick_gap_semantics='cumulative_max_not_samples',status_request_s=distribution(rtt),
+        max_tick_gap_semantics='cumulative_max_not_samples',status_request_s=distribution(rtt),status_request_outcomes=dict(poll_outcomes),
         missing=['per_tick_distribution','per_job_latency_distribution','cpu_rss','acoustic_latency']
             +([] if queue else ['queue_depth'])+([] if progress else ['progress_age']))
 

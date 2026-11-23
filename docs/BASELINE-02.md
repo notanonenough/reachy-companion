@@ -73,10 +73,10 @@ PYTHONPATH=src:tests python3 -m unittest test_production_baseline -v
 не запускает прежний `audit-correlation.py` (тот перезаписывает local summary).
 
 Missing file отличается от empty/incomplete trace и stale dispositions.
-Footer/counters и duplicate/conflicting IDs проверяются; incomplete не скрывается
+Footer/counters, duplicate JSON keys, typed authority, duplicate/conflicting IDs и обязательный порядок событий проверяются; incomplete не скрывается
 при наличии нескольких удачных цепочек. Каждый main join использует task,
 attempt,input_ref,authority; retry наследует только зарегистрированный parent.
-STT counts и интервалы разделены на recognized/empty/stale/error/other. Число
+Первоначальный audio admission anchor сохраняется при retry; ожидание нового retry candidate имеет отдельный интервал. STT counts и интервалы разделены на recognized/empty/stale/error/other. Число
 исходных событий сохраняется даже при потере join. Background main не попадает
 в voice latency; ready/discarded/failed имеют отдельные counts. Соответствие
 terminal по ID не выдаётся за проверенную остановку: flags считаются отдельно.
@@ -93,7 +93,7 @@ Status counters — только наблюдаемые deltas, не абсол�
 первый sample — baseline. Missing identity/status, source change, elapsed reset,
 counter reset разрывают последовательность. Отсутствующие пары — null, не0.
 Повторные last Job latency и cumulative max не создают новые call samples.
-Poll duration — локальный Hub request interval; Mac received timestamp не
+Poll duration учитывает и unavailable/error ответы даже без peer identity, с отдельными outcome counts; counters через эту границу не соединяются. Это локальный Hub request interval; Mac received timestamp не
 вычитается из него. Частота sampling ограничивает наблюдаемость коротких пиков.
 
 ### Проверка сохранённого717

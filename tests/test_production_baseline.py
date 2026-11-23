@@ -24,7 +24,7 @@ def trace():
     source=dict(source_boot='source',sequence=1,lineage_id='source:1')
     task=dict(task_id='task',attempt_id='attempt',input_ref='input',authority=authority)
     add('session_begin',0)
-    add('stt_result',3,started_at=1,ended_at=3,disposition='recognized',**source)
+    add('stt_result',3,started_at=1,ended_at=3,disposition='recognized',authority=authority,**source)
     add('input_admission',3.1,input_ref='input',authority=authority,disposition='admitted',**source)
     add('main_request',4,started_at=4,disposition='audio_linked',**task)
     add('main_result',9,started_at=4,ended_at=9,disposition='unchecked',**task)
@@ -37,7 +37,7 @@ def trace():
 
 def finish(rows):
     rows=[row for row in rows if row['kind']!='trace_end']
-    rows.append(dict(version=1,kind='trace_end',at=15,clock_basis='hub_monotonic',incomplete=False,dropped=0,records_written=len(rows)))
+    rows.append(dict(version=1,kind='trace_end',at=max(row['at'] for row in rows)+1,clock_basis='hub_monotonic',incomplete=False,dropped=0,records_written=len(rows)))
     return rows
 
 
@@ -151,6 +151,33 @@ class BaselineTests(unittest.TestCase):
         self.assertIsNone(result['audio_observed_deltas']['errors'])
         rows=trace();rows[-1]['records_written']=True
         self.assertEqual(b.analyze_trace(rows)['state'],'incomplete')
+
+    def test_attempt_time_authority_and_duplicate_json_are_rejected(self):
+        for change in (dict(started_at=8),dict(ended_at=2),dict(authority={}),dict(authority={'hub_boot_id':'other'})):
+            rows=trace();rows[4].update(change)
+            result=b.analyze_trace(rows)
+            self.assertEqual(result['state'],'incomplete');self.assertEqual(result['metrics']['main_client_s']['n'],0)
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'trace';path.write_text('{"ended_at":8,"ended_at":9}')
+            with self.assertRaises(ValueError):b.read_rows(path,trace=True)
+
+    def test_retry_keeps_original_audio_anchor_and_separate_candidate_wait(self):
+        rows=trace();retry={**rows[2],'kind':'input_retry','input_ref':'retry','parent_input_ref':'input','at':3.5,'disposition':'linked'}
+        rows.insert(3,retry)
+        for row in rows:
+            if row['kind'] in ('main_request','main_result','main_checked','speech_commit','speech_terminal'):row['input_ref']='retry'
+        result=b.analyze_trace(finish(rows))
+        self.assertEqual(result['state'],'complete')
+        self.assertAlmostEqual(result['metrics']['admission_to_main_start_s']['p50'],.9)
+        self.assertEqual(result['metrics']['retry_candidate_to_main_start_s']['p50'],.5)
+
+    def test_cancel_stop_can_precede_worker_terminal_and_poll_failure_is_counted(self):
+        rows=trace();rows[-2]['at']=10.5;rows[-3]['cancelled']=True
+        result=b.analyze_trace(rows)
+        self.assertEqual(result['state'],'complete');self.assertEqual(result['terminal_outcomes']['cancelled'],1)
+        status=b.analyze_status([dict(stage='unavailable',hub_request_begin=1,hub_request_end=2)])
+        self.assertEqual(status['status_request_s']['n'],1);self.assertEqual(status['status_request_s']['max'],1)
+        self.assertEqual(status['status_request_outcomes']['unavailable'],1)
 
     def test_caps_reject_before_parse(self):
         with tempfile.TemporaryDirectory() as directory:
