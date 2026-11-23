@@ -58,8 +58,17 @@ STT-end→first-TTS-PCM11.209s по Hub clock; main client interval7.650s не �
 | Карточка | Статус, владелец и ревьюер | Следующий шаг и контакт |
 |---|---|---|
 | [PERF-01, Issue #30](https://github.com/notanonenough/reachy-companion/issues/30) | Software PR #32 принят; выбран candidate `fc55460668816122f1a2062e499f77a943965078`. Автор `/root/implementer`, reviewer `/root/reviewer`; physical acceptance открыта | Установка независимо принята, окно освобождено00:48. Единственный owner `/root/implementer`, **один90s опыт24.11 00:51–01:05 Asia/Baku**, checkpoint **01:00**. Original44ee0 harness/штатные camera+speech+motion, без observerv3; fresh preflight, exact helper/own-PID abort delta review доstart, затем один start. Failure→штатный cleanup, безповтора/автоматической pose recovery. Reviewer проверит evidence после освобождения. |
-| [MODEL-LATENCY-01, Issue #33](https://github.com/notanonenough/reachy-companion/issues/33) | Независимый offline-аудит оставшегося main client ожидания; автор `/root/ci_implementer`, reviewer `/root/reviewer` | Existing callers/logs/metadata: observed/derived/missing timing/token/cache/queue, одинаковый-input future experiment и варианты ускорения. Без новых inference/SSH/process probes/service/model changes; код #30 не редактирует. Контроль **24.11 00:55 Asia/Baku**, раньше доказательный результат/PR. |
+| [MODEL-TIMING-01, Issue #35](https://github.com/notanonenough/reachy-companion/issues/35) | Принят аудит #33/PR #34; автор `/root/ci_implementer`, независимый reviewer `/root/reviewer` | Same-call числовые этапы tokenize/completion/validation, exact usage и typed reported native fields через existing bounded trace. Никаких новых inference/RPC/streaming/model/settings/outcome changes; только offline code/tests. Fresh `reachy-model-timing` / `codex/model-stage-timing`; контроль **24.11 01:10 Asia/Baku**, раньше contract/PR/препятствие. Hardware #30 не затрагивается. |
 | [BASELINE-02, Issue #26](https://github.com/notanonenough/reachy-companion/issues/26) | Протокол прерванной реплики принят через PR #31; владелец `/root/ci_implementer`, reviewer `/root/reviewer`; baseline неполон, карточка открыта и ожидает зависимость | Штатный cleanup независимо подтверждён, окно освобождено **24.11 00:22:24**. Полный resource baseline ждёт отложенной OBSERVE-02; по новому указанию владельца приоритет #30. Автор #26 завершил текущий шаг, новых starts/probes/observer edits нет. Следующая сверка зависимости с ведущим при контроле #30 **01:00**. |
+
+MODEL-LATENCY-01 #33 закрыта после [PR #34](https://github.com/notanonenough/reachy-companion/pull/34):
+exact `72aefec1fe1af65bdf00ec6ebb228c43e9f7a144`,
+independent APPROVED6029300494, CI45262760006/45262805137 SUCCESS;
+merge `342aa4ceb996f264714c075d4b2b222b5c912e5b` подтверждён в origin/main,
+remote branch удалена. [Аудит](MODEL-LATENCY-01.md) подтверждает два existing
+tokenizer RPC и missing per-request native timings/token/cache data для717.
+Main client6.7–7.8s не объявлен compute-only. Следующий #35 готовит числовую
+диагностику existing calls; отдельный normal-chain опыт будет назначен позже.
 
 PR #32 принят: exact reviewed `7b6020b7ab4df8067721e8a0073e983feb18059e`,
 [independent APPROVED](https://github.com/notanonenough/reachy-companion/pull/32#pullrequestreview-6029112603),
@@ -108,10 +117,10 @@ remote branch удалена. Lifecycle finish и Mac runner blockers испра
 перепроверены. Это подготовка observer, не измеренное покрытие трёх узлов.
 
 Ведущий — `reachy-development-map`; автор #30 использует clean detached source
-для exact candidate и новую ветку протокола после software merge; автор #33 —
-отдельную `reachy-model-latency`; reviewer — `/tmp/reachy-review-map`. #26 ожидает
+для exact candidate и новую ветку протокола после software merge; автор #35 —
+отдельную `reachy-model-timing`; reviewer — `/tmp/reachy-review-map`. #26 ожидает
 зависимость, её завершённая рабочая ветка слита/удалена. Одновременных редакторов
-одного модуля и владельцев стенда нет; #33 выполняется только offline.
+одного модуля и владельцев стенда нет; #35 выполняется только offline.
 Production checkout `reachy-companion` установлен на exactfc554; для разработки его не используют.
 Read-only readiness независимо принята; одна назначенная120s реплика досрочно завершена. Stopped
 workers не дают positive acquisition receipts; полнота после старта потребует
