@@ -36,6 +36,9 @@ class DurableStore:
           CREATE TABLE IF NOT EXISTS changes(field TEXT PRIMARY KEY, changed REAL NOT NULL);
           CREATE TABLE IF NOT EXISTS tool_admissions(name TEXT PRIMARY KEY, request_id TEXT NOT NULL,
             status TEXT NOT NULL, at TEXT NOT NULL);
+          CREATE TABLE IF NOT EXISTS character_proposals(id TEXT PRIMARY KEY, body TEXT NOT NULL,
+            base_digest TEXT NOT NULL, digest TEXT NOT NULL, status TEXT NOT NULL,
+            repo TEXT, base_commit TEXT, head TEXT, pr INTEGER, applied_revision INTEGER);
           CREATE TABLE IF NOT EXISTS outbox(id TEXT PRIMARY KEY, body TEXT NOT NULL,
             s3 INTEGER NOT NULL DEFAULT 0, vps INTEGER NOT NULL DEFAULT 0);
         ''')
@@ -64,25 +67,28 @@ class DurableStore:
         return row[0] if row else 0
 
     def update(self, patch, expected, reason):
+        with self.db:
+            self.db.execute('BEGIN IMMEDIATE')
+            return self._update(patch, expected, reason)
+
+    def _update(self, patch, expected, reason):
         if type(expected) is not int or expected < -1:raise ValueError('Integer revision required')
         if (not isinstance(patch, dict) or not patch or set(patch)-{'personality','principles','goal','memory'}
                 or not isinstance(reason,str) or not 1 <= len(reason) <= 240):
             raise ValueError('Bounded versioned update required')
-        with self.db:
-            self.db.execute('BEGIN IMMEDIATE')
-            row = self.db.execute('SELECT revision,body FROM versions ORDER BY revision DESC LIMIT 1').fetchone()
-            revision, body = (row[0], decode(row[1])) if row else (-1, {})
-            if revision != expected:raise ValueError('Version CAS conflict')
-            for key, value in patch.items():
-                if key == 'goal':
-                    if value is not None:validate('Goal', value)
-                elif not isinstance(value,str) or len(value) > (512 if key != 'memory' else 2048):
-                    raise ValueError('State projection bound')
-            body.update(patch)
-            for field in patch:
-                self.db.execute('INSERT OR REPLACE INTO changes VALUES (?,?)',(field,time.time() if revision>=0 else 0))
-            self.db.execute('INSERT INTO versions VALUES (?,?,?,?)',
-                (revision+1,json.dumps(body,ensure_ascii=False),reason,utc()))
+        row = self.db.execute('SELECT revision,body FROM versions ORDER BY revision DESC LIMIT 1').fetchone()
+        revision, body = (row[0], decode(row[1])) if row else (-1, {})
+        if revision != expected:raise ValueError('Version CAS conflict')
+        for key, value in patch.items():
+            if key == 'goal':
+                if value is not None:validate('Goal', value)
+            elif not isinstance(value,str) or len(value) > (512 if key != 'memory' else 2048):
+                raise ValueError('State projection bound')
+        body.update(patch)
+        for field in patch:
+            self.db.execute('INSERT OR REPLACE INTO changes VALUES (?,?)',(field,time.time() if revision>=0 else 0))
+        self.db.execute('INSERT INTO versions VALUES (?,?,?,?)',
+            (revision+1,json.dumps(body,ensure_ascii=False),reason,utc()))
         return revision+1
 
     def rollback(self, target, expected, reason):

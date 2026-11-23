@@ -2776,14 +2776,6 @@
               "type": "object",
               "minProperties": 1,
               "properties": {
-                "personality": {
-                  "type": "string",
-                  "maxLength": 512
-                },
-                "principles": {
-                  "type": "string",
-                  "maxLength": 512
-                },
                 "goal": {
                   "type": "string",
                   "maxLength": 512
@@ -2817,6 +2809,9 @@
             "argument"
           ],
           "additionalProperties": false
+        },
+        "propose_character": {
+          "$ref": "#/$defs/CharacterProposal"
         }
       },
       "required": [
@@ -3288,6 +3283,38 @@
         "state",
         "age_ms",
         "summary"
+      ],
+      "additionalProperties": false
+    },
+    "CharacterProposal": {
+      "type": "object",
+      "properties": {
+        "patch": {
+          "type": "object",
+          "minProperties": 1,
+          "properties": {
+            "personality": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            },
+            "principles": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            }
+          },
+          "additionalProperties": false
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 240
+        }
+      },
+      "required": [
+        "patch",
+        "reason"
       ],
       "additionalProperties": false
     }

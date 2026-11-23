@@ -70,20 +70,47 @@ def attach(scheduler, config_path):
 
 
 def main():
-    """Offline version inspection/rollback hook; no service or device commands."""
+    """Offline owner state management; no service or device commands."""
     import argparse
     import json
     parser=argparse.ArgumentParser(description=main.__doc__)
-    parser.add_argument('action',choices=('inspect','rollback'))
+    parser.add_argument('action',choices=('inspect','rollback','set-character','list-character-proposals','publish-character-proposal','apply-character-proposal'))
+    parser.add_argument('proposal_id',nargs='?')
+    parser.add_argument('--repo')
     parser.add_argument('--state',type=Path,required=True)
     parser.add_argument('--target',type=int)
     parser.add_argument('--expected',type=int)
     parser.add_argument('--reason')
+    parser.add_argument('--personality')
+    parser.add_argument('--principles')
     args=parser.parse_args()
     if not args.state.is_file():parser.error('Existing state database required')
+    character={key:getattr(args,key) for key in ('personality','principles') if getattr(args,key) is not None}
+    if args.action=='set-character':
+        if args.expected is None or args.expected<0 or not args.reason:
+            parser.error('Set-character requires expected revision and reason')
+        if not character or any(not 1<=len(value)<=512 for value in character.values()):
+            parser.error('Set-character requires personality or principles, each 1..512 characters')
+    elif character:parser.error('Character fields require set-character')
+    proposal_action=args.action in ('publish-character-proposal','apply-character-proposal')
+    if proposal_action and not args.proposal_id:parser.error('Proposal id required')
+    if args.proposal_id and not proposal_action:parser.error('Proposal id requires publish or apply')
+    if args.repo is not None and args.action!='publish-character-proposal':parser.error('Repository is selected only at publication')
     store=DurableStore(args.state)
     try:
-        if args.action=='rollback':
+        if args.action in ('list-character-proposals','publish-character-proposal','apply-character-proposal'):
+            from .character_proposals import CharacterProposals,GitHub
+            proposals=CharacterProposals(store)
+            if args.action=='list-character-proposals':result=proposals.listing()
+            elif args.action=='publish-character-proposal':
+                item=proposals.publish(args.proposal_id,args.repo,GitHub())
+                result=dict(id=args.proposal_id,status=item['status'],url=f"https://github.com/{item['repo']}/pull/{item['pr']}")
+            else:result=dict(id=args.proposal_id,revision=proposals.apply(args.proposal_id,GitHub()))
+            print(json.dumps(result,ensure_ascii=False));return
+        if args.action=='set-character':
+            store.claim()
+            store.update(character,args.expected,args.reason)
+        elif args.action=='rollback':
             if args.target is None or args.expected is None or not args.reason:parser.error('Rollback requires target, expected and reason')
             store.rollback(args.target,args.expected,args.reason)
         revision,body=store.current()
