@@ -77,7 +77,7 @@ CONTRACT-01 (передача записана в Issue #2 до начала). �
 2. **[CONTRACT-01, Issue #2](https://github.com/notanonenough/reachy-companion/issues/2), принята через PR #10.** Контракт шести модулей (§7–10,15–16,19–22)
    описывает каталог, актуальность, допуски и результаты. Следующая узкая задача
    [CATALOG-01, Issue #12](https://github.com/notanonenough/reachy-companion/issues/12)
-   назначена второму исполнителю: scalar registry/adapter в существующий runtime.
+   принята через PR #14: scalar registry/adapter в существующем runtime.
    Медиатранспорт и движение в неё не входят.
 3. **[BASELINE-01, Issue #8](https://github.com/notanonenough/reachy-companion/issues/8), принята через PR #11.** Инвентаризация версий и штатных
    интерфейсов выполнена. Погрешность часов, совместная нагрузка и численные
@@ -320,3 +320,20 @@ head `4d4f5f192428b56c30e59578f9a4593e34b61a66`, получил конкретн
 CATALOG уже воспроизводит первый loopback через штатный production entrypoint;
 13 новых/55 existing tests прошли локально, пока не независимая приёмка.
 Следующий шаг автора — camera/config edges и PR, контроль21:50.
+
+Приёмка CATALOG-01, 21:45 Asia/Baku: PR #14 слит как
+`43bcc45bd1ddec8ace6860252474d15193652e85`; ancestry точного reviewed head
+`972959f65e2f24e7412a1fce07d9fd4fc692a3a3` проверена в origin/main.
+[Независимое APPROVED](https://github.com/notanonenough/reachy-companion/pull/14#pullrequestreview-6026526400)
+подтвердило 134 targeted tests и два delayed probes. Оба Linux CI
+45230437328/45230450409 успешны: 1817 tests, 26 skipped, Node и сборка.
+Issue #12 закрыта, remote branch удалена; автор удаляет local branch при переходе
+к [LEASE-01 #15](https://github.com/notanonenough/reachy-companion/issues/15).
+
+Аппаратный контроль 21:45 и передача 21:46: кандидат `362002991` установлен,
+но сквозной опыт не принят. Подробности сохраняет
+[protocol PR #16](https://github.com/notanonenough/reachy-companion/pull/16),
+не закрывающий #9. Автор и reviewer подтвердили нехватку first-invalid данных;
+второму исполнителю назначена #15, reviewer прежний, контроль21:55.
+Стенд остановлен, новые start/recovery отложены до принятой диагностики и
+явного выбора следующего кандидата. Это не отказ от выпуска и не его приёмка.
