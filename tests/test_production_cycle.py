@@ -1,5 +1,8 @@
 """Protocol evidence with substituted IO. No device or infrastructure acceptance."""
 import json
+import os
+import subprocess
+import sys
 from pathlib import Path
 import tempfile
 import threading
@@ -427,6 +430,9 @@ class CycleTests(unittest.TestCase):
         body['state']={'maintenance':'memory'}
         self.assertEqual(backend.generate('main',body)['output'],backend.text)
         self.assertEqual(backend.payload['json_schema']['required'],['memory'])
+        body['state']={'maintenance':'character'}
+        backend.generate('main',body)
+        self.assertNotIn('json_schema',backend.payload)
         body['state']={}
         with self.assertRaises(ValueError):backend.generate('main',body)
 
@@ -538,15 +544,118 @@ class CycleTests(unittest.TestCase):
         self.assertEqual(argv[0],'companion-autonomous')
         self.assertNotIn('--allow-native-observation',argv)
 
-    def test_character_changes_are_rate_limited_and_mic_off_does_not_poll_audio(self):
+    def test_character_deadline_never_schedules_profile_inference(self):
+        service=self.scheduler.services;before=self.store.current()
+        now=time.monotonic()+self.cfg['production']['character_refresh_s']+1
+        service.next_memory=now+10
+        service.advance(now)
+        self.assertIsNone(service.maintenance)
+        self.assertFalse(self.model.prompts)
+        self.assertEqual(self.store.current(),before)
+        service.next_memory=0
+        service.advance(now)
+        service.maintenance[0].thread.join(1)
+        self.assertEqual(self.model.prompts[-1]['state']['maintenance'],'memory')
+        self.assertEqual(self.store.current(),before)
+
+    def test_model_schema_and_service_reject_profile_and_mixed_updates(self):
+        from jsonschema import ValidationError
+        from reachy_companion.autonomous.gateway import fast_schema
+        state=self.scheduler.state;service=self.scheduler.services
+        before=self.store.current();now=time.monotonic()
+        schema=fast_schema(state.snapshot(now))
+        fields=schema['properties']['update']['properties']['patch']['properties']
+        self.assertNotIn('personality',fields);self.assertNotIn('principles',fields)
+        for patch_value in ({'personality':'changed'}, {'principles':'changed'},
+                            {'personality':'changed','goal':'partial mutation'},
+                            {'principles':'changed','memory':'partial mutation'}):
+            with self.subTest(patch=patch_value):
+                value=dict(a='think',why='model change',update=dict(
+                    expected_revision=state.durable_revision,reason='model',patch=patch_value))
+                with self.assertRaises(ValidationError):state.apply(value,state.bind(now,1),now)
+                with self.assertRaises(ValueError):service.update(patch_value,state.durable_revision,'model',now)
+                self.assertEqual(self.store.current(),before)
+        service.update({'memory':'inference: quiet room'},state.durable_revision,'reflection',now)
+        service.update({'goal':'Watch the room'},state.durable_revision,'reflection',now)
+        self.assertEqual(state.character['memory'],'inference: quiet room')
+        self.assertEqual(state.character['goal']['text'],'Watch the room')
+        self.assertEqual(state.character['personality'],before[1]['personality'])
+
+    def test_vps_profile_patch_is_rejected_atomically(self):
+        service=self.scheduler.services;state=self.scheduler.state;before=self.store.current()
+        service.update_reader=lambda:dict(patch={'personality':'VPS character','goal':'VPS goal'},
+            expected_revision=state.durable_revision,reason='external proposal')
+        self.pump(lambda:'updates' in service.errors)
+        self.assertEqual(self.store.current(),before)
+
+    def test_late_character_completion_cannot_apply_even_memory(self):
+        from concurrent.futures import Future
+        from types import SimpleNamespace
         service=self.scheduler.services;state=self.scheduler.state
-        service.update(dict(personality='curious'),state.durable_revision,'reflection',time.monotonic())
-        with self.assertRaises(ValueError):service.update(dict(personality='different'),state.durable_revision,'too soon',time.monotonic())
-        calls=[]
+        before=self.store.current();now=time.monotonic()
+        for patch_value in ({'personality':'old result'}, {'principles':'old result'}, {'memory':'old character task'}):
+            with self.subTest(patch=patch_value):
+                future=Future();future.set_result(dict(output=json.dumps(patch_value),
+                    compute_boot_id=state.authority.compute_boot_id,request_id='old-character'))
+                service.maintenance_task=SimpleNamespace(attempt_id='old-character')
+                service.maintenance=(SimpleNamespace(future=future),now,state.authority,state.durable_revision,True)
+                service.advance(now)
+                self.assertIsNone(service.maintenance)
+                self.assertIn('maintenance',service.errors)
+                self.assertEqual(self.store.current(),before)
+
+    def test_mic_off_does_not_poll_audio(self):
+        service=self.scheduler.services;calls=[]
         service.sensors['audio.extra']=(lambda:calls.append(1),.01,'capture')
         self.scheduler.ingest(dict(type='operator',muted=True))
         self.pump(lambda:len(self.model.views)>=3)
         self.assertFalse(calls)
+
+    def owner_command(self,path,*arguments):
+        return subprocess.run([sys.executable,'-m','reachy_companion.autonomous.production',
+            'set-character','--state',str(path),*arguments],cwd=ROOT,
+            env={**os.environ,'PYTHONPATH':str(ROOT/'src')},capture_output=True,text=True,timeout=10)
+
+    def test_owner_cli_cas_bounds_restart_and_runtime_exclusion(self):
+        path=Path(self.temp.name)/'owner.sqlite3';store=DurableStore(path)
+        original=store.current();store.close()
+        result=self.owner_command(path,'--expected','0','--reason','Owner chooses profile',
+            '--personality','Дружелюбный и любопытный','--principles','Уважать личные границы')
+        self.assertEqual(result.returncode,0,result.stderr)
+        accepted=json.loads(result.stdout);self.assertEqual(accepted['revision'],1)
+        reopened=DurableStore(path)
+        try:
+            self.assertEqual(reopened.current()[1],accepted['state'])
+            self.assertEqual(accepted['state']['memory'],original[1]['memory'])
+            self.assertEqual(accepted['state']['goal'],original[1]['goal'])
+            failures=[('--expected','0','--reason','stale','--personality','stale'),
+                      ('--expected','1','--reason','long','--principles','x'*513),
+                      ('--expected','1','--reason','empty','--personality',''),
+                      ('--expected','1','--personality','missing reason'),
+                      ('--reason','missing revision','--personality','changed'),
+                      ('--expected','1','--reason','missing fields')]
+            for args in failures:
+                with self.subTest(args=args[:4]):
+                    result=self.owner_command(path,*args)
+                    self.assertNotEqual(result.returncode,0)
+                    self.assertEqual(reopened.current(),(1,accepted['state']))
+            reopened.claim()
+            result=self.owner_command(path,'--expected','1','--reason','busy','--personality','changed')
+            self.assertNotEqual(result.returncode,0)
+            self.assertIn('runtime owner',result.stderr)
+            self.assertEqual(reopened.current(),(1,accepted['state']))
+        finally:reopened.close()
+        result=self.owner_command(path,'--expected','1','--reason','Owner correction','--principles','x'*512)
+        self.assertEqual(result.returncode,0,result.stderr)
+        self.assertEqual(json.loads(result.stdout)['revision'],2)
+        # A restarted production session sees the owner profile in the model snapshot.
+        scheduler=Scheduler(self.cfg,Models());store=DurableStore(path)
+        try:
+            scheduler.enable_production(store)
+            view=scheduler.state.snapshot(time.monotonic())
+            self.assertEqual(view['personality'],accepted['state']['personality'])
+            self.assertEqual(store.current()[1]['principles'],'x'*512)
+        finally:scheduler.close()
 
     def test_s3_sigv4_real_request_shape_and_missing_credentials(self):
         import hashlib

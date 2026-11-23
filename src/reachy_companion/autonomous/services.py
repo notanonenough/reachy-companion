@@ -11,13 +11,13 @@ class Services:
         self.scheduler=scheduler;self.store=store;self.last_depth=0;self.unresolved=store.tool_pending()
         self.sensors=sensors or {};self.deliveries=deliveries or {};self.tools=tools or {}
         self.polls={};self.next_poll={};self.exports={};self.next_export={}
-        self.tool_jobs={};self.maintenance=None;self.next_memory=0;self.next_character=0
+        self.tool_jobs={};self.maintenance=None;self.next_memory=0
         self.errors={};self.latency={};self.closed=False
         self.outbox_summary={}
         self.update_reader=None;self.update_job=None;self.next_update=0
         self.reload()
         now=time.monotonic();settings=scheduler.config.get('production',{})
-        self.next_memory=now+settings.get('memory_refresh_s',60);self.next_character=now+settings.get('character_refresh_s',3600)
+        self.next_memory=now+settings.get('memory_refresh_s',60)
 
     def reload(self):
         revision,body=self.store.current()
@@ -55,10 +55,11 @@ class Services:
     def update(self,patch,expected,reason,now,origin='agent'):
         state=self.scheduler.state
         if state.privacy or state.stopped:raise ValueError('Update admission withdrawn')
-        if not isinstance(patch,dict):raise ValueError('Update object required')
+        if not isinstance(patch,dict) or not patch or set(patch)-{'goal','memory'}:
+            raise ValueError('Agent updates may change only goal or memory')
         settings=self.scheduler.config.get('production',{})
         for field in patch:
-            cadence=settings.get('character_refresh_s',3600) if field in ('personality','principles') else settings.get('memory_refresh_s',60) if field=='memory' else 0
+            cadence=settings.get('memory_refresh_s',60) if field=='memory' else 0
             if cadence and time.time()-self.store.last_changed(field)<cadence:raise ValueError('Update cadence not due')
         if 'goal' in patch:
             text=patch['goal']
@@ -125,14 +126,13 @@ class Services:
                 result=job.future.result()
                 if authority!=state.authority or result.get('compute_boot_id')!=authority.compute_boot_id or result.get('request_id')!=self.maintenance_task.attempt_id:raise ValueError('Maintenance authority changed')
                 patch=decode(result['output'])
-                if set(patch)-({'personality','principles'} if character else {'memory'}):raise ValueError('Maintenance capability')
+                if character or set(patch)-{'memory'}:raise ValueError('Maintenance capability')
                 self.update(patch,revision,'periodic reflection (model inference)',now)
                 self.errors.pop('maintenance',None)
             except Exception as exc:self.errors['maintenance']=type(exc).__name__
             # Cadence is measured from completion, just like last_changed in
             # the durable store; slow inference must not make the next update early.
-            if character:self.next_character=now+self.scheduler.config.get('production',{}).get('character_refresh_s',3600)
-            else:self.next_memory=now+self.scheduler.config.get('production',{}).get('memory_refresh_s',60)
+            self.next_memory=now+self.scheduler.config.get('production',{}).get('memory_refresh_s',60)
             self.maintenance=None
         if self.update_job and self.update_job[0].future.done():
             job,started,authority=self.update_job
@@ -172,17 +172,15 @@ class Services:
         if last_dialogue is not None and now-last_dialogue<self.scheduler.config.get('production',{}).get('maintenance_idle_s',10):return
         speech=self.scheduler.speech_adapter
         if speech and speech.status().get('execution_busy'):return
-        character=now>=self.next_character
-        if not character and now<self.next_memory:return
-        if character:self.next_character=now+self.scheduler.config.get('production',{}).get('character_refresh_s',3600)
-        else:self.next_memory=now+self.scheduler.config.get('production',{}).get('memory_refresh_s',60)
+        if now<self.next_memory:return
+        self.next_memory=now+self.scheduler.config.get('production',{}).get('memory_refresh_s',60)
         # Same main model/permit, bounded context; reflections are explicitly inferences.
         prompt=dict(schema_version='companion-1',
-            utterance='Return ONLY JSON patch '+('personality/principles (strings <=512)' if character else 'memory (inference summary string <=2048)'),
-            state=dict(maintenance='character' if character else 'memory',current=state.character,recent=list(state.previous),historical_working=dict(state.working)),memory=[],observations=[])
+            utterance='Return ONLY JSON patch memory (inference summary string <=2048)',
+            state=dict(maintenance='memory',current=state.character,recent=list(state.previous),historical_working=dict(state.working)),memory=[],observations=[])
         task=Task(uid(),uid(),'maintenance',prompt,state.authority,now,now+30)
         self.maintenance_task=task
-        self.maintenance=(Job(self.scheduler.gateway.main,task),now,state.authority,state.durable_revision,character)
+        self.maintenance=(Job(self.scheduler.gateway.main,task),now,state.authority,state.durable_revision,False)
 
     def close(self):
         self.status()

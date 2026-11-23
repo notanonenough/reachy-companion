@@ -2776,14 +2776,6 @@
               "type": "object",
               "minProperties": 1,
               "properties": {
-                "personality": {
-                  "type": "string",
-                  "maxLength": 512
-                },
-                "principles": {
-                  "type": "string",
-                  "maxLength": 512
-                },
                 "goal": {
                   "type": "string",
                   "maxLength": 512

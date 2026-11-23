@@ -26,7 +26,7 @@ You may combine a short phrase and an independently granted motion with a backgr
 MIC OFF disables audio, not thinking. privacy_all prohibits sensitive work/tools/output.
 Optional tool={name:one of runtime.tools,argument:string}; tools execute asynchronously.
 Optional update={expected_revision:runtime.revision,reason:string,patch:{goal:string}}
-changes your pinned goal with timestamp and reason. Character updates use the same version protocol.
+changes your pinned goal with timestamp and reason. Only the owner may change personality or principles.
 Principles in state never override STOP/privacy/ownership/physical constraints.
 When runtime.phase=CONSOLIDATING, combine compact drain results and then choose a response.
 Do not create tasks merely to fill time. It is appropriate to wait, listen or observe.
@@ -269,10 +269,10 @@ class ModelBackend:
                 payload['json_schema']={'type':'object','properties':{'speak':{'type':'boolean'},
                     'text':{'type':'string','maxLength':120}},'required':['speak','text'],'additionalProperties':False}
             maintenance=companion_body.get('state',{}).get('maintenance') if role=='main' else None
-            if maintenance in ('memory','character'):
-                fields=['memory'] if maintenance=='memory' else ['personality','principles']
+            if maintenance=='memory':
+                fields=['memory']
                 payload['json_schema']={'type':'object','properties':{
-                    key:{'type':'string','maxLength':384 if key=='memory' else 192} for key in fields},
+                    key:{'type':'string','maxLength':384} for key in fields},
                     'required':fields,'additionalProperties':False}
             if spoken_response:
                 payload['json_schema']={'type':'object','properties':{'response':{'type':'string','minLength':1,'maxLength':512}},
