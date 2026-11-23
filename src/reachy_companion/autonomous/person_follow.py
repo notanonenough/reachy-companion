@@ -102,13 +102,13 @@ class PersonFollow:
         next_body=clamp(body+body_delta,50)
         next_yaw=clamp(max(next_body-15,min(next_body+15,desired)),60)
         if max(abs(next_yaw-yaw_base),abs(next_pitch-pitch_base),abs(next_body-body_base))<.8:return None
-        duration=.8
-        if self.mode=='following':
-            # Quintic minjerk has peak acceleration 10/sqrt(3) * angle/T².
-            # Faster far turns, without making short corrections snap abruptly.
-            angles=(abs(next_yaw-yaw),abs(next_body-body),abs(next_pitch-pitch))
-            duration=max(.35,*(angle/rate for angle,rate in zip(angles,(26,20,12))),
-                         *(math.sqrt((10/math.sqrt(3))*angle/acceleration)
-                           for angle,acceleration in zip(angles,(320,250,160))))
+        # Survey and following share the same bounded minjerk timing. A fixed
+        # .8s survey stretched small 5/4-degree corrections unnecessarily.
+        # Quintic peak acceleration is 10/sqrt(3) * angle/T²; dispatch still
+        # independently checks the fresh measured pose and its stricter envelope.
+        angles=(abs(next_yaw-yaw),abs(next_body-body),abs(next_pitch-pitch))
+        duration=max(.35,*(angle/rate for angle,rate in zip(angles,(26,20,12))),
+                     *(math.sqrt((10/math.sqrt(3))*angle/acceleration)
+                       for angle,acceleration in zip(angles,(320,250,160))))
         return dict(head_pose=dict(x=0,y=0,z=0,roll=0,pitch=math.radians(next_pitch),yaw=math.radians(next_yaw)),
             body_yaw=math.radians(next_body),antennas=None,duration=math.ceil(duration*1000)/1000,interpolation='minjerk')

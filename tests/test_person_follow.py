@@ -107,6 +107,32 @@ class PlannerTests(unittest.TestCase):
         self.assertIsNone(f.plan(sample(4),pose(),8))
         self.assertIsNone(f.scan_index)
 
+    def test_survey_uses_existing_rate_and_acceleration_bounds_instead_of_fixed_delay(self):
+        f=PersonFollow();f.plan(sample(1,[]),pose(),0)
+        step=f.plan(sample(2,[]),pose(),6)
+        self.assertEqual(step['duration'],.35)  # was .8 for the same5°/4° target
+        self.assertAlmostEqual(math.degrees(step['head_pose']['yaw']),5)
+        self.assertAlmostEqual(math.degrees(step['body_yaw']),4)
+        validate_follow_step(step,pose())
+        # Fresh-pose corrections near both absolute bounds and pitch recovery
+        # can need longer than .35; shortening is never an unconditional cap.
+        durations=[]
+        for body in (-50,-30,0,30,50):
+            for twist in (-10,0,10):
+                for pitch in (-17.8,-10,0,10,17.8):
+                    actual=pose(body+twist,body,pitch)
+                    planner=PersonFollow();planner.plan(sample(1,[]),actual,0)
+                    step=planner.plan(sample(2,[]),actual,6)
+                    if step is None:continue
+                    validate_follow_step(step,actual);durations.append(step['duration'])
+                    angles=(abs(math.degrees(step['head_pose']['yaw'])-body-twist),
+                            abs(math.degrees(step['body_yaw'])-body),
+                            abs(math.degrees(step['head_pose']['pitch'])-pitch))
+                    for angle,rate,accel in zip(angles,(26,20,12),(320,250,160)):
+                        self.assertLessEqual(angle/step['duration'],rate+1e-9)
+                        self.assertLessEqual((10/math.sqrt(3))*angle/step['duration']**2,accel+1e-9)
+        self.assertGreater(max(durations),.6)
+
     def test_invalid_coordinates_and_motion_bounds(self):
         for value in (sample(1,[[float('nan'),.5,.1,.1,.8]]),sample(1,[[.5,.5,0,.1,.8]]),sample(True)):
             with self.assertRaises(ValueError):checked_sample(value)

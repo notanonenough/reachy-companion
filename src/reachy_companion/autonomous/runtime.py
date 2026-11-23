@@ -134,6 +134,8 @@ class Scheduler:
         self.fast_job = self.main_job = None
         self.binding = self.main_task = None
         self.next_tick = 0
+        self.decision_pending = False
+        self.next_reaction = 0
         self.next_autonomous = 0
         self.expiry_logged = False
         self.context_job=None;self.context_revoke_job=None;self.context_terminal_job=None
@@ -235,6 +237,9 @@ class Scheduler:
             self.next_autonomous=self.last_dialogue_at+30
         old_authority=self.state.authority
         self.state.ingest(event, time.monotonic() if now is None else now)
+        if (event.get('type')=='utterance'
+                and self.state.authority.interaction_epoch==old_authority.interaction_epoch+1):
+            self.decision_pending = True
         if trace is not None and event.get('type')=='utterance' and event.get('audio'):
             audio=event['audio'];admitted=self.state.authority.interaction_epoch==old_authority.interaction_epoch+1
             refs=list(self.state.candidates) if admitted else []
@@ -365,6 +370,8 @@ class Scheduler:
                 emit(self,'main_checked',task_id=task.task_id,attempt_id=task.attempt_id,input_ref=task.input_ref,
                     authority=task.authority.wire(),disposition=task.status,final=task.completion_provenance)
             self.main_job = self.main_task = None
+            if task.status=='ready' or self.state.candidates:
+                self.decision_pending = True
         if self.fast_job and self.fast_job.future.done():
             try:
                 result = self.fast_job.future.result()
@@ -410,7 +417,15 @@ class Scheduler:
             self.expiry_logged = True
         if self.production and (self.state.stopped or self.state.overload=='DRAINING'):return
         if self.motion_adapter and self.state.actor_binding is None and not self.production:return
-        if now < self.next_tick:
+        # Coalesce new dialogue/ready transitions, without bypassing the model
+        # decision or pretending a revoked main request has physically finished.
+        # At most one reactive launch per period; quiet ticks keep their cadence.
+        ready = any(task.status=='ready' for task in self.state.tasks.values())
+        candidate_available = bool(self.state.candidates) and not self.main_job and not (
+            self.services and self.services.maintenance)
+        reactive = (self.decision_pending and now>=self.next_reaction and not self.fast_job
+                    and (ready or candidate_available))
+        if now < self.next_tick and not reactive:
             return
         # No catch-up burst. Skipped busy ticks remain explicit gaps.
         self.next_tick = now + self.config['period_s']
@@ -437,6 +452,9 @@ class Scheduler:
             view['pending'] = view['pending'][:7] + [dict(alias=self.main_task.task_id,
                 kind=self.main_task.kind, status='execution_busy_result_revoked',
                 age_ms=max(0, int((now-self.main_task.created)*1000)))]
+        if self.decision_pending:
+            self.next_reaction = now + self.config['period_s']
+            self.decision_pending = False
         self.binding = self.state.bind(now, self.config['fast_deadline_s'])
         self.fast_job = Job(self.gateway.fast, self.binding.request_id, view)
         self.expiry_logged = False
