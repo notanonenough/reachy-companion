@@ -11,13 +11,14 @@ import signal
 import subprocess
 import sys
 import time
-from .lease_diagnostics import project_first_lease_invalid,project_lease_withdrawal_reason
+from .lease_diagnostics import project_first_lease_invalid,project_lease_withdrawal_reason,project_first_reducer_expiry
 
 
 def report_summary(report):
     result={k:report[k] for k in ('mode','accepted','reason','errors','error','cleanup_error',
         'failure_code','cleanup_verified','cleanup_issues','elapsed_s','peer_close_reason','microphone_restored','capture_closed') if k in report}
     if 'first_lease_invalid' in report:result['first_lease_invalid']=project_first_lease_invalid(report['first_lease_invalid'])
+    if 'first_reducer_expiry' in report:result['first_reducer_expiry']=project_first_reducer_expiry(report['first_reducer_expiry'])
     if isinstance(report.get('lease'),dict):
         result['lease_withdrawal_reason']=project_lease_withdrawal_reason(report['lease'].get('withdrawal_reason'))
     return result

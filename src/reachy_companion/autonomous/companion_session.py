@@ -25,7 +25,7 @@ from .playback import Playback
 from .runtime import Job,RemoteGateway,Scheduler
 from .speech_adapter import SpeechAdapter,HttpTTS
 from .voice_chain import check_context_task,check_context_view,context_binding
-from ..lease_diagnostics import project_first_lease_invalid
+from ..lease_diagnostics import project_first_lease_invalid,ReducerTrace
 
 
 class SessionFailure(RuntimeError):
@@ -123,6 +123,9 @@ def run_session(scheduler,poller,lease,client,stop_client,source,stop,duration,p
     if lifetime=='finite' and (type(duration) not in (int,float) or not math.isfinite(duration) or not 1<=duration<=180):
         raise ValueError('Normal session must fit the existing finite device window')
     if lifetime=='lease' and (duration is not None or lease.source_boot!=source):raise ValueError('Explicit owned lease lifetime without finite duration')
+    trace=getattr(lease,'reducer_trace',None)
+    if trace is None:trace=ReducerTrace();lease.reducer_trace=trace
+    trace.bind_current()
     startup=PeerStartup(source);peer_job=health_job=stop_job=None
     retire_job=None;media_close_job=None;retiring_terminal=None;next_retire=0;peer_receipt=None
     next_peer=next_health=next_publish=0;started=time.monotonic();last_health=last_operator=started
@@ -143,6 +146,7 @@ def run_session(scheduler,poller,lease,client,stop_client,source,stop,duration,p
         if current:motion_identity={key:current['binding'][key] for key in ('agent_boot_id','actor_boot_id','session_id')}
     try:
         while not stop.is_set() and (lifetime=='lease' or time.monotonic()-started<duration):
+            trace.enter('startup_control')
             now=time.monotonic()
             if peer_job and peer_job.future.done():
                 peer_ok=False
@@ -178,6 +182,7 @@ def run_session(scheduler,poller,lease,client,stop_client,source,stop,duration,p
             if lifetime=='lease' and lease.status()['withdrawn'] and not scheduler.production:raise RuntimeError('Lease withdrawal is latched')
             if not health_job and now>=next_health:
                 health_job=Job(scheduler.gateway.call,'/health');next_health=now+.2
+            trace.enter('speech_advance')
             scheduler.speech_adapter.advance(scheduler.state.authority)
             operator=scheduler.speech_adapter.operator_view()
             if operator is not None:
@@ -186,8 +191,10 @@ def run_session(scheduler,poller,lease,client,stop_client,source,stop,duration,p
                     raise RuntimeError('Speaker and motor belong to different physical operator boots')
             if now-last_operator>=.5:raise SessionFailure('operator_receipt_expired')
             if stop.is_set():reason='controller_stop';break
-            if scheduler.production and startup.phase!='ACTIVE':scheduler.advance()
+            if scheduler.production and startup.phase!='ACTIVE':
+                trace.enter('scheduler_advance');scheduler.advance()
             if startup.phase=='ACTIVE':
+                trace.enter('playback_control')
                 if lifetime=='lease':
                     backend=scheduler.speech_adapter.playback.backend
                     if (scheduler.speech_adapter.playback.status()['quarantined']
@@ -204,7 +211,8 @@ def run_session(scheduler,poller,lease,client,stop_client,source,stop,duration,p
                             and not speech_status['tts_execution_busy'] and not speech_status['cancellation_execution_busy']):
                         retiring_terminal=terminal;retire_job=Job(backend.retire,terminal)
                 # No synthetic question, echo-reference admission or speaker claim.
-                scheduler.advance()
+                trace.enter('scheduler_advance');scheduler.advance()
+                trace.enter('peer_poll')
                 poller.advance(scheduler.state.authority,scheduler.speech_adapter.operator_view())
                 ready_seen=ready_seen or scheduler.audio_adapter.allowed
                 if scheduler.motion_adapter:
@@ -215,6 +223,7 @@ def run_session(scheduler,poller,lease,client,stop_client,source,stop,duration,p
                         and not scheduler.speech_adapter.status()['execution_busy']):
                     reason='finite_stream_budget';break
             if stop.is_set():reason='controller_stop';break
+            trace.enter('lease_gate')
             if lifetime=='finite':lease.tick()
             else:
                 with scheduler.speech_adapter.lock:
@@ -236,9 +245,10 @@ def run_session(scheduler,poller,lease,client,stop_client,source,stop,duration,p
                     lease.close()
                     if not scheduler.production:raise RuntimeError('Fresh complete lease authority required')
             if now>=next_publish:
+                trace.enter('status_publish')
                 next_publish=now+.05
                 publish(dict(stage=startup.phase,elapsed_s=now-started,counts=dict(scheduler.state.counts),
-                    first_lease_invalid=invalid_view(),
+                    first_lease_invalid=invalid_view(),first_reducer_expiry=trace.view(),
                     audio=scheduler.audio_adapter.status(),peer_poll=poller.status(),lease=lease.status(),
                     motion=dict(allowed=scheduler.state.motion_allowed,receipts=list(scheduler.motion_adapter.receipts)[-4:],
                         **scheduler.motion_adapter.status()) if scheduler.motion_adapter else None,
@@ -250,6 +260,7 @@ def run_session(scheduler,poller,lease,client,stop_client,source,stop,duration,p
                     listening_ready=startup.phase=='ACTIVE' and scheduler.audio_adapter.allowed
                         and scheduler.speech_adapter.operator_view() is not None,
                     peer=startup.status(),execution_busy=occupied(scheduler,poller,lease,peer_job,health_job,retire_job=retire_job)))
+            trace.enter('loop_wait')
             stop.wait(.005)
         if stop.is_set():reason='controller_stop'
     except BaseException as exc:
@@ -257,6 +268,7 @@ def run_session(scheduler,poller,lease,client,stop_client,source,stop,duration,p
         logging.getLogger(__name__).exception('Production session failed')
         reason='runtime_error';failure_code=getattr(exc,'code',type(exc).__name__);errors.append(type(exc).__name__)
     finally:
+        trace.enter('cleanup')
         stop.set();startup.close()
         # Send explicit withdrawal before local cleanup can outlast the device's
         # short controller lease. Keep its real transport slot until terminal.
@@ -286,7 +298,7 @@ def run_session(scheduler,poller,lease,client,stop_client,source,stop,duration,p
             try:peer_stop=stop_job.future.result()
             except Exception as exc:errors.append(type(exc).__name__)
         report.update(reason=reason,failure_code=failure_code,errors=errors,elapsed_s=time.monotonic()-started,
-            first_lease_invalid=invalid_view(),
+            first_lease_invalid=invalid_view(),first_reducer_expiry=trace.view(),
             background=scheduler.services.status() if scheduler.services else None,
             listening_ready_seen=ready_seen,
             counts=dict(scheduler.state.counts),peer_stop=peer_stop,
@@ -322,7 +334,8 @@ def run_session(scheduler,poller,lease,client,stop_client,source,stop,duration,p
             and report['speech_stop_known'] is True and isinstance(peer_stop,dict)
             and peer_stop.get('stop_known') is True and peer_stop.get('execution_busy') is False)
         report['accepted']=ready_seen and report['cleanup_verified'] and reason in ('duration','controller_stop','finite_stream_budget')
-        publish(dict(stage='STOPPED',reason=reason,failure_code=failure_code,first_lease_invalid=invalid_view(),execution_busy=report['execution_busy'],cleanup_verified=report['cleanup_verified']))
+        publish(dict(stage='STOPPED',reason=reason,failure_code=failure_code,first_lease_invalid=invalid_view(),first_reducer_expiry=trace.view(),execution_busy=report['execution_busy'],cleanup_verified=report['cleanup_verified']))
+        trace.unbind()
     return report
 
 

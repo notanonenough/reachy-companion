@@ -16,6 +16,7 @@ import time
 from urllib.request import Request, build_opener, ProxyHandler
 from urllib.parse import urlsplit
 from .contracts import decode, uid
+from ..lease_diagnostics import ReducerTrace
 
 
 def stream_identity(boot,sequence):
@@ -733,6 +734,7 @@ class PeerLease:
         self.max_tick_gap_ms=0;self.error_types={}
         self.last_worker_tick=None;self.max_worker_gap_ms=0;self.last_send=None;self.last_accepted=None
         self.worker_exit=None;self.worker_exception=None;self.first_close=None
+        self.reducer_trace=ReducerTrace()
         endpoint=urlsplit(client.url)
         # Allow ordinary Wi-Fi/SSH jitter while leaving 200 ms of the device's
         # 300 ms lease for withdrawal. Unknown completion still latches closed.
@@ -751,7 +753,7 @@ class PeerLease:
                 try:valid=lease_authority(authority)==self.authority
                 except ValueError:valid=False
                 if not valid or self.armed and now-self.last_tick>=self.progress_timeout_s:
-                    self._withdraw('authority_changed' if not valid else 'reducer_expired');return False
+                    self._withdraw('authority_changed' if not valid else 'reducer_expired',trigger='tick');return False
                 self.armed=True
             self.max_tick_gap_ms=max(self.max_tick_gap_ms,(now-self.last_tick)*1000);self.last_tick=now
             return True
@@ -780,7 +782,7 @@ class PeerLease:
                         continue_wait=True
                     else:
                         continue_wait=False
-                        if now-self.last_tick>=self.progress_timeout_s:self._withdraw('reducer_expired');return
+                        if now-self.last_tick>=self.progress_timeout_s:self._withdraw('reducer_expired',trigger='worker');return
                 else:continue_wait=False
                 valid=not continue_wait and time.monotonic()-self.last_tick<self.progress_timeout_s
                 self.busy=valid
@@ -830,10 +832,15 @@ class PeerLease:
                     self.busy=False
                     self.max_call_ms=max(self.max_call_ms,(time.monotonic()-started)*1000)
             time.sleep(.02)
-    def _withdraw(self,reason):
-        if self.withdrawal_reason is None:self.withdrawal_reason=reason
+    def _withdraw(self,reason,*,trigger=None):
+        first=self.withdrawal_reason is None
+        if first:self.withdrawal_reason=reason
         if self.first_close is None:self.first_close=self._timing(time.monotonic())
         self.closed=True
+        # The original latch is complete before diagnostics. No new lock, IO,
+        # retry or callback; capture cannot authorize or postpone a renewal.
+        if first and reason=='reducer_expired':
+            self.reducer_trace.capture(trigger,self.first_close['reducer_progress_age_ms'],time.monotonic())
     def close(self):
         with self.lock:
             self._withdraw('controller_stop')
@@ -851,6 +858,7 @@ class PeerLease:
             progress_age_ms=(time.monotonic()-self.last_tick)*1000,
             max_worker_scheduling_gap_ms=self.max_worker_gap_ms,worker_exit=self.worker_exit,worker_exception=self.worker_exception,
             first_close=self.first_close,timing=self._timing(time.monotonic()),
+            first_reducer_expiry=self.reducer_trace.view(),
             datagram=self.datagram.status() if self.datagram else None)
 
 

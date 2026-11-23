@@ -7,7 +7,7 @@ from pathlib import Path
 import shlex
 import subprocess
 from urllib.request import Request, urlopen
-from .lease_diagnostics import project_first_lease_invalid,project_lease_withdrawal_reason
+from .lease_diagnostics import project_first_lease_invalid,project_lease_withdrawal_reason,project_first_reducer_expiry
 
 HOSTS = {
     'hub': ('reachy-hub', '/home/deploy/reachy-companion',
@@ -17,7 +17,7 @@ HOSTS = {
 }
 PORTS = {'llm': 18097, 'router': 18098, 'worker': 8082, 'gateway': 8097, 'vlm':18099}
 # Self-contained so a stopped, old or broken installation can still be inspected.
-REMOTE_PROBE = inspect.getsource(project_first_lease_invalid) + inspect.getsource(project_lease_withdrawal_reason) + r'''
+REMOTE_PROBE = inspect.getsource(project_first_lease_invalid) + inspect.getsource(project_lease_withdrawal_reason) + inspect.getsource(project_first_reducer_expiry) + r'''
 import json,pathlib,shutil,subprocess,sys,urllib.request
 root=pathlib.Path(sys.argv[1]); role=sys.argv[2]; names=sys.argv[3:]
 def command(args):
@@ -33,6 +33,7 @@ for p in reports[:3]:
  try:
   if p.stat().st_size>8*1024*1024:continue
   d=json.loads(p.read_text());result['last_session']={k:d.get(k) for k in ('reason','failure_code','errors','accepted','cleanup_verified','cleanup_issues','elapsed_s','peer_close_reason','cleanup_error')}
+  result['last_session']['first_reducer_expiry']=project_first_reducer_expiry(d.get('first_reducer_expiry'))
   result['last_session']['first_lease_invalid']=project_first_lease_invalid(d.get('first_lease_invalid'))
   result['last_session']['lease_withdrawal_reason']=project_lease_withdrawal_reason(d.get('lease',{}).get('withdrawal_reason')) if isinstance(d.get('lease'),dict) else None
   result['last_session']['finished_at']=p.stat().st_mtime
@@ -47,6 +48,8 @@ if role=='hub':
   if len(raw)>262144:raise ValueError('status bound')
   d=json.loads(raw)
   result['session']={k:d.get(k) for k in ('stage','reason','failure_code','elapsed_s','listening_ready','counts','audio','lease','peer_poll','background','cycle_phase','runtime','execution_busy','cleanup_verified')}
+  result['session']['first_reducer_expiry']=project_first_reducer_expiry(d.get('first_reducer_expiry'))
+  if isinstance(result['session'].get('lease'),dict):result['session']['lease']['first_reducer_expiry']=project_first_reducer_expiry(result['session']['lease'].get('first_reducer_expiry'))
   result['session']['first_lease_invalid']=project_first_lease_invalid(d.get('first_lease_invalid'))
   result['session']['speech']={k:d.get('speech',{}).get(k) for k in ('quarantined','terminal_unknown','stop_known','execution_busy','operator_receipt_fresh')}
   motion=d.get('motion') or {}
