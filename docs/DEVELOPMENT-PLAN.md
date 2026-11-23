@@ -34,7 +34,9 @@
 [LEASE-01 #17](https://github.com/notanonenough/reachy-companion/pull/17)
 (диагностика первой причины отзыва без изменения допуска);
 [REDUCER-01 #20](https://github.com/notanonenough/reachy-companion/pull/20)
-(однократный снимок этапа и стека при reducer expiry, без изменения срока допуска).
+(однократный снимок этапа и стека при reducer expiry, без изменения срока допуска);
+[AUDIO-TRACE-01 #24](https://github.com/notanonenough/reachy-companion/pull/24)
+(явно включаемая private trace одного production сеанса; default-off).
 На Mac/Hub/Ричи установлен точный кандидат
 `3a0f076bac3575ccc6504e8bd320ad5a50554b7f`: один архив 668 файлов, одинаковый
 пакет, imports и identity 59 модулей проверены; пять sensor readers остаются legacy.
@@ -57,8 +59,12 @@ Mac jobs/ports закрыты, moves пусты, профиль неизмене
 задержкой неверный ответ на контрольный вопрос 2+2. Raw STT/model text в
 завершённом production не сохранялись; digests/receipts не различают ошибку
 сегментации, подмену входа следующей репликой и ответ модели. [AUDIO-TRACE-01 #22](https://github.com/notanonenough/reachy-companion/issues/22)
-добавит явно включаемый на один сеанс bounded private trace настоящего пути,
-без изменения поведения/сроков допуска. Выпуск, тег и GitHub Release не приняты.
+принята через PR #24: exact reviewed `415be7015ea486d014371eb8211752260dd66131`,
+98 независимых проверок, local full 1849/26 skipped PASS, оба Linux CI
+45246690234/45246700289 успешны. Выбран новый кандидат из main
+`717a6577a9f7c2b3ff6dd22045761866678b37bc`, наличие reviewed head проверено.
+Автор устанавливает его и выполняет один диагностический опыт. Диагностика
+не является исправлением голоса; выпуск, тег и GitHub Release не приняты.
 История предыдущих отказов: [362](releases/2026-11-23-362002991d9c.md),
 [15b](releases/2026-11-23-15b784eeafd4.md); первичный reducer expiry 15b пока не
 имеет установленного конкретного блокирующего вызова.
@@ -67,8 +73,11 @@ Mac jobs/ports закрыты, moves пусты, профиль неизмене
 
 | Карточка | Статус, владелец и ревьюер | Следующий шаг и контакт |
 |---|---|---|
-| [RELEASE-01, Issue #9](https://github.com/notanonenough/reachy-companion/issues/9) | PR #23 и offline lifecycle harness приняты; автор `/root/implementer`, reviewer `/root/reviewer` | Harness выдержал 7 независимых fault/positive сценариев и zero-IO dry-run. Следующий шаг автора — rollout и один trace-опыт только после принятия #22, выбора exact candidate и аппаратного окна. Пока стенд остановлен; контакт 23:20 Asia/Baku вместе с зависимостью. |
-| [AUDIO-TRACE-01, Issue #22](https://github.com/notanonenough/reachy-companion/issues/22) | Автор `/root/ci_implementer`, независимый reviewer `/root/reviewer`; [PR #24](https://github.com/notanonenough/reachy-companion/pull/24) на повторной проверке | Reviewer воспроизвёл потерю audio lineage при memory/context retry. Автор передал causal исправление exact `415be7015ea486d014371eb8211752260dd66131`, 49 целевых проверок PASS. Ожидаются независимый повтор, full/checks и CI именно этого head; прежние результаты его не подменяют. Контроль 23:20 Asia/Baku. Hardware не используется. |
+| [RELEASE-01, Issue #9](https://github.com/notanonenough/reachy-companion/issues/9) | Единственный hardware owner и автор `/root/implementer`; независимый reviewer `/root/reviewer` читает локальные evidence | Exact rollout `717a6577a9f7c2b3ff6dd22045761866678b37bc` с backup3a0, imports/identity60 и прежними configs. Один approved 90s trace-опыт, отдельное trace window150s; bound stop/known Hub PID exit, device/Mac shutdown и terminal checks. Окно 23:18–23:40, контроль 23:25 Asia/Baku. Без autoretry/recovery по умолчанию. |
+
+AUDIO-TRACE-01 #22 закрыта после PR #24; remote branch удалена, автор
+`/root/ci_implementer` ожидает конкретный causal результат для следующей offline
+карточки. Предполагаемое исправление голоса до evidence не назначается.
 
 Прежняя предпосылка sleep→disabled оказалась неверна: Hub sleep выполняет
 stock pose и не выключает моторы. После sleep body≈−0.5°, neutral expression
@@ -92,9 +101,9 @@ Read-only инвентаризация закончена; прежнее окн
 Сверены origin/main, открытая Issue #9 и отсутствие открытых PR после принятия
 #21; затем создана #22 и автор фактически начал работу от fresh main.
 Mac production checkout и оба Linux узла — exact `3a0f076`.
-Reviewer явно освободил стенд в 22:49 после независимого опыта. Оба автора
-работают offline. LEASE-01 #17 и REDUCER-01 #20 приняты; второй автор получил
-готовую AUDIO-TRACE-01 #22 вместо гипотетического исправления голоса.
+Reviewer освободил стенд в 22:49 после независимого опыта; в 23:18 ведущий
+передал его одному автору #9 для нового точного кандидата. Reviewer и второй
+автор работают offline; повторных назначений нет.
 CATALOG входит в новый кандидат, но реальные readers остаются в прежнем legacy mode.
 CI-01 принята в 21:03 Asia/Baku: [PR #6](https://github.com/notanonenough/reachy-companion/pull/6),
 проверенный head `bc63ac863b64194e70a04510f0fdae0f0f2395d0`, merge в origin/main
