@@ -24,8 +24,8 @@
 
 | Карточка | Статус, владелец и ревьюер | Следующий шаг и контакт |
 |---|---|---|
-| [RELEASE-01, Issue #9](https://github.com/notanonenough/reachy-companion/issues/9) | В работе, подготовка; автор — `/root/implementer`, независимый ревьюер — `/root/reviewer` | Prep PR исправления Mac доступа, затем новый кандидат, rollout и физическая приёмка. Контроль 23.11.2026 в 21:40 Asia/Baku; 18 access tests прошли, автор завершает regression/docs и PR. Изменения стенда после принятого prep PR и передачи окна. |
-| [CATALOG-01, Issue #12](https://github.com/notanonenough/reachy-companion/issues/12) | Готова и назначена; единственный автор — `/root/ci_implementer`, независимый ревьюер — `/root/reviewer` | Runtime registry и scalar HTTP adapter через существующий production цикл; первый loopback и план интеграции. Следующий контакт 23.11.2026 в 21:40 Asia/Baku. Стенд не занимает. |
+| [RELEASE-01, Issue #9](https://github.com/notanonenough/reachy-companion/issues/9) | В работе, подготовка; автор — `/root/implementer`, независимый ревьюер — `/root/reviewer` | Prep PR исправления Mac доступа, затем новый кандидат, rollout и физическая приёмка. Контроль 23.11.2026 в 21:40 Asia/Baku; PR #13 на исправлении замечания о границах чужих Host-блоков, reviewer повторит новый SHA. Изменения стенда после принятого prep PR и передачи окна. |
+| [CATALOG-01, Issue #12](https://github.com/notanonenough/reachy-companion/issues/12) | Готова и назначена; единственный автор — `/root/ci_implementer`, независимый ревьюер — `/root/reviewer` | 13 новых actual HTTP→production→model tests и 55 existing проходят; автор завершает camera/config и PR. Следующий контакт 23.11.2026 в 21:50 Asia/Baku. Стенд не занимает. |
 
 Ведущий работает в `reachy-development-map`, исполнитель — в `reachy-audit-map`,
 ревьюер — в `/tmp/reachy-review-map`; рабочие ветки короткоживущие `codex/*`.
@@ -292,3 +292,12 @@ explicit compatibility и freshness; без media/motion/deploy. Первый lo
 и план — 21:40 Asia/Baku. Аппаратные accuracy/load остаются непроверенными;
 BASELINE дала inventory, а не приёмку этих свойств. Access boundary #9 отдельно
 согласована техлидом, стенд пока свободен.
+
+Контроль 21:32 Asia/Baku: prep [PR #13](https://github.com/notanonenough/reachy-companion/pull/13),
+head `4d4f5f192428b56c30e59578f9a4593e34b61a66`, получил конкретное
+[CHANGES REQUESTED](https://github.com/notanonenough/reachy-companion/pull/13#pullrequestreview-6026325207):
+удаление managed Host boundary меняло effective config чужого alias (0→42),
+хотя строки сохранялись. Автор исправляет, live install не выполнялся.
+CATALOG уже воспроизводит первый loopback через штатный production entrypoint;
+13 новых/55 existing tests прошли локально, пока не независимая приёмка.
+Следующий шаг автора — camera/config edges и PR, контроль21:50.
