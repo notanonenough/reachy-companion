@@ -55,7 +55,7 @@ STT-end→first-TTS-PCM11.209s по Hub clock; main client interval7.650s не �
 
 | Карточка | Статус, владелец и ревьюер | Следующий шаг и контакт |
 |---|---|---|
-| [BASELINE-02, Issue #26](https://github.com/notanonenough/reachy-companion/issues/26) | Подготовка PR #27 и зависимость OBSERVE-01 PR #29 приняты. Владелец `/root/ci_implementer`, reviewer `/root/reviewer`; карточка открыта | Readiness принята, окно освобождено00:17. Единственное аппаратное окно **24.11 00:19–00:35 Asia/Baku**, владелец `/root/ci_implementer`: одна120s реплика exact717 через accepted v3 harness, прежние controlled speech/camera/motion, observer finish118s и owner STOP120s. Никакого изменения settings/guards или второго start. При observed failure — штатный cleanup и остановка серии. Контроль **00:30**, раньше result/failure; reviewer проверяет evidence после освобождения окна. |
+| [BASELINE-02, Issue #26](https://github.com/notanonenough/reachy-companion/issues/26) | Подготовка PR #27 и зависимость OBSERVE-01 PR #29 приняты. Владелец `/root/ci_implementer`, reviewer `/root/reviewer`; карточка открыта | Первая реплика досрочно остановлена: Mac acquisition_failed, полноценного baseline нет. Штатный cleanup завершён, окно освобождено **24.11 00:22:24**. Автор сохраняет протокол/manifest и воспроизводит причину offline; reviewer независимо проверяет terminal/evidence. Никаких новых starts или probes. Контроль **00:35**, раньше причина/PR. |
 
 PR #27 принят: exact reviewed `a5a296061a51cf45dd5a8af42493bb45133bea40`,
 30 независимых целевых/negative/parity checks; local full1866/26 skipped PASS,
@@ -75,7 +75,7 @@ remote branch удалена. Lifecycle finish и Mac runner blockers испра
 origin/main для протокола результатов; reviewer — `/tmp/reachy-review-map`.
 Автор #28 завершил работу; одновременных редакторов collector и владельцев стенда нет.
 Production checkout `reachy-companion` остаётся exact717; для правок его не используют.
-Read-only readiness независимо принята; ведущий назначил одну120s реплику. Stopped
+Read-only readiness независимо принята; одна назначенная120s реплика досрочно завершена. Stopped
 workers не дают positive acquisition receipts; полнота после старта потребует
 реальных process instances/CPU deltas/status gauges, трёх успешных footer и terminal
 receipts. Pre-stimulus automatic coverage gate отсутствует; observed failure
@@ -88,6 +88,15 @@ Evidence `~/reachy-release-backups/20261124-baseline02-readiness-001`,
 manifest `4da25840fff4f62163a45cdc8da8f6d1981554df1b7382ef5556d729c9152902`;
 reviewer сверил9 evidence files, expected anchors и v3 hashes. Это point-in-time
 readiness: actual worker coverage и новая motion-envelope certification не заявлены.
+
+Реплика001: local start00:21:28, ACTIVE00:21:45, observed Mac acquisition_failed
+→ адресный SIGINT supervisor00:22:17 → authSTOP00:22:19, known Hub exit0,
+terminal00:22:24. По авторским receipts Hub elapsed34.074s accepted/cleanup true,
+busy false, no first invalid/expiry; trace36records complete; Hub/robot observers
+32ticks complete, Mac acquisition failed. Независимая проверка этих результатов
+идёт; это неполный baseline и основание прекратить серию, не новый выпуск.
+Evidence `~/reachy-release-backups/20261124-baseline02-replica-001`,
+own-supervisor receipts `20261124-baseline02-runner-001`. Причина Mac пока не установлена.
 
 Принятый observer snapshot v3 сохранён в
 `~/reachy-release-backups/20261124-observer-harness-review-v3`; все10 файлов и
