@@ -178,14 +178,28 @@ class RuntimeTests(unittest.TestCase):
         self.assertFalse(thread.is_alive())
 
     def test_storage_failure_and_sequence_exhaustion_cannot_block_verified_revoke(self):
-        lease=self.arm()
-        self.proxy.handle(self.request('trajectory',lease_id=lease,offset_radians=.01,duration_s=1))
-        self.runtime.guard.db.close()
-        self.assertFalse(self.proxy.handle(self.request('heartbeat',lease_id=lease,sequence=1))['accepted'])
-        self.assertTrue(self.runtime.guard.storage_failed)
-        self.runtime.guard.high_watermark=2**63-1
-        self.assertTrue(self.proxy.handle(self.request('revoke',lease_id=lease))['result']['verified_stopped'])
-        self.assertFalse(self.proxy.status()['ready'])
+        from contextlib import contextmanager
+        from threading import Event
+        from unittest.mock import patch
+        guard=self.runtime.guard
+        now=time.monotonic()
+        entered=Event();original=guard.transaction
+        @contextmanager
+        def storage_failure():
+            entered.set()
+            guard.db.close()
+            with original():yield
+        # Isolate ordered storage failure from the separately tested lease expiry.
+        # Keep the real HoldActor stop verification; this is not active-motion/timing evidence.
+        with patch.object(guard,'clock',lambda:now),patch.object(guard.output,'clock',lambda:now):
+            lease=self.arm()
+            with patch.object(guard,'transaction',storage_failure):
+                self.assertFalse(self.proxy.handle(self.request('heartbeat',lease_id=lease,sequence=1))['accepted'])
+            self.assertTrue(entered.is_set())
+            self.assertTrue(guard.storage_failed)
+            guard.high_watermark=2**63-1
+            self.assertTrue(self.proxy.handle(self.request('revoke',lease_id=lease))['result']['verified_stopped'])
+            self.assertFalse(self.proxy.status()['ready'])
 
     def test_acquired_lease_revoke_bypasses_withdrawn_policy_and_unavailable_operator_provider(self):
         lease=self.arm()
