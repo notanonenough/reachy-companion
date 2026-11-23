@@ -12,6 +12,7 @@ from unittest.mock import patch
 from reachy_companion.autonomous.audio_adapter import AudioAdapter,HttpSTT
 from reachy_companion.autonomous.audio_peer import AudioPeer,AudioPolling,PeerClient,PeerLease,RemotePCM,create_server
 from reachy_companion.autonomous.companion_session import run_session,read_speech_operator
+from reachy_companion.autonomous import terminal_drain
 from reachy_companion.autonomous.config import load
 from reachy_companion.autonomous.playback import Playback,ReplayPCM
 from reachy_companion.autonomous.runtime import ReplayGateway,Scheduler
@@ -152,6 +153,7 @@ class SessionTests(unittest.TestCase):
         report=self.run_normal(1)
         self.assertEqual(self.peer.close_reason,'controller_stop')
         self.assertTrue(report['cleanup_verified'])
+    @patch.object(terminal_drain,'TERMINAL_GRACE_S',1)
     def test_expired_health_keeps_real_occupied_job_and_stops_renewal(self):
         self.gateway.health_release=threading.Event()
         report=self.run_normal(2)
@@ -194,6 +196,7 @@ class SessionTests(unittest.TestCase):
                 self.assertEqual(self.speech.pending is not None,mode=='same')
                 self.speech.pending=None
 
+    @patch.object(terminal_drain,'TERMINAL_GRACE_S',1)
     def test_stop_during_occupied_stt_retains_slot_and_discards_late_text(self):
         entered=threading.Event();release=threading.Event();reports=[]
         def transcribe(pcm):entered.set();release.wait(3);return 'Late fixture text'
@@ -208,6 +211,7 @@ class SessionTests(unittest.TestCase):
             finally:release.set();runner.join(3)
         self.audio.job.join(1);self.assertIsNone(self.audio.result)
 
+    @patch.object(terminal_drain,'TERMINAL_GRACE_S',1)
     def test_new_turn_during_held_main_keeps_slot_and_fast_ticks_without_old_speech(self):
         entered=threading.Event();release=threading.Event();reports=[]
         def main(task):

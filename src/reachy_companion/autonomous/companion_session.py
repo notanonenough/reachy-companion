@@ -25,6 +25,7 @@ from .playback import Playback
 from .runtime import Job,RemoteGateway,Scheduler
 from .speech_adapter import SpeechAdapter,HttpTTS
 from .voice_chain import check_context_task,check_context_view,context_binding
+from . import terminal_drain
 from ..lease_diagnostics import project_first_lease_invalid,ReducerTrace
 
 
@@ -80,12 +81,17 @@ class ContextGateway(RemoteGateway):
         return super().main(task,on_transport=on_transport)
 
 
-def occupied(scheduler,poller,lease,peer_job=None,health_job=None,stop_job=None,retire_job=None,media_close_job=None):
+def session_jobs(scheduler,peer_job=None,health_job=None,stop_job=None,retire_job=None,media_close_job=None):
     jobs={name:getattr(scheduler,name+'_job') for name in
           ('fast','main','actor','motion','context','context_revoke','context_terminal')}
     jobs.update(peer_status=peer_job,health=health_job,peer_stop=stop_job,retirement=retire_job,media_close=media_close_job)
+    jobs['context_terminal_revoke']=jobs.pop('context_terminal')
+    return jobs
+
+
+def occupied(scheduler,poller,lease,peer_job=None,health_job=None,stop_job=None,retire_job=None,media_close_job=None):
+    jobs=session_jobs(scheduler,peer_job,health_job,stop_job,retire_job,media_close_job)
     result={name:bool(job and not job.future.done()) for name,job in jobs.items()}
-    result['context_terminal_revoke']=result.pop('context_terminal')
     result.update(audio=scheduler.audio_adapter.status()['execution_busy'],
         speech=scheduler.speech_adapter.status()['execution_busy'],
         peer_poll=poller.status()['execution_busy'],lease=lease.status()['execution_busy'])
@@ -273,6 +279,7 @@ def run_session(scheduler,poller,lease,client,stop_client,source,stop,duration,p
         logging.getLogger(__name__).exception('Production session failed')
         reason='runtime_error';failure_code=getattr(exc,'code',type(exc).__name__);errors.append(type(exc).__name__)
     finally:
+        cleanup_started=time.monotonic()
         trace.enter('cleanup')
         if private_trace is not None:private_trace.disable('stop')
         stop.set();startup.close()
@@ -296,9 +303,15 @@ def run_session(scheduler,poller,lease,client,stop_client,source,stop,duration,p
                 finally:status_transport.close()
             return True
         media_close_job=Job(close_media)
-        deadline=time.monotonic()+1
+        # Admission and physical/peer withdrawal happened above. Only observe
+        # retained workers here: advance() could apply results to closed state/DB.
+        deadline=cleanup_started+terminal_drain.TERMINAL_GRACE_S
         while time.monotonic()<deadline and any(occupied(scheduler,poller,lease,peer_job,health_job,stop_job,retire_job,media_close_job).values()):
             time.sleep(.005)
+        final_busy=occupied(scheduler,poller,lease,peer_job,health_job,stop_job,retire_job,media_close_job)
+        jobs=list(session_jobs(scheduler,peer_job,health_job,stop_job,retire_job,media_close_job).items())
+        if scheduler.services:jobs.extend(scheduler.services.owned_jobs())
+        drain=terminal_drain.snapshot(cleanup_started,time.monotonic(),final_busy,jobs)
         peer_stop=None
         if stop_job.future.done():
             try:peer_stop=stop_job.future.result()
@@ -309,7 +322,7 @@ def run_session(scheduler,poller,lease,client,stop_client,source,stop,duration,p
             listening_ready_seen=ready_seen,
             counts=dict(scheduler.state.counts),peer_stop=peer_stop,
             peer_stop_execution_busy=not stop_job.future.done(),
-            execution_busy=occupied(scheduler,poller,lease,peer_job,health_job,stop_job,retire_job,media_close_job),
+            execution_busy=final_busy,terminal_drain=drain,
             speech_stop_known=scheduler.speech_adapter.status()['stop_known'])
         # Bounded metadata for silent-tick acceptance; no dialogue, memory or
         # model reasoning is copied into the session report.
@@ -340,7 +353,7 @@ def run_session(scheduler,poller,lease,client,stop_client,source,stop,duration,p
             and report['speech_stop_known'] is True and isinstance(peer_stop,dict)
             and peer_stop.get('stop_known') is True and peer_stop.get('execution_busy') is False)
         report['accepted']=ready_seen and report['cleanup_verified'] and reason in ('duration','controller_stop','finite_stream_budget')
-        publish(dict(stage='STOPPED',reason=reason,failure_code=failure_code,first_lease_invalid=invalid_view(),first_reducer_expiry=trace.view(),execution_busy=report['execution_busy'],cleanup_verified=report['cleanup_verified']))
+        publish(dict(stage='STOPPED',reason=reason,failure_code=failure_code,first_lease_invalid=invalid_view(),first_reducer_expiry=trace.view(),execution_busy=report['execution_busy'],cleanup_verified=report['cleanup_verified'],terminal_drain=drain))
         trace.unbind()
         if private_trace is not None:
             if any(report['execution_busy'].values()):private_trace.drop('occupied_at_close')

@@ -9,6 +9,7 @@ import subprocess
 from urllib.request import Request, urlopen
 from .private_audio_trace import project_summary
 from .autonomous.stock_diagnostics import project as project_stock_diagnostics
+from .autonomous.terminal_drain import project as project_terminal_drain
 from .lease_diagnostics import project_first_lease_invalid,project_lease_withdrawal_reason,project_first_reducer_expiry
 
 HOSTS = {
@@ -19,7 +20,7 @@ HOSTS = {
 }
 PORTS = {'llm': 18097, 'router': 18098, 'worker': 8082, 'gateway': 8097, 'vlm':18099}
 # Self-contained so a stopped, old or broken installation can still be inspected.
-REMOTE_PROBE = inspect.getsource(project_stock_diagnostics).replace('def project(', 'def project_stock_diagnostics(') + inspect.getsource(project_first_lease_invalid) + inspect.getsource(project_lease_withdrawal_reason) + inspect.getsource(project_first_reducer_expiry) + inspect.getsource(project_summary) + r'''
+REMOTE_PROBE = inspect.getsource(project_terminal_drain).replace('def project(', 'def project_terminal_drain(') + inspect.getsource(project_stock_diagnostics).replace('def project(', 'def project_stock_diagnostics(') + inspect.getsource(project_first_lease_invalid) + inspect.getsource(project_lease_withdrawal_reason) + inspect.getsource(project_first_reducer_expiry) + inspect.getsource(project_summary) + r'''
 import json,pathlib,shutil,subprocess,sys,urllib.request
 root=pathlib.Path(sys.argv[1]); role=sys.argv[2]; names=sys.argv[3:]
 def command(args):
@@ -36,6 +37,7 @@ for p in reports[:3]:
   if p.stat().st_size>8*1024*1024:continue
   d=json.loads(p.read_text());result['last_session']={k:d.get(k) for k in ('reason','failure_code','errors','accepted','cleanup_verified','cleanup_issues','elapsed_s','peer_close_reason','cleanup_error')}
   result['last_session']['stock_diagnostics']=project_stock_diagnostics((d.get('motion_after') or {}).get('stock_diagnostics'))
+  result['last_session']['terminal_drain']=project_terminal_drain(d.get('terminal_drain'))
   result['last_session']['private_audio_trace']=project_summary(d.get('private_audio_trace'))
   result['last_session']['first_reducer_expiry']=project_first_reducer_expiry(d.get('first_reducer_expiry'))
   result['last_session']['first_lease_invalid']=project_first_lease_invalid(d.get('first_lease_invalid'))
@@ -53,6 +55,7 @@ if role=='hub':
   d=json.loads(raw)
   result['session']={k:d.get(k) for k in ('stage','reason','failure_code','elapsed_s','listening_ready','counts','audio','lease','peer_poll','background','cycle_phase','runtime','execution_busy','cleanup_verified')}
   result['session']['first_reducer_expiry']=project_first_reducer_expiry(d.get('first_reducer_expiry'))
+  result['session']['terminal_drain']=project_terminal_drain(d.get('terminal_drain'))
   if isinstance(result['session'].get('lease'),dict):result['session']['lease']['first_reducer_expiry']=project_first_reducer_expiry(result['session']['lease'].get('first_reducer_expiry'))
   result['session']['first_lease_invalid']=project_first_lease_invalid(d.get('first_lease_invalid'))
   result['session']['speech']={k:d.get('speech',{}).get(k) for k in ('quarantined','terminal_unknown','stop_known','execution_busy','operator_receipt_fresh')}
