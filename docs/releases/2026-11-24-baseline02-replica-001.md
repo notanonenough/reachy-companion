@@ -92,7 +92,7 @@ Reviewer независимо проверил dry-run, отказ на stale id
 | Camera-on receipt accepted | 00:21:48.237 |
 | Acoustic capture / controlled stimulus begin | 00:21:49.545 /00:21:53.556 |
 | Stimulus exited0 | 00:21:57.873 |
-| Mac acquisition failure обнаружен; identity-fenced abort, observer finish request | 00:22:17.943 |
+| Identity-fenced abort после обнаружения Mac failure; observer finish request | 00:22:17.943 |
 | Authenticated STOP admission ACK | 00:22:19.060 |
 | Tracked foreground Hub terminal known | 00:22:19.886 |
 | Device/Mac shutdown / camera-off accepted | 00:22:20.889 /00:22:21.479 |
@@ -102,7 +102,7 @@ Reviewer независимо проверил dry-run, отказ на stale id
 Observer startup происходил после ACTIVE. Как и оговорено до опыта, harness
 не имел pre-stimulus three-node ACK gate: камера и stimulus уже начались к
 моменту первого чтения observer files. Mac файл содержал только failure footer;
-Hub и robot уже давали samples. Исполнитель сразу применил согласованный abort;
+Hub и robot уже давали samples. Исполнитель применил согласованный abort;
 нового запуска или повторного discovery после остановки не было.
 
 ## Завершение и ограниченные измерения
