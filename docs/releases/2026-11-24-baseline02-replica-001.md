@@ -142,6 +142,47 @@ Private trace закрыта без drops:36 data records плюс footer. В н
 WAV и prompt/profile не публикуются. Качество ответа, точная acoustic latency
 и новая physical-motion приёмка этим протоколом не заявляются.
 
+## Сохранённые интервалы для PERF-01
+
+Голосовые цепочки ниже сопоставлены по source/sequence/lineage и полному
+ task/attempt/input_ref/authority в одном Hub boot. Это два распознанных
+фрагмента;10 empty STT результатов считаются отдельно. Время — Hub monotonic,
+client intervals с транспортом/очередью, не compute-only и не время до уха.
+
+| Интервал, seconds | Цепочка1: discarded, без speech | Цепочка2: ready, speech committed |
+|---|---:|---:|
+| STT client |2.176780|2.259907|
+| STT end → admission |0.022505|0.025070|
+| Admission → main start |0.935340|7.498118|
+| Main client |7.828230|6.687042|
+| Main end → checked |0.012455|0.010806|
+| Checked → speech commit |нет commit|1.226927|
+| TTS first PCM / producer elapsed |нет TTS|0.334854 /0.385376|
+| STT end → playback stop receipt |нет playback|16.451412|
+
+У каждого столбца n=1; агрегировать discarded и spoken turn в «средний ответ»
+нельзя. Private `performance-intervals.json` сохраняет также числовые времена
+admission/main start/end/checked относительно session_begin для независимой
+проверки перекрытия jobs. Discard reason и причина7.498s ожидания здесь не
+приписываются без дальнейшей PERF-диагностики.
+
+В старом status stream22 повторения motion receipts дают только **два уникальных
+request_id**, конфликтующих копий0. Оба tracking_mode=surveying, accepted=true,
+steps_observed1, pose_verified=false, hard_stop_certified=false.
+
+| Motion interval/field | Receipt1 | Receipt2 | Граница измерения |
+|---|---:|---:|---|
+| planning_s |0.155|0.084|Вход `StockMotionAdapter.follow` → начало dispatch; включает operator/pose reads и планирование|
+| dispatch_s |1.574|1.591|Синхронный `hub.expression(...,follow=True)` до возврата|
+| duration_s |0.8|0.8|Заданная длительность шага, не измеренное физическое начало движения|
+| frame_age_s |0.827|0.962|Возраст mapped sensor capture при dispatch; не доказанное время экспозиции|
+
+Это n=2 receipts, не22 независимых движений. Короткий прерванный опыт и отсутствие
+Mac CPU/RSS не позволяют установить ресурсную причину задержек. Пользовательское
+наблюдение медленной головы и долгого ответа передано в приоритетный PERF-01;
+новое hardware окно, изменение движения/моделей и observer fix этим протоколом
+не выполнялись.
+
 ## Что установлено о Mac failure
 
 Наблюдаемый footer содержит только `acquisition_failed`. Исторические stage,
@@ -167,7 +208,7 @@ no receipts,9 targets,receipt changed,deadline и API unavailable дают то�
 Следующая dependency должна явно ограничить coverage compute provider trees
 (llm/fast/worker/gateway/vlm), отделить support logger/tunnels/caffeinate по
 проверяемым known receipts и сохранить bounded stage/count diagnostics.
-Cap8 не поднимается вслепую. Исправление observer/collector сюда не входит;
+Cap8 не поднимается вслепую. Этот контракт отложен до приоритетной PERF-диагностики. Исправление observer/collector сюда не входит;
 его владельца и отдельное окно после приёмки назначает ведущий. #26 остаётся открытой.
 
 ## Приватные доказательства и повтор вычислений
@@ -178,13 +219,13 @@ Roots под `~/reachy-release-backups/`:
 |---|---|
 | `20261124-baseline02-readiness-001` | `4da25840fff4f62163a45cdc8da8f6d1981554df1b7382ef5556d729c9152902` |
 | `20261124-baseline02-runner-001` | `bb46ab08e1836fd2fd786cc0b926ba9f8a8e93750e15e545b0cd55e4ff04769d` |
-| `20261124-baseline02-replica-001` | `ea4aa695f68ee23bf0c6d3e059b88456931997df86a0bc793c8dffe3a4c0624d` |
+| `20261124-baseline02-replica-001` | `e4c2ead91259583011e4b1b654699483c0491fafbc1e4669909532dc09163f21` |
 
 Readiness root содержит exact read-only commands и comparison anchors.
 Runner root — reviewed launch/abort, immutable local PID/Mach receipt и console.
 Replica root — observer streams/footers, actions/owner events/finals, private
 trace/WAV, `baseline-summary.json`, `summary.json`, `static-topology.json`,
-оба offline repro и их результаты. Raw evidence в Git не копируется.
+оба offline repro и их результаты, `extract-performance.py`/`performance-intervals.json`. Raw evidence в Git не копируется.
 
 Повтор только офлайн, Python≥3.11, из принятого source tree observer:
 
@@ -192,6 +233,7 @@ trace/WAV, `baseline-summary.json`, `summary.json`, `static-topology.json`,
 EVIDENCE=/Users/notanonenough/reachy-release-backups/20261124-baseline02-replica-001
 PYTHONPATH=src python -B "$EVIDENCE/reproduce-mac-topology.py"
 PYTHONPATH=src python -B "$EVIDENCE/reproduce-acquisition.py"
+python -B "$EVIDENCE/extract-performance.py"
 PYTHONPATH=src python -B deploy/autonomous/production_baseline.py \
   --candidate 717a6577a9f7c2b3ff6dd22045761866678b37bc \
   --trace "$EVIDENCE/private-trace.jsonl" --status "$EVIDENCE/observer-hub.jsonl" \
