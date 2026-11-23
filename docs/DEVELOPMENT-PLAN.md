@@ -28,9 +28,9 @@
 Одна диалоговая модель пока не реализована; Go/gRPC остаются гипотезами для сравнения.
 
 Опубликован [стендовый prerelease `stand-2026-11-23.1`](https://github.com/notanonenough/reachy-companion/releases/tag/stand-2026-11-23.1)
-на точном `717a6577a9f7c2b3ff6dd22045761866678b37bc`. Эта версия установлена на
-Mac/Hub/Reachy: один архив673 files, одинаковый wheel, actual imports и canonical
-identity60 проверены. Tag в origin указывает именно на испытанный commit;
+на точном `717a6577a9f7c2b3ff6dd22045761866678b37bc`. При его приёмке на
+Mac/Hub/Reachy проверены один архив673 files, одинаковый wheel, actual imports и
+canonical identity60. Текущие тестовые установки указаны в активной фазе ниже. Tag в origin указывает именно на испытанный commit;
 GitHub assets archive/wheel/checksums опубликованы и их digests сверены.
 [RELEASE-01 #9](https://github.com/notanonenough/reachy-companion/issues/9) закрыта.
 
@@ -57,9 +57,24 @@ STT-end→first-TTS-PCM11.209s по Hub clock; main client interval7.650s не �
 
 | Карточка | Статус, владелец и ревьюер | Следующий шаг и контакт |
 |---|---|---|
-| [PERF-01, Issue #30](https://github.com/notanonenough/reachy-companion/issues/30) | Installedfc554 остаётся stopped; protocol PR #37 принят, physical gate failed. Автор `/root/implementer`, reviewer `/root/reviewer` | На независимом ревью [PR #38](https://github.com/notanonenough/reachy-companion/pull/38), exact `8e03fbf5423d93ef91da2ba6a0f83b7e263affff` отfreshc995: bounded first stock failure/stop receipt, control semantics прежние.98 targeted/build/package126/canonical61 PASS, exact full/CI ожидаются. Только offline; контроль **24.11 01:25**, раньше review/CI/препятствие. |
-| [MODEL-TIMING-01, Issue #35](https://github.com/notanonenough/reachy-companion/issues/35) | Software PR #36 принят, автор `/root/ci_implementer`, reviewer `/root/reviewer`; карточка открыта для normal-chain evidence | Ожидает accepted diagnostic #30 и отдельный общий quiet hardware window одного владельца. После него автор проверяет same-call model stage/usage/provenance receipts offline. Новых starts/tests/builds в аппаратном окне не выполняет. Контроль вместе с #30 **24.11 01:25**. |
-| [BASELINE-02, Issue #26](https://github.com/notanonenough/reachy-companion/issues/26) | Протокол прерванной реплики принят через PR #31; владелец `/root/ci_implementer`, reviewer `/root/reviewer`; baseline неполон, карточка открыта и ожидает зависимость | Штатный cleanup независимо подтверждён, окно освобождено **24.11 00:22:24**. Полный resource baseline ждёт отложенной OBSERVE-02; по новому указанию владельца приоритет #30. Автор #26 завершил текущий шаг, новых starts/probes/observer edits нет. Следующая сверка зависимости с ведущим при контроле #30 **01:25**. |
+| [PERF-01, Issue #30](https://github.com/notanonenough/reachy-companion/issues/30) | Диагностика PR #38 принята; выбран общий candidate `3aea1cd42d0e13b396766bea3bfd4659d698eef5` для #30/#35. Автор `/root/implementer`, reviewer `/root/reviewer` | Единственное **install-only окно24.11 01:20–01:40 Asia/Baku**, owner `/root/implementer`: fresh stopped/free preflight, backup текущегоfc554, один archive/wheel, package126/top61/21configs/profile proof. Production/motion/mic/camera start не назначен. Контроль **01:30**, раньше result/failure; общий quiet trial после independent installation review отдельным решением. |
+| [MODEL-TIMING-01, Issue #35](https://github.com/notanonenough/reachy-companion/issues/35) | Software PR #36 принят, автор `/root/ci_implementer`, reviewer `/root/reviewer`; карточка открыта для normal-chain evidence | Диагностика #30 принята, включена вместе с #35 в candidate3aea. Ожидает installation review и отдельный общий quiet hardware window одного владельца. После него автор проверяет same-call model stage/usage/provenance receipts offline. Новых starts/tests/builds в аппаратном окне не выполняет. Контроль вместе с #30 **24.11 01:30**. |
+| [BASELINE-02, Issue #26](https://github.com/notanonenough/reachy-companion/issues/26) | Протокол прерванной реплики принят через PR #31; владелец `/root/ci_implementer`, reviewer `/root/reviewer`; baseline неполон, карточка открыта и ожидает зависимость | Штатный cleanup независимо подтверждён, окно освобождено **24.11 00:22:24**. Полный resource baseline ждёт отложенной OBSERVE-02; по новому указанию владельца приоритет #30. Автор #26 завершил текущий шаг, новых starts/probes/observer edits нет. Следующая сверка зависимости с ведущим при контроле #30 **01:30**. |
+
+PR #38 принят: exact `8e03fbf5423d93ef91da2ba6a0f83b7e263affff`,
+[independent APPROVED](https://github.com/notanonenough/reachy-companion/pull/38#pullrequestreview-6029645032),
+98 targeted и independent8-scenario RPC/order/outcome parity PASS;
+full1924/26 skipped PASS, CI45267350563/45267367605 SUCCESS.
+Merge `3aea1cd42d0e13b396766bea3bfd4659d698eef5` подтверждён в origin/main
+и выбран общим кандидатом #30/#35; remote branch удалена. Package126/top61
+включает nested stock_diagnostics и top-level model_timing. Это диагностическая
+версия, не установленная причина или исправление motion_stop_unknown.
+
+Pinned SDK1.2.11/e25d28a52f657354716b693ca6d557fe3595702a audit сохраняется private:
+command/state XYZRPY radians/xyz, head matrix/body_yaw раздельны, FK даёт
+T_world_platform. Дополнительное вычитание body yaw для сравнения не обосновано;
+GotoMove UUID/task end не ждёт FK target tolerance. Cause yaw residual неизвестен.
+Future fixed-target+hold опыт только предложен, сейчас не назначен.
 
 PR #36 software принят: exact `56ccc9d89a1c1e340ec9f53e2d70db24df0bae99`,
 [independent APPROVED](https://github.com/notanonenough/reachy-companion/pull/36#pullrequestreview-6029554003),
@@ -169,7 +184,7 @@ remote branch удалена. Lifecycle finish и Mac runner blockers испра
 отдельную `reachy-model-timing`; reviewer — `/tmp/reachy-review-map`. #26 ожидает
 зависимость, её завершённая рабочая ветка слита/удалена. Одновременных редакторов
 одного модуля и владельцев стенда нет; #35 выполняется только offline.
-Production checkout `reachy-companion` установлен на exactfc554; для разработки его не используют.
+Production checkout `reachy-companion` переводится сfc554 только на exact3aea в назначенном install-only окне; для разработки его не используют.
 Read-only readiness независимо принята; одна назначенная120s реплика досрочно завершена. Stopped
 workers не дают positive acquisition receipts; полнота после старта потребует
 реальных process instances/CPU deltas/status gauges, трёх успешных footer и terminal
