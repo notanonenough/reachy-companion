@@ -1,0 +1,305 @@
+{
+  "note": "Design vectors only. All limits and clocks here are synthetic, not measured budgets.",
+  "capabilities": [
+    {
+      "kind": "capability",
+      "protocol": 1,
+      "catalog_generation": 3,
+      "id": "fixture.permissions",
+      "source_boot_id": "robot-boot-1",
+      "module": "permissions",
+      "direction": "executor",
+      "semantic": "permit.control",
+      "version": {
+        "major": 1,
+        "minor": 0,
+        "min_minor": 0
+      },
+      "description": "Synthetic permit.control adapter; not a hardware assertion",
+      "unit": null,
+      "range": null,
+      "period_ms": null,
+      "ttl_ms": 2000,
+      "availability": "available",
+      "required_for": [],
+      "operations": [
+        "inspect",
+        "set",
+        "revoke"
+      ],
+      "coordinate_frame": null
+    },
+    {
+      "kind": "capability",
+      "protocol": 1,
+      "catalog_generation": 3,
+      "id": "fixture.motion",
+      "source_boot_id": "robot-boot-1",
+      "module": "motion",
+      "direction": "executor",
+      "semantic": "motion.target",
+      "version": {
+        "major": 1,
+        "minor": 0,
+        "min_minor": 0
+      },
+      "description": "Synthetic motion.target adapter; not a hardware assertion",
+      "unit": "rad",
+      "range": null,
+      "period_ms": null,
+      "ttl_ms": 2000,
+      "availability": "available",
+      "required_for": [],
+      "operations": [
+        "target",
+        "cancel",
+        "replace"
+      ],
+      "coordinate_frame": "robot_base_x_forward_y_left_z_up"
+    },
+    {
+      "kind": "capability",
+      "protocol": 1,
+      "catalog_generation": 3,
+      "id": "fixture.playback",
+      "source_boot_id": "robot-boot-1",
+      "module": "playback",
+      "direction": "executor",
+      "semantic": "audio.playback",
+      "version": {
+        "major": 1,
+        "minor": 0,
+        "min_minor": 0
+      },
+      "description": "Synthetic audio.playback adapter; not a hardware assertion",
+      "unit": "PCM_frames",
+      "range": null,
+      "period_ms": null,
+      "ttl_ms": 2000,
+      "availability": "available",
+      "required_for": [],
+      "operations": [
+        "start",
+        "write",
+        "finish",
+        "stop"
+      ],
+      "coordinate_frame": null
+    },
+    {
+      "kind": "capability",
+      "protocol": 1,
+      "catalog_generation": 3,
+      "id": "fixture.microphone",
+      "source_boot_id": "robot-boot-1",
+      "module": "audio_capture",
+      "direction": "source",
+      "semantic": "audio.capture",
+      "version": {
+        "major": 1,
+        "minor": 0,
+        "min_minor": 0
+      },
+      "description": "Synthetic audio.capture adapter; not a hardware assertion",
+      "unit": "PCM_frames",
+      "range": null,
+      "period_ms": 500,
+      "ttl_ms": 2000,
+      "availability": "available",
+      "required_for": [],
+      "operations": [],
+      "coordinate_frame": null
+    },
+    {
+      "kind": "capability",
+      "protocol": 1,
+      "catalog_generation": 3,
+      "id": "fixture.camera",
+      "source_boot_id": "robot-boot-1",
+      "module": "video",
+      "direction": "source",
+      "semantic": "video.frame",
+      "version": {
+        "major": 1,
+        "minor": 0,
+        "min_minor": 0
+      },
+      "description": "Synthetic video.frame adapter; not a hardware assertion",
+      "unit": "pixel",
+      "range": null,
+      "period_ms": 500,
+      "ttl_ms": 2000,
+      "availability": "available",
+      "required_for": [],
+      "operations": [],
+      "coordinate_frame": null
+    },
+    {
+      "kind": "capability",
+      "protocol": 1,
+      "catalog_generation": 3,
+      "id": "room.temperature",
+      "source_boot_id": "robot-boot-1",
+      "module": "metrics",
+      "direction": "source",
+      "semantic": "metric.scalar",
+      "version": {
+        "major": 1,
+        "minor": 0,
+        "min_minor": 0
+      },
+      "description": "Synthetic metric.scalar adapter; not a hardware assertion",
+      "unit": "Cel",
+      "range": [
+        -40,
+        85
+      ],
+      "period_ms": 500,
+      "ttl_ms": 2000,
+      "availability": "available",
+      "required_for": [],
+      "operations": [],
+      "coordinate_frame": null
+    }
+  ],
+  "hub_supported": {
+    "permit.control": {
+      "major": 1,
+      "max_minor": 0
+    },
+    "motion.target": {
+      "major": 1,
+      "max_minor": 0
+    },
+    "audio.playback": {
+      "major": 1,
+      "max_minor": 0
+    },
+    "audio.capture": {
+      "major": 1,
+      "max_minor": 0
+    },
+    "video.frame": {
+      "major": 1,
+      "max_minor": 0
+    },
+    "metric.scalar": {
+      "major": 1,
+      "max_minor": 0
+    }
+  },
+  "observation": {
+    "kind": "observation",
+    "protocol": 1,
+    "connection_id": "link-2",
+    "catalog_generation": 3,
+    "capability_id": "room.temperature",
+    "source_boot_id": "robot-boot-1",
+    "sequence": 8,
+    "challenge_id": "challenge-9",
+    "sample_mono_ms": 500,
+    "time_basis": "sample",
+    "age_at_send_ms": 20,
+    "ttl_ms": 2000,
+    "availability": "available",
+    "value": 22.5,
+    "confidence": null,
+    "reason": null
+  },
+  "command": {
+    "kind": "command",
+    "protocol": 1,
+    "connection_id": "link-2",
+    "command_id": "command-7",
+    "capability_id": "fixture.motion",
+    "catalog_generation": 3,
+    "authority": {
+      "hub_boot_id": "hub-1",
+      "compute_boot_id": "compute-1",
+      "robot_boot_id": "robot-boot-1",
+      "operator_epoch": 2,
+      "microphone_epoch": 4,
+      "interaction_epoch": 7,
+      "speech_epoch": 3
+    },
+    "generation": 4,
+    "operation": "target",
+    "arguments": {
+      "yaw_rad": 0.1
+    },
+    "permit_id": "permit-3",
+    "permit_epoch": 5,
+    "challenge_id": "challenge-9",
+    "age_at_send_ms": 10,
+    "ttl_ms": 500
+  },
+  "result": {
+    "kind": "result",
+    "protocol": 1,
+    "command_id": "command-7",
+    "authority": {
+      "hub_boot_id": "hub-1",
+      "compute_boot_id": "compute-1",
+      "robot_boot_id": "robot-boot-1",
+      "operator_epoch": 2,
+      "microphone_epoch": 4,
+      "interaction_epoch": 7,
+      "speech_epoch": 3
+    },
+    "generation": 4,
+    "status": "accepted",
+    "reason": null,
+    "physical_verified": false,
+    "evidence_id": null
+  },
+  "receiver": {
+    "connection_id": "link-2",
+    "catalog_generation": 3,
+    "source_boot_id": "robot-boot-1",
+    "last_sequence": 7,
+    "challenge_id": "challenge-9",
+    "challenge_sent_mono_ms": 1000,
+    "received_mono_ms": 1040,
+    "clock_error_ms": 2,
+    "challenge_source_boot_id": "robot-boot-1",
+    "policy_ttl_ms": 1000
+  },
+  "permit": {
+    "id": "permit-3",
+    "epoch": 5,
+    "capability_id": "fixture.motion",
+    "generation": 4,
+    "allowed": true,
+    "expires_mono_ms": 1200
+  },
+  "command_receiver": {
+    "connection_id": "link-2",
+    "catalog_generation": 3,
+    "source_boot_id": "hub-1",
+    "last_sequence": 7,
+    "challenge_id": "challenge-9",
+    "challenge_sent_mono_ms": 1000,
+    "received_mono_ms": 1040,
+    "clock_error_ms": 2,
+    "challenge_source_boot_id": "hub-1",
+    "policy_ttl_ms": 1000
+  },
+  "argument_schemas": {
+    "motion.target": {
+      "target": {
+        "type": "object",
+        "properties": {
+          "yaw_rad": {
+            "type": "number",
+            "minimum": -0.3,
+            "maximum": 0.3
+          }
+        },
+        "required": [
+          "yaw_rad"
+        ],
+        "additionalProperties": false
+      }
+    }
+  }
+}
