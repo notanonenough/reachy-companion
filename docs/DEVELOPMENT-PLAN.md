@@ -40,17 +40,17 @@ verified cleanup не приняты; текущие процессы и outputs
 
 | Карточка | Статус, владелец и ревьюер | Следующий шаг и контакт |
 |---|---|---|
-| [RELEASE-01, Issue #9](https://github.com/notanonenough/reachy-companion/issues/9) | Опыт остановлен, ожидает диагностику #15; автор стенда — `/root/implementer`, reviewer — `/root/reviewer` | Кандидат `362002991` установлен, E2E не прошёл. [Протокол](releases/2026-11-23-362002991d9c.md) принят через PR #16. Подготовлен один bounded повтор после нового SHA; контроль22:10 Asia/Baku. Резервирование стенда продлено до22:25 только за автором; новый start после принятого diagnostic SHA и явной передачи. |
-| [LEASE-01, Issue #15](https://github.com/notanonenough/reachy-companion/issues/15) | PR #17: runtime одобрен, разбирается CI failure; автор — `/root/ci_implementer`, reviewer — `/root/reviewer` | Exact `b55cc1ba`: local1824/26skip и PR CI успешны, branch CI получил 2 model calls вместо3 в тесте с60ms timer после peer withdrawal. Автор воспроизводит причину, без blind rerun/ослабления assertions. Контроль23.11.2026 22:10 Asia/Baku или раньше новая версия. |
+| [RELEASE-01, Issue #9](https://github.com/notanonenough/reachy-companion/issues/9) | Новый диагностический rollout; единственный автор стенда — `/root/implementer`, reviewer — `/root/reviewer` | PR #17 принят, выбран `15b784eeafd47cf585e6c87249cec4d523896e41`. Установить/проверить и выполнить один прежний bounded сценарий, затем stop и разбор. Окно 22:08–22:25, контроль 22:15 Asia/Baku. Исходная причина ещё не исправлена. |
 
 Ведущий работает в `reachy-development-map`, исполнитель — в `reachy-audit-map`,
 ревьюер — в `/tmp/reachy-review-map`; рабочие ветки короткоживущие `codex/*`.
 Основную рабочую копию `reachy-companion` не используют для продуктовых правок.
 Read-only инвентаризация закончена; reviewer освободил стенд в 21:18:20 Asia/Baku.
-Резервирование стенда за автором #9 продлено до22:25 Asia/Baku из-за CI-зависимости.
-Стенд остановлен; reviewer получает его только после освобождения и явной передачи ведущим.
-LEASE-01 работает офлайн. Принятая CATALOG не установлена на текущий кандидат;
-следующий SHA ведущий выбирает явно после приёмки диагностического изменения.
+Автору #9 передано окно 22:08–22:25 для exact `15b784eea` и одного диагностического опыта.
+Reviewer получает стенд только после освобождения и явной передачи ведущим.
+LEASE-01 принята через PR #17; её автор `/root/ci_implementer` ожидает результат
+аппаратной диагностики для следующей конкретной зависимости, контроль22:15.
+CATALOG входит в новый кандидат, но реальные readers остаются в прежнем legacy mode.
 CI-01 принята в 21:03 Asia/Baku: [PR #6](https://github.com/notanonenough/reachy-companion/pull/6),
 проверенный head `bc63ac863b64194e70a04510f0fdae0f0f2395d0`, merge в origin/main
 `ee3b7abc6c908e8160862ebe768630545379ef40` проверен после слияния. Issue #5 закрыта,
