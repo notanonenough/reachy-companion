@@ -24,7 +24,7 @@
 
 | Карточка | Статус, владелец и ревьюер | Следующий шаг и контакт |
 |---|---|---|
-| [RELEASE-01, Issue #9](https://github.com/notanonenough/reachy-companion/issues/9) | В работе, подготовка; автор — `/root/implementer`, независимый ревьюер — `/root/reviewer` | Prep PR исправления Mac доступа, затем новый кандидат, rollout и физическая приёмка. Контроль 23.11.2026 в 21:30 Asia/Baku; изменения стенда после принятого prep PR и передачи окна. |
+| [RELEASE-01, Issue #9](https://github.com/notanonenough/reachy-companion/issues/9) | В работе, подготовка; автор — `/root/implementer`, независимый ревьюер — `/root/reviewer` | Prep PR исправления Mac доступа, затем новый кандидат, rollout и физическая приёмка. Контроль 23.11.2026 в 21:40 Asia/Baku; 18 access tests прошли, автор завершает regression/docs и PR. Изменения стенда после принятого prep PR и передачи окна. |
 | [CATALOG-01, Issue #12](https://github.com/notanonenough/reachy-companion/issues/12) | Готова и назначена; единственный автор — `/root/ci_implementer`, независимый ревьюер — `/root/reviewer` | Runtime registry и scalar HTTP adapter через существующий production цикл; первый loopback и план интеграции. Следующий контакт 23.11.2026 в 21:40 Asia/Baku. Стенд не занимает. |
 
 Ведущий работает в `reachy-development-map`, исполнитель — в `reachy-audit-map`,
@@ -90,8 +90,9 @@ StrictHostKeyChecking и сохранёнными ключами работае�
 правка конфигурации доступа с backup/rollback; после её code review ведущий
 явно выберет новый кандидат. Роутер пока менять оснований нет.
 Назначенный автор #9 — `/root/implementer`, независимый reviewer — `/root/reviewer`,
-выпуск принимает ведущий. Предварительное окно: автор 21:30–22:00, reviewer
-22:00–22:20 Asia/Baku; ранняя передача возможна только явно через ведущего.
+выпуск принимает ведущий. Предварительные окна 21:30–22:00/22:00–22:20 не открыты: prep PR ещё
+не принят. Ведущий назначит фактические окна после code review/CI;
+следующий контроль готовности 21:40 Asia/Baku.
 
 Проверяются версии и рабочие entrypoints всех затронутых служб Ричи/Hub/Mac,
 штатный start, микрофон→STT→слышимый ответ, свежий кадр, движение с обратной связью
