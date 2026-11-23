@@ -94,10 +94,82 @@ Python-кода не требуется.
 5. Настроить Mac en0: Vuqar 5G, DHCP, MTU1492; ожидаемый адрес192.168.100.31.
    Router WAN ожидается192.168.100.45. Если DHCP другой — согласовать адреса
    и правило WAN SSH в router firewall.
-6. Создать `~/.ssh/cm` (0700). Установить SSH config/known_hosts из Mac stage.
+6. Установить только управляемый Mac SSH-доступ способом ниже; остальные
+   файлы network scope не нужны для обновления приложения.
    На новых ОС проверить новые host fingerprints через доверенный локальный
    доступ; закреплённые known_hosts текущих устройств не подходят новым ключам.
    Проверить `ssh reachy-hub`, `ssh reachy-mini`, `ssh reachy-router-vuqar`.
+
+## Mac: выбрать прямой LAN или доступ через router
+
+Live [BASELINE-01](BASELINE-01.md) обнаружила Mac в LAN192.168.0/24,
+а старый alias по-прежнему использовал jump192.168.100.45 и отсутствующий
+known_hosts. Для такого случая есть `deploy/current/access.py`, использующий
+четыре закреплённых manifest templates: managed config и robot/Hub/router
+known_hosts. `--route direct` явно задаёт `ProxyJump none`; `--route jump`
+сохраняет путь через `reachy-router-vuqar`. В обоих случаях pinned keys,
+`StrictHostKeyChecking yes`, users/addresses неизменны. `ProxyCommand none`
+стоит после `ProxyJump`: иначе чужой `Host *` может перехватить прямой маршрут,
+а перестановка строк может отключить выбранный jump.
+
+Выполнять от владельца Mac home, без sudo. Backup и stage содержат частную SSH
+конфигурацию, хранить вне Git. Сначала локальный rehearsal в отдельном корне:
+
+```sh
+umask 077
+access_work=$(mktemp -d)
+python3 deploy/current/access.py render --home "$HOME" --route direct --output "$access_work/stage"
+python3 deploy/current/access.py install --stage "$access_work/stage" --root "$access_work/rehearsal" --backup "$access_work/rehearsal-backup"
+python3 deploy/current/access.py verify --backup "$access_work/rehearsal-backup"
+python3 deploy/current/access.py rollback --backup "$access_work/rehearsal-backup"
+```
+
+Для проверки с существующей конфигурацией перед rehearsal скопировать её
+в `REHEARSAL_ROOT/$HOME/.ssh/config` (без начального `/` в относительном пути).
+Инструмент переносит свои два парных `BEGIN/END reachy…` блока в начало;
+остальные байты сохраняет, завершает управляемую область `Host *`.
+Отсутствующий каталог `~/.ssh/cm` создаётся с mode0700 и учитывается при откате.
+Непарные/повторные маркеры и symlink в файле либо родительском пути дают отказ
+до изменения файлов. Если после старого блока идут чужие параметры или
+`Include`, удаление блока разрешено только при доказанно той же области
+`Host`/`Match`; иначе инструмент отказывает до backup/установки. Владелец должен
+явно определить желаемую область этих строк перед повторением. Входной stage сверяется с ровно четырьмя pinned templates,
+а не принимается как произвольный список путей.
+
+После принятия prep PR и передачи окна ведущим выполнить реальную установку:
+
+```sh
+python3 deploy/current/access.py install --stage "$access_work/stage" --backup "$access_work/installed-backup"
+python3 deploy/current/access.py verify --backup "$access_work/installed-backup"
+ssh -G reachy-mini | rg '^(hostname|user |proxyjump|proxycommand|hostkeyalias|userknownhostsfile|stricthostkeychecking) '
+ssh -G reachy-hub | rg '^(hostname|user |proxyjump|proxycommand|hostkeyalias|userknownhostsfile|stricthostkeychecking) '
+# Новое соединение: старый ControlMaster не должен маскировать маршрут.
+ssh -S none -o BatchMode=yes -o ConnectTimeout=5 reachy-mini hostname
+ssh -S none -o BatchMode=yes -o ConnectTimeout=5 reachy-hub hostname
+```
+
+Для `.local` aliases маршрут тот же. `ssh -G` проверяет итоговую конфигурацию,
+не доступность устройства. Для jump дополнительно проверить router с его
+закреплённым ключом; direct не требует настройки router. Не применять общий
+`manage.py install --scope network` ради этого изменения: он устанавливает и
+другие network-файлы. Mac reverse tunnels к Hub используют те же aliases и
+после разрешённого запуска возвращают compute ports18097/18082/8097.
+
+Backup0700 содержит preimages0600, исходные mode и факт отсутствия каждого
+файла в `journal.json`, записанные до первой установки. Ключи устанавливаются
+перед config. Атомарная замена отдельного файла не делает весь набор атомарным:
+после interruption использовать тот же backup для восстановления:
+
+```sh
+python3 deploy/current/access.py rollback --backup "$access_work/installed-backup"
+```
+
+Rollback сначала проверяет весь набор: файл должен соответствовать исходному
+или установленному digest/mode. Более поздняя чужая правка останавливает откат
+без изменений; разбирать её вручную с backup. Частичная установка и повторный
+rollback поддержаны; исходно отсутствовавшие файлы удаляются, пустые созданные
+каталоги убираются. Backup не перезаписывается. Службы не запускаются и router,
+factory, private keys, профиль и память не меняются.
 
 ## 3. Код и Python
 
@@ -255,9 +327,21 @@ plist нужны `bootout` и `bootstrap`. Изменение только Pytho
 3. `artifacts.py verify` на Mac подтверждает все веса и бинарники.
 4. `scripts/production-control status --json` проверяет модели, gateway, worker,
    состояние Hub/Robot и factory. Панель доступна через localhost18080/control.
-5. Отдельная физическая приёмка — явный новый start, речь, камера и движение.
-   Она не заменяется HTTP health или unit-тестами. При необходимости остановить
-   через `production-control stop`; `reachy-off` выгружает также Mac jobs.
+5. В выделенном окне единственный автор выполняет новый штатный start:
+   реальная речь с микрофона → STT → слышимый ответ, свежий кадр с timestamp,
+   допустимое движение с измеренной обратной связью, затем stop с наблюдаемым
+   прекращением звука/движения. Acoustic observation/человек нужны для слова
+   «слышимый»; consumed PCM и HTTP health этого не доказывают.
+   `production-control stop` завершает сеанс; `reachy-off` выгружает также Mac jobs.
+6. В протоколе записать exact main SHA/архив, узлы, effective import/units,
+   предыдущую установленную версию и границы её известной работоспособности,
+   команды, время/часы, наблюдение каждого эффекта и закрытый путь rollback.
+   Не включать память, профиль, secrets и сырые разговоры/кадры в публичный PR.
+7. Автор освобождает стенд; независимый reviewer подтверждает тот же кандидат
+   и физические результаты. Ведущий после этой приёмки ставит понятный тег
+   на проверенный commit и публикует GitHub Release со ссылкой на протокол.
+   Более новая main не подменяет кандидат. Непроверенный обязательный сценарий
+   остаётся открытым и блокирует тег успешного выпуска.
 
 Откат: остановить сеанс, вернуть прежнюю ссылку `current`, unit-файлы и
 соответствующие drop-ins из закрытого backup, выполнить daemon-reload и

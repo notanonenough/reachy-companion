@@ -36,8 +36,11 @@ def load_manifest(directory=HERE):
 
 def render(manifest, host, values, directory=HERE, scopes=None):
     settings = dict(manifest['hosts'][host])
-    defaults = dict(ROOT=settings['root'], HOME=settings['home'], SOURCE_ROOT=settings['source_root'])
+    defaults = dict(ROOT=settings['root'], HOME=settings['home'], SOURCE_ROOT=settings['source_root'],
+                    SSH_PROXY_JUMP='reachy-router-vuqar')
     defaults.update(values)
+    if defaults['SSH_PROXY_JUMP'] not in ('none', 'reachy-router-vuqar'):
+        raise ValueError('SSH_PROXY_JUMP must be none or reachy-router-vuqar')
     output = []
     def substitute(text, *, uci=False):
         def replace(match):
