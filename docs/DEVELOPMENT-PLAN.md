@@ -35,54 +35,55 @@
 (диагностика первой причины отзыва без изменения допуска);
 [REDUCER-01 #20](https://github.com/notanonenough/reachy-companion/pull/20)
 (однократный снимок этапа и стека при reducer expiry, без изменения срока допуска).
-С 22:37 на Mac/Hub/Ричи установлен диагностический кандидат `3a0f076ba`;
-668 файлов архива, одинаковый пакет, imports и identity 59 модулей проверены.
-Один опыт достиг запланированных 175 s и завершён stop/shutdown/camera_off.
-first_reducer_expiry и first_lease_invalid остались null; прежний сбой не
-воспроизведён, что не доказывает исправление. Настройки legacy сохранены.
-Предыдущий `15b784eea` завершил единственный опыт через 20.34 s до camera_on/stimulus:
-первичный `reducer_expired`
-при отсутствии прогресса 202.470 ms и пределе 200 ms. Последующий `status_fresh`
-уже вторичен. Конкретный задержавший вызов пока неизвестен; #18 добавляет
-однократный снимок этапа/стека, вошедший в новый кандидат. Предыдущий сеанс был
-остановлен, mic/camera выключены; его cleanup false (`busy:audio`, `peer_stop_unknown`).
-В новом опыте device подтвердил terminal stop, закрытие capture и восстановление
-mic; Hub cleanup false из-за busy:fast/main/background, audio false.
-Независимые проверки подтвердили выключенные mic/camera, отсутствие moves,
-production PIDs и Mac jobs/ports. Acoustic attribution не подтвердила отдельный
-ответ робота; frame identity не сохранялась, движение отклонено до исполнения
-из-за прежней позы вне envelope. Выпуск не принят.
-Предыдущий `362002991` завершил опыт
-после102.58s: Hub прекратил renewal по ещё не установленной
-причине, device закрыл controller lease. Сквозная акустика, кадр, движение и
-verified cleanup пока не приняты. Следующий запуск после новой диагностики и
-явного выбора кандидата; существующие сроки допуска не расширяются.
+На Mac/Hub/Ричи установлен точный кандидат
+`3a0f076bac3575ccc6504e8bd320ad5a50554b7f`: один архив 668 файлов, одинаковый
+пакет, imports и identity 59 модулей проверены; пять sensor readers остаются legacy.
+Авторский опыт достиг 175 s без reducer expiry. [Протокол](releases/2026-11-23-3a0f076bac35.md)
+принят через PR #21, reviewed `03f50a5bd73f793197fa759ee9c15f75a778160f`,
+оба CI успешны, merge `ea3cdab4da5561496ed2af5b847abc66456292b1` проверен в main.
+Это невоспроизведение прежнего сбоя, а не доказательство его исправления.
+
+Независимый reviewer затем выполнил один 90 s опыт того же кандидата. После
+штатных sleep и neutral expression измеренная поза вошла в прежний envelope.
+Свежий видимый кадр и движение с measured feedback подтверждены. Hub/device
+accepted=true, Hub cleanup_verified=true; mic/camera off, production PIDs и
+Mac jobs/ports закрыты, moves пусты, профиль неизменен. В 22:49 reviewer явно
+освободил стенд; новых запусков нет. Протокол независимого опыта готовит автор.
+
+Акустическая приёмка остаётся открытой: владелец услышал из Ричи с большой
+задержкой неверный ответ на контрольный вопрос 2+2. Raw STT/model text в
+завершённом production не сохранялись; digests/receipts не различают ошибку
+сегментации, подмену входа следующей репликой и ответ модели. [AUDIO-TRACE-01 #22](https://github.com/notanonenough/reachy-companion/issues/22)
+добавит явно включаемый на один сеанс bounded private trace настоящего пути,
+без изменения поведения/сроков допуска. Выпуск, тег и GitHub Release не приняты.
+История предыдущих отказов: [362](releases/2026-11-23-362002991d9c.md),
+[15b](releases/2026-11-23-15b784eeafd4.md); первичный reducer expiry 15b пока не
+имеет установленного конкретного блокирующего вызова.
 
 ## Активная работа и следующий контакт
 
 | Карточка | Статус, владелец и ревьюер | Следующий шаг и контакт |
 |---|---|---|
-| [RELEASE-01, Issue #9](https://github.com/notanonenough/reachy-companion/issues/9) | Автор `/root/implementer` передал protocol PR #21; независимый reviewer `/root/reviewer` получил стенд после явного освобождения автором в 22:42 | Один независимый опыт того же exact `3a0f076bac3575ccc6504e8bd320ad5a50554b7f`: штатный sleep уже вернул body≈0, затем обычный Hub neutral expression и measured pose; при PASS — normal start, свежий /frame, адресная акустика, движение с feedback и stop. При unknown/busy/pose failure остановиться. Окно reviewer 22:43–23:00, контроль 22:50 Asia/Baku. |
+| [RELEASE-01, Issue #9](https://github.com/notanonenough/reachy-companion/issues/9) | Автор `/root/implementer` пишет протокол независимого 90 s опыта; reviewer `/root/reviewer` | Protocol PR offline к 23:00 Asia/Baku. Стенд освобождён в 22:49; новый старт только после выбора кандидата и отдельного окна. |
+| [AUDIO-TRACE-01, Issue #22](https://github.com/notanonenough/reachy-companion/issues/22) | Автор `/root/ci_implementer`, независимый reviewer `/root/reviewer`; контракт согласован до старта | Default-off private trace real STT→admission→model→TTS с lineage/временами, без IO в reducer и без публикации текста. Код/проверка через PR; контроль 23:00 Asia/Baku. Hardware не используется. |
 
-В независимом recovery выяснено: Hub sleep выполняет stock pose и не обещает
-disabled. После него mode остался enabled, body≈−0.5°, head pitch≈25.75°.
-Прежняя предпосылка плана sleep→disabled была неверна; wake не выполнялся.
-Ведущий согласовал существующий Hub neutral expression после sleep (body=None,
-как в штатном маршруте) и последующую проверку измеренной позы. Продукт, motor
-mode и guards не меняются; прямой factory вызов не используется.
+Прежняя предпосылка sleep→disabled оказалась неверна: Hub sleep выполняет
+stock pose и не выключает моторы. После sleep body≈−0.5°, neutral expression
+через существующий Hub маршрут дал measured yaw0.413°, pitch4.194°, body−0.352°.
+Guard и motor mode не менялись, прямого factory setter не было.
 
-Ведущий работает в `reachy-development-map`, исполнитель — в `reachy-audit-map`,
-ревьюер — в `/tmp/reachy-review-map`; рабочие ветки короткоживущие `codex/*`.
+Ведущий работает в `reachy-development-map`, автор протокола — в `reachy-release-protocol`,
+автор #22 — в `reachy-ci-temp` на `codex/private-audio-trace`, ревьюер — в
+`/tmp/reachy-review-map`; рабочие ветки короткоживущие `codex/*`.
 Основную рабочую копию `reachy-companion` не используют для продуктовых правок.
 Read-only инвентаризация закончена; прежнее окно reviewer завершилось в 21:18:20.
 После явного «продолжай» прежние исполнитель и reviewer продолжили работу.
-Сверены origin/main, единственная открытая Issue #9 и отсутствие открытых PR
-после принятия #20. Mac production checkout и оба Linux узла — exact `3a0f076`.
-Стенд явно передан reviewer после завершения авторского опыта и освобождения
-в 22:42. Автор больше не выполняет hardware calls; второй автор также offline.
-LEASE-01 #17 и REDUCER-01 #20 приняты; `/root/ci_implementer` ожидает
-конкретную offline-зависимость по результатам опыта; без воспроизведения новая
-продуктовая правка не назначена.
+Сверены origin/main, открытая Issue #9 и отсутствие открытых PR после принятия
+#21; затем создана #22 и автор фактически начал работу от fresh main.
+Mac production checkout и оба Linux узла — exact `3a0f076`.
+Reviewer явно освободил стенд в 22:49 после независимого опыта. Оба автора
+работают offline. LEASE-01 #17 и REDUCER-01 #20 приняты; второй автор получил
+готовую AUDIO-TRACE-01 #22 вместо гипотетического исправления голоса.
 CATALOG входит в новый кандидат, но реальные readers остаются в прежнем legacy mode.
 CI-01 принята в 21:03 Asia/Baku: [PR #6](https://github.com/notanonenough/reachy-companion/pull/6),
 проверенный head `bc63ac863b64194e70a04510f0fdae0f0f2395d0`, merge в origin/main
