@@ -24,13 +24,14 @@
 
 | Карточка | Статус, владелец и ревьюер | Следующий шаг и контакт |
 |---|---|---|
-| [CHAR-01](#char-01-личность-меняет-только-владелец) | В работе ([Issue #1](https://github.com/notanonenough/reachy-companion/issues/1)); автор — `/root/implementer`, независимый ревьюер — `/root/reviewer` | Ревьюер проверяет PR #3 (`caac45c6`); автор обновляет базу после принятой CI-01; затем reviewer подтверждает новый SHA и ведущий ждёт CI. Следующий контакт 23.11.2026 в 21:10 Asia/Baku или раньше по готовности/препятствию. |
+| [BASELINE-01, Issue #8](https://github.com/notanonenough/reachy-companion/issues/8) | Назначена после принятой CHAR-01; автор — `/root/implementer`, независимый ревьюер — `/root/reviewer` | Read-only инвентаризация Ричи/Hub/Mac, протокол и PR; исключительное окно автора 21:08–21:30, следующий контакт 23.11.2026 в 21:20 Asia/Baku. |
 | [CONTRACT-01, Issue #2](https://github.com/notanonenough/reachy-companion/issues/2) | Назначена после закрытия CI-01; единственный автор — `/root/ci_implementer`, независимый ревьюер — `/root/reviewer` | Документ интерфейса шести модулей и исполняемые design examples; следующий контакт 23.11.2026 в 21:15 Asia/Baku. |
 
 Ведущий работает в `reachy-development-map`, исполнитель — в `reachy-audit-map`,
 ревьюер — в `/tmp/reachy-review-map`; рабочие ветки короткоживущие `codex/*`.
 Основную рабочую копию `reachy-companion` не используют для продуктовых правок.
-Стенд пока никому не выделен; все текущие проверки офлайн.
+Стенд выделен `/root/implementer` для read-only Issue #8: 21:08–21:30 Asia/Baku.
+Параллельная CONTRACT-01 офлайн; аппаратных работ другого автора нет.
 CI-01 принята в 21:03 Asia/Baku: [PR #6](https://github.com/notanonenough/reachy-companion/pull/6),
 проверенный head `bc63ac863b64194e70a04510f0fdae0f0f2395d0`, merge в origin/main
 `ee3b7abc6c908e8160862ebe768630545379ef40` проверен после слияния. Issue #5 закрыта,
@@ -48,7 +49,7 @@ CONTRACT-01 (передача записана в Issue #2 до начала). �
 
 ## Ближайшая очередь и препятствия
 
-1. **CHAR-01, в работе; контракт уточнён владельцем.** Модель может предложить
+1. **CHAR-01 принята; контракт уточнён владельцем.** Модель может предложить
    изменение personality/principles через отдельный черновик и настоящий GitHub PR
    без обязательного авто-ревьюера. Профиль меняется только после ручного принятия
    владельцем и явного применения; прямое фоновое применение запрещено. Основание §35; контракт согласован
@@ -58,7 +59,7 @@ CONTRACT-01 (передача записана в Issue #2 до начала). �
    каталог возможностей и результаты шести модулей (§7–10,15–16,19–22).
    До реализации обеих сторон техлид проверяет совместимость, недоступность
    источника, отзыв допуска и обратную связь. Транспорт пока не выбирать.
-3. **BASELINE-01, подготовка измерений.** Инвентаризация версий и штатных
+3. **[BASELINE-01, Issue #8](https://github.com/notanonenough/reachy-companion/issues/8), назначена.** Инвентаризация версий и штатных
    интерфейсов, единые часы/погрешность, исходная совместная нагрузка и бюджеты
    (§4,10,17–19,25,27–29). Нужен последовательный доступ к стенду.
 4. **BEHAVIOR-01, после фиксации контракта цикла.** Одна диалоговая модель
@@ -75,6 +76,26 @@ GitHub-доступ восстановлен и проверен 23.11.2026 в 2
 возобновлены; рабочая копия исполнителя была чистой, продуктовых изменений
 до прерывания не было. Владелец CHAR-01 не менялся: `/root/implementer`
 фактически начал работу в `codex/owner-character` от `a6826c789` в 20:48.
+
+## Ближайший выпуск и постоянная аппаратная приёмка
+
+[Issue #9 — релиз на реальном стенде](https://github.com/notanonenough/reachy-companion/issues/9)
+обязательна в дополнение к инвентаризации #8. Кандидат — точный принятый commit
+`407f4c56e5bca3544fcbbadbb1ac9f14c8e93fad`; новые docs в main его не подменяют.
+Следующий автор после #8 — `/root/implementer`, независимый reviewer — `/root/reviewer`,
+выпуск принимает ведущий. Предварительное окно: автор 21:30–22:00, reviewer
+22:00–22:20 Asia/Baku; ранняя передача возможна только явно через ведущего.
+
+Проверяются версии и рабочие entrypoints всех затронутых служб Ричи/Hub/Mac,
+штатный start, микрофон→STT→слышимый ответ, свежий кадр, движение с обратной связью
+и stop. Конфигурация/секреты/память сохраняются, предыдущая версия и откат записываются
+до установки по [DEPLOYMENT.md](DEPLOYMENT.md). HTTP health не доказывает физический
+эффект. Любое неподтверждённое обязательное поведение оставляет выпуск открытым.
+
+Для этого и каждого следующего выпуска тег ставится только на прошедший кандидат,
+GitHub Release ссылается на протокол с узлами, версиями, фактическими результатами,
+ограничениями и откатом. Предлагаемый первый тег `stand-2026-11-23.1`; пока тег и
+Release не созданы, аппаратная приёмка не пройдена. Подробная постоянная карточка — #9.
 
 ## Карточки
 
@@ -98,29 +119,24 @@ GitHub-доступ восстановлен и проверен 23.11.2026 в 2
 
 ### CHAR-01 — личность меняет только владелец
 
-Постоянная карточка с результатом, границами, контрактом и приёмкой:
-[Issue #1](https://github.com/notanonenough/reachy-companion/issues/1).
+[Issue #1](https://github.com/notanonenough/reachy-companion/issues/1) закрыта после
+[PR #3](https://github.com/notanonenough/reachy-companion/pull/3). Автор `/root/implementer`,
+независимый reviewer `/root/reviewer`. Принята 23.11.2026 в 21:07 Asia/Baku:
+проверенный head `dcba48254661d824f1e61cacc27f41c0d904f0f3`, подтверждённый merge
+в origin/main `407f4c56e5bca3544fcbbadbb1ac9f14c8e93fad`.
 
-- В работе после возобновления 23.11.2026 в 20:48 Asia/Baku.
-- Один автор: `/root/implementer`; независимый ревьюер: `/root/reviewer`.
-- База: `a6826c78962df441c9e2333d00e941718074175c`; ветка `codex/owner-character`,
-  рабочая копия `reachy-audit-map`. Проверки офлайн, без занятия стенда.
-- Реальный [PR #3](https://github.com/notanonenough/reachy-companion/pull/3) открыт;
-  исходный head `6251f048` прошёл 126 целевых тестов, но не принят: владелец
-  уточнил контракт до приёмки. Модель вправе предложить профиль; обязательного
-  модельного reviewer для persona PR нет. Черновик, GitHub PR, ручное принятие
-  и явное применение — разные шаги. В публичный PR не отправляются текущий
-  профиль, память и состояние сеанса. Детали и сценарии — только в Issue #1.
-- Уточнение реализовано в head `caac45c6b03f4fb263ee4b2225c647af73e59944`,
-  база `f1b87ed416a741e495254e58fcccf7be84fb947a`. [Synthetic PR #7](https://github.com/notanonenough/reachy-companion/pull/7)
-  подтвердил открытие настоящего предложения без reviewer request и без изменения
-  временного профиля; закрыт без merge. Личные данные стенда не использовались.
-- Следующий шаг ревьюера: независимая проверка нового head; автора — исправления
-  и обновление базы после принятой CI-01. Независимое ревью кода сохраняется; ведущий persona PR автоматически не
-  сливает. Контрольная точка 23.11.2026 в 21:10 Asia/Baku.
-- Разрешение владельца на существенный рефакторинг передано исполнителю и ревьюеру;
-  размер diff не требует отдельного согласования. Корневой AGENTS обновляет
-  исходный чат; требования задачи и проверка штатных путей остаются обязательными.
+[Независимое APPROVED](https://github.com/notanonenough/reachy-companion/pull/3#pullrequestreview-6025860091)
+подтвердило неизменность diff после rebase и 120 совместных tests. Полные Linux
+runs 45223311455/45223326620 успешны: 1767 tests, Node UI, wheel/sdist.
+[Синтетический PR #7](https://github.com/notanonenough/reachy-companion/pull/7) подтвердил
+публикацию без auto reviewer и без изменения временного профиля; закрыт unmerged.
+Remote working branch удалена, автор удаляет локальную при переходе к #8.
+
+Результат: модель может сохранить предложение; явный publisher создаёт настоящий
+GitHub PR; владелец вручную принимает/отклоняет, отдельный apply проверяет точную
+принятую версию и профильный CAS. Прямое model/background применение запрещено.
+Code PR не принимает persona proposal. Установленный профиль не менялся;
+развёртывание и физическая приёмка — отдельная Issue #9.
 
 ## Как читать привязку решений
 
@@ -177,7 +193,7 @@ GitHub-доступ восстановлен и проверен 23.11.2026 в 2
 | 32 | П | [brains.py:answer](../src/reachy_companion/brains.py) openclaw/hermes; [autonomous/workflows.py:WorkflowClient](../src/reachy_companion/autonomous/workflows.py); [deploy/workflows/](../deploy/workflows); config `workflows.enabled=false` | Текстовые адаптеры и synthetic workflows есть, живые integrations не включены/не подтверждены. Блокирующий полный ответ. | 24,30,34 | Offline trace одинаковый для агентов/обычной модели, identity/cancel/capability; первый полезный workflow определить отдельно. |
 | 33 | Т | [autonomous/durable.py:DurableStore.append,Delivery](../src/reachy_companion/autonomous/durable.py); [autonomous/services.py:log,advance](../src/reachy_companion/autonomous/services.py); [tests/test_production_cycle.py](../tests/test_production_cycle.py); [tests/test_s3_delivery_connection.py](../tests/test_s3_delivery_connection.py) | Durable SQLite outbox/retry/batching существует, но append намеренно оставляет только metadata; write синхронный в цикле. Нет полного тестового audio/video/model архива с bounded producer queue. | 3,17,24 | Offline/slow S3, restart/idempotence, completeness+redaction, disk cap gap markers, сравнить latency export on/off. |
 | 34 | Исследование завершено; перенос Г | [docs/REACHY-ECOSYSTEM-RESEARCH.md](REACHY-ECOSYSTEM-RESEARCH.md); [emotion_library.py](../src/reachy_companion/emotion_library.py); [assets/pollen-emotions-v1.json](../src/reachy_companion/assets/pollen-emotions-v1.json); [speech_clock.py](../src/reachy_companion/speech_clock.py); [autonomous/stock_motion_adapter.py](../src/reachy_companion/autonomous/stock_motion_adapter.py) | Есть закреплённые emotion assets и часть timing; не единая локальная композиция primary/idle/gaze/speech. Совместимость новых apps не равна совместимости 1.2.11. | 11,12,14,29,33 | Начать с одного executor/generations; три жеста из ненулевой позы без sidecar sound, consumed PCM sync, отмена; версия/license каждого донора. |
-| 35 | Т; частота/хранилище Г; reflection П | [autonomous/runtime.py:Scheduler.advance](../src/reachy_companion/autonomous/runtime.py); [autonomous/state.py:snapshot](../src/reachy_companion/autonomous/state.py); [autonomous/services.py:update,advance](../src/reachy_companion/autonomous/services.py); [autonomous/durable.py](../src/reachy_companion/autonomous/durable.py); [tests/test_production_cycle.py](../tests/test_production_cycle.py) | Тишина, TTL, goal CAS, background IO и overload уже есть. Fast/main ещё две модели. **Конфликт исходной базы:** модель может напрямую менять профиль. CHAR-01 закрывает прямое применение, но по уточнению владельца разрешает отдельные предложения через PR без auto reviewer; принятие и применение остаются явными действиями владельца. | 23,30,31,36; запрет auto-character независим | Программно доказать регулярную итерацию в тишине/stale context/разные goals; запретить прямую model/background character mutation; проверить отдельный proposal→PR→owner acceptance→apply и owner update; device acceptance отдельная. |
+| 35 | Т; частота/хранилище Г; reflection П | [autonomous/runtime.py:Scheduler.advance](../src/reachy_companion/autonomous/runtime.py); [autonomous/state.py:snapshot](../src/reachy_companion/autonomous/state.py); [autonomous/services.py:update,advance](../src/reachy_companion/autonomous/services.py); [autonomous/durable.py](../src/reachy_companion/autonomous/durable.py); [tests/test_production_cycle.py](../tests/test_production_cycle.py) | Тишина, TTL, goal CAS, background IO и overload уже есть. Fast/main ещё две модели. CHAR-01 принята через PR #3: прямое применение профиля моделью закрыто, отдельный proposal→GitHub PR без auto reviewer→owner acceptance→apply реализован программно. Фактическое развёртывание и проверка стенда ещё впереди (#8/#9). | 23,30,31,36; запрет auto-character независим | Программно доказать регулярную итерацию в тишине/stale context/разные goals; запретить прямую model/background character mutation; проверить отдельный proposal→PR→owner acceptance→apply и owner update; device acceptance отдельная. |
 | 36 | Т редактируемой памяти; recognition П/Г | [autonomous/memory.py:MemoryStore.commit,recall](../src/reachy_companion/autonomous/memory.py); [autonomous/context.py:ContextProvider](../src/reachy_companion/autonomous/context.py); [autonomous/durable.py](../src/reachy_companion/autonomous/durable.py) memory string; [tests/test_memory_context.py](../tests/test_memory_context.py) | Provenance/CAS/forget для записей есть отдельно от character summary. Готового знакомства/связывания лица/голоса с записью нет. | 9,28,30,35 | Owner confirmation→recall→correction/delete; спорное сходство не перезаписывает личность, слова не приписываются присутствующему автоматически. |
 | 37 | Действующее разрешение | [docs/REVIEW-NOTES.md](REVIEW-NOTES.md) §37; [scripts/factory_ssh.py](../scripts/factory_ssh.py); [scripts/production-control](../scripts/production-control); [deploy/current/release.py](../deploy/current/release.py); [deploy/autonomous/robot_inventory.py](../deploy/autonomous/robot_inventory.py) | Доступ разрешён владельцем; аудит не проверял connectivity и запущенный SHA. | Координация ведущего | Перед каждым опытом узел/версия/занятость; не повторное согласование разрешённого опыта. |
 | 38 | Действующий процесс | [AGENTS.md](../AGENTS.md); [docs/REVIEW-NOTES.md](REVIEW-NOTES.md) §38; git baseline | MAP-01 принята в origin/main, роли и CHAR-01 назначены; процесс каждого следующего изменения проверяется отдельно. | MAP-01, reviewer | По каждому diff base/head/checks/reviewer verdict, свежий main; только ведущий merge и карта, автор исправляет замечания. |
@@ -223,3 +239,7 @@ CI-01 у ведущего после CI. Работы продолжаются, 
 успешных CI; свежая main отличалась от проверенной базы только картой. После merge
 проверена ancestry exact head в origin/main, закрытие Issue #5 и удаление remote
 ветки. Автору CHAR-01 передана база, CONTRACT-01 передана освободившемуся автору.
+
+21:08 Asia/Baku: CHAR-01 принята, следующий шаг передан одному автору #8;
+CONTRACT-01 продолжает второй автор. Кандидат #9 зафиксирован; окно read-only #8
+выделено до любых изменений стенда. Ведущий продолжает сопровождение до результатов.
