@@ -57,9 +57,20 @@ STT-end→first-TTS-PCM11.209s по Hub clock; main client interval7.650s не �
 
 | Карточка | Статус, владелец и ревьюер | Следующий шаг и контакт |
 |---|---|---|
-| [PERF-01, Issue #30](https://github.com/notanonenough/reachy-companion/issues/30) | Установка и exact runner/readers3aea независимо приняты. Автор `/root/implementer`, reviewer `/root/reviewer` | **Единственное quiet90s окно24.11 01:30–01:40 Asia/Baku**, owner `/root/implementer`, candidate `3aea1cd42d0e13b396766bea3bfd4659d698eef5`: fresh stopped/free → один normal90s trial → knownexit/STOP/device/Mac cleanup → firstfailure/model receipts. Никаких project tests/builds/benchmarks/параллельных model calls на Mac у команды. Контроль **01:35**, раньше failure/result; никаких автоматических повторов. |
-| [MODEL-TIMING-01, Issue #35](https://github.com/notanonenough/reachy-companion/issues/35) | Software PR #36 принят, автор `/root/ci_implementer`, reviewer `/root/reviewer`; карточка открыта для normal-chain evidence | Диагностика #30 принята, включена вместе с #35 в candidate3aea. Установка принята; ожидает отдельный общий quiet hardware window одного владельца. После него автор проверяет same-call model stage/usage/provenance receipts offline. Новых starts/tests/builds в аппаратном окне не выполняет. Контроль вместе с #30 **24.11 01:35**. |
-| [BASELINE-02, Issue #26](https://github.com/notanonenough/reachy-companion/issues/26) | Протокол прерванной реплики принят через PR #31; владелец `/root/ci_implementer`, reviewer `/root/reviewer`; baseline неполон, карточка открыта и ожидает зависимость | Штатный cleanup независимо подтверждён, окно освобождено **24.11 00:22:24**. Полный resource baseline ждёт отложенной OBSERVE-02; по новому указанию владельца приоритет #30. Автор #26 завершил текущий шаг, новых starts/probes/observer edits нет. Следующая сверка зависимости с ведущим при контроле #30 **01:35**. |
+| [PERF-01, Issue #30](https://github.com/notanonenough/reachy-companion/issues/30) | Quiet90s trial3aea завершён; mandatory gate не пройден: busy:audio/background. Автор `/root/implementer`, reviewer `/root/reviewer` | Окно освобождено **01:33**, all3 stopped/free; no motion_stop_unknown. Автор сохраняет bounded correlation; reviewer проверяет причины pending и stock/pose evidence. Новые starts не назначены. Следующий конкретный fix выбирается по данным; контроль **01:40**. |
+| [MODEL-TIMING-01, Issue #35](https://github.com/notanonenough/reachy-companion/issues/35) | Software PR #36 принят, автор `/root/ci_implementer`, reviewer `/root/reviewer`; карточка открыта для normal-chain evidence | Диагностика #30 принята, включена вместе с #35 в candidate3aea. Quiet trial завершён; автор разбирает сохранённые same-call model stage/usage/provenance и выбирает конкретное ускорение. Hardware starts не назначены. Контроль вместе с #30 **24.11 01:40**. |
+| [BASELINE-02, Issue #26](https://github.com/notanonenough/reachy-companion/issues/26) | Протокол прерванной реплики принят через PR #31; владелец `/root/ci_implementer`, reviewer `/root/reviewer`; baseline неполон, карточка открыта и ожидает зависимость | Штатный cleanup независимо подтверждён, окно освобождено **24.11 00:22:24**. Полный resource baseline ждёт отложенной OBSERVE-02; по новому указанию владельца приоритет #30. Автор #26 завершил текущий шаг, новых starts/probes/observer edits нет. Следующая сверка зависимости с ведущим при контроле #30 **01:40**. |
+
+Quiet trial3aea: ACTIVE01:30:27.872, stimulus01:30:35.870–40.690,
+knownHubexit01:32:00.642 rc2, device/Macshutdown01:32:03.220, окно освобождено01:33.
+Обязательный gate **failed**: busy:audio и busy:background; trace incomplete
+occupied_at_close,92 records/dropped1. Причины ещё проверяются. Motion stopknowntrue,
+firststockfailure null; последняя команда отклонена operator-phase до stock_begin.
+Device accepted/captureclosed/micrestored/playbackstopknown; all3 stopped/free,
+mic/cameraoff,0moves, profile unchanged.8poststopposes1.169s с jitter yaw0.0544°,
+pitch0.0562° не заменяют исходный stop ACK. Ни нового tag, ни автоматического retry.
+Private evidence: `20261124-3aea1cd42d0e/combined-trial-001`.
+Все авторы могут разбирать сохранённые данные offline; новое аппаратное окно не назначено.
 
 Установка exact `3aea1cd42d0e13b396766bea3bfd4659d698eef5` завершена 24.11 около 01:23,
 окно освобождено. Все три узла: source696/package126/top61, один Linux wheel,
