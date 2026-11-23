@@ -37,10 +37,15 @@
 (однократный снимок этапа и стека при reducer expiry, без изменения срока допуска);
 [AUDIO-TRACE-01 #24](https://github.com/notanonenough/reachy-companion/pull/24)
 (явно включаемая private trace одного production сеанса; default-off).
-На Mac/Hub/Ричи установлен точный кандидат
-`3a0f076bac3575ccc6504e8bd320ad5a50554b7f`: один архив 668 файлов, одинаковый
-пакет, imports и identity 59 модулей проверены; пять sensor readers остаются legacy.
-Авторский опыт достиг 175 s без reducer expiry. [Протокол](releases/2026-11-23-3a0f076bac35.md)
+С 23:20 на Mac/Hub/Ричи установлен точный кандидат
+`717a6577a9f7c2b3ff6dd22045761866678b37bc`: один архив 673 файлов, одинаковый
+пакет, actual imports/metadata и canonical identity 60 модулей проверены.
+Runtime8+7+6 byte-equal, пять sensor readers остаются legacy. Backup прежнего3a0
+проверен по hashes; project base services перезапущены, factory/tunnel сохранены.
+Начат один approved 90s trace-опыт; фактический результат пока ожидается.
+
+На прежнем `3a0f076bac3575ccc6504e8bd320ad5a50554b7f` авторский опыт достиг
+175 s без reducer expiry. [Протокол](releases/2026-11-23-3a0f076bac35.md)
 принят через PR #21, reviewed `03f50a5bd73f793197fa759ee9c15f75a778160f`,
 оба CI успешны, merge `ea3cdab4da5561496ed2af5b847abc66456292b1` проверен в main.
 Это невоспроизведение прежнего сбоя, а не доказательство его исправления.
@@ -63,7 +68,7 @@ Mac jobs/ports закрыты, moves пусты, профиль неизмене
 98 независимых проверок, local full 1849/26 skipped PASS, оба Linux CI
 45246690234/45246700289 успешны. Выбран новый кандидат из main
 `717a6577a9f7c2b3ff6dd22045761866678b37bc`, наличие reviewed head проверено.
-Автор устанавливает его и выполняет один диагностический опыт. Диагностика
+Автор завершил установку и выполняет один диагностический опыт. Диагностика
 не является исправлением голоса; выпуск, тег и GitHub Release не приняты.
 История предыдущих отказов: [362](releases/2026-11-23-362002991d9c.md),
 [15b](releases/2026-11-23-15b784eeafd4.md); первичный reducer expiry 15b пока не
@@ -73,7 +78,7 @@ Mac jobs/ports закрыты, moves пусты, профиль неизмене
 
 | Карточка | Статус, владелец и ревьюер | Следующий шаг и контакт |
 |---|---|---|
-| [RELEASE-01, Issue #9](https://github.com/notanonenough/reachy-companion/issues/9) | Единственный hardware owner и автор `/root/implementer`; независимый reviewer `/root/reviewer` читает локальные evidence | Exact rollout `717a6577a9f7c2b3ff6dd22045761866678b37bc` с backup3a0, imports/identity60 и прежними configs. Один approved 90s trace-опыт, отдельное trace window150s; bound stop/known Hub PID exit, device/Mac shutdown и terminal checks. Окно 23:18–23:40, контроль 23:25 Asia/Baku. Без autoretry/recovery по умолчанию. |
+| [RELEASE-01, Issue #9](https://github.com/notanonenough/reachy-companion/issues/9) | Единственный hardware owner и автор `/root/implementer`; независимый reviewer `/root/reviewer` читает локальные evidence | Exact717 установлен и проверен; идёт один approved 90s trace-опыт с отдельным trace window150s. Затем bound stop/known Hub PID exit, device/Mac shutdown и terminal checks; приватный causal разбор. Окно 23:18–23:40, контроль 23:25 Asia/Baku. Без autoretry/recovery по умолчанию. |
 
 AUDIO-TRACE-01 #22 закрыта после PR #24; remote branch удалена, автор
 `/root/ci_implementer` ожидает конкретный causal результат для следующей offline
@@ -100,7 +105,7 @@ Read-only инвентаризация закончена; прежнее окн
 После явного «продолжай» прежние исполнитель и reviewer продолжили работу.
 Сверены origin/main, открытая Issue #9 и отсутствие открытых PR после принятия
 #21; затем создана #22 и автор фактически начал работу от fresh main.
-Mac production checkout и оба Linux узла — exact `3a0f076`.
+Mac production checkout и оба Linux узла — exact `717a6577a`.
 Reviewer освободил стенд в 22:49 после независимого опыта; в 23:18 ведущий
 передал его одному автору #9 для нового точного кандидата. Reviewer и второй
 автор работают offline; повторных назначений нет.
