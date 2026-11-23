@@ -24,7 +24,7 @@
 
 | Карточка | Статус, владелец и ревьюер | Следующий шаг и контакт |
 |---|---|---|
-| [CHAR-01](#char-01-личность-меняет-только-владелец) | В работе ([Issue #1](https://github.com/notanonenough/reachy-companion/issues/1)); автор — `/root/implementer`, независимый ревьюер — `/root/reviewer` | Исполнитель готовит код и воспроизводимую проверку; следующий контакт 23.11.2026 в 20:55 Asia/Baku или раньше по готовности/препятствию. |
+| [CHAR-01](#char-01-личность-меняет-только-владелец) | В работе ([Issue #1](https://github.com/notanonenough/reachy-companion/issues/1)); автор — `/root/implementer`, независимый ревьюер — `/root/reviewer` | Исполнитель готовит код и воспроизводимую проверку; следующий контакт 23.11.2026 в 21:00 Asia/Baku или раньше по готовности/препятствию. |
 
 Ведущий работает в `reachy-development-map`, исполнитель — в `reachy-audit-map`,
 ревьюер — в `/tmp/reachy-review-map`; рабочие ветки короткоживущие `codex/*`.
@@ -33,12 +33,13 @@
 
 ## Ближайшая очередь и препятствия
 
-1. **CHAR-01, назначена после принятой MAP-01.** Запретить изменение личности и принципов
-   результатом модели/фонового обновления; дать владельцу явную офлайн-правку
-   через существующий production CLI. Основание §35; контракт согласован
+1. **CHAR-01, в работе; контракт уточнён владельцем.** Модель может предложить
+   изменение personality/principles через отдельный черновик и настоящий GitHub PR
+   без обязательного авто-ревьюера. Профиль меняется только после ручного принятия
+   владельцем и явного применения; прямое фоновое применение запрещено. Основание §35; контракт согласован
    ведущим и техлидом до реализации. Владелец — `/root/implementer`,
    ревьюер — `/root/reviewer`.
-2. **CONTRACT-01, подготовка контракта.** Описать общий конверт наблюдений,
+2. **[CONTRACT-01, Issue #2](https://github.com/notanonenough/reachy-companion/issues/2), готова в очереди.** Описать общий конверт наблюдений,
    каталог возможностей и результаты шести модулей (§7–10,15–16,19–22).
    До реализации обеих сторон техлид проверяет совместимость, недоступность
    источника, отзыв допуска и обратную связь. Транспорт пока не выбирать.
@@ -89,9 +90,18 @@ GitHub-доступ восстановлен и проверен 23.11.2026 в 2
 - Один автор: `/root/implementer`; независимый ревьюер: `/root/reviewer`.
 - База: `a6826c78962df441c9e2333d00e941718074175c`; ветка `codex/owner-character`,
   рабочая копия `reachy-audit-map`. Проверки офлайн, без занятия стенда.
-- Следующий шаг автора: воспроизводимое изменение и PR в main с `Closes #1`.
-  Затем ревьюер проверяет актуальный SHA, ведущий — совместимость со свежей main
-  и приёмку. Контрольная точка 23.11.2026 в 20:55 Asia/Baku.
+- Реальный [PR #3](https://github.com/notanonenough/reachy-companion/pull/3) открыт;
+  исходный head `6251f048` прошёл 126 целевых тестов, но не принят: владелец
+  уточнил контракт до приёмки. Модель вправе предложить профиль; обязательного
+  модельного reviewer для persona PR нет. Черновик, GitHub PR, ручное принятие
+  и явное применение — разные шаги. В публичный PR не отправляются текущий
+  профиль, память и состояние сеанса. Детали и сценарии — только в Issue #1.
+- Следующий шаг автора: расширить существующий PR по уточнению и передать новый
+  SHA. Независимое ревью кода сохраняется; ведущий persona PR автоматически не
+  сливает. Контрольная точка 23.11.2026 в 21:00 Asia/Baku.
+- Разрешение владельца на существенный рефакторинг передано исполнителю и ревьюеру;
+  размер diff не требует отдельного согласования. Корневой AGENTS обновляет
+  исходный чат; требования задачи и проверка штатных путей остаются обязательными.
 
 ## Как читать привязку решений
 
@@ -148,7 +158,7 @@ GitHub-доступ восстановлен и проверен 23.11.2026 в 2
 | 32 | П | [brains.py:answer](../src/reachy_companion/brains.py) openclaw/hermes; [autonomous/workflows.py:WorkflowClient](../src/reachy_companion/autonomous/workflows.py); [deploy/workflows/](../deploy/workflows); config `workflows.enabled=false` | Текстовые адаптеры и synthetic workflows есть, живые integrations не включены/не подтверждены. Блокирующий полный ответ. | 24,30,34 | Offline trace одинаковый для агентов/обычной модели, identity/cancel/capability; первый полезный workflow определить отдельно. |
 | 33 | Т | [autonomous/durable.py:DurableStore.append,Delivery](../src/reachy_companion/autonomous/durable.py); [autonomous/services.py:log,advance](../src/reachy_companion/autonomous/services.py); [tests/test_production_cycle.py](../tests/test_production_cycle.py); [tests/test_s3_delivery_connection.py](../tests/test_s3_delivery_connection.py) | Durable SQLite outbox/retry/batching существует, но append намеренно оставляет только metadata; write синхронный в цикле. Нет полного тестового audio/video/model архива с bounded producer queue. | 3,17,24 | Offline/slow S3, restart/idempotence, completeness+redaction, disk cap gap markers, сравнить latency export on/off. |
 | 34 | Исследование завершено; перенос Г | [docs/REACHY-ECOSYSTEM-RESEARCH.md](REACHY-ECOSYSTEM-RESEARCH.md); [emotion_library.py](../src/reachy_companion/emotion_library.py); [assets/pollen-emotions-v1.json](../src/reachy_companion/assets/pollen-emotions-v1.json); [speech_clock.py](../src/reachy_companion/speech_clock.py); [autonomous/stock_motion_adapter.py](../src/reachy_companion/autonomous/stock_motion_adapter.py) | Есть закреплённые emotion assets и часть timing; не единая локальная композиция primary/idle/gaze/speech. Совместимость новых apps не равна совместимости 1.2.11. | 11,12,14,29,33 | Начать с одного executor/generations; три жеста из ненулевой позы без sidecar sound, consumed PCM sync, отмена; версия/license каждого донора. |
-| 35 | Т; частота/хранилище Г; reflection П | [autonomous/runtime.py:Scheduler.advance](../src/reachy_companion/autonomous/runtime.py); [autonomous/state.py:snapshot](../src/reachy_companion/autonomous/state.py); [autonomous/services.py:update,advance](../src/reachy_companion/autonomous/services.py); [autonomous/durable.py](../src/reachy_companion/autonomous/durable.py); [tests/test_production_cycle.py](../tests/test_production_cycle.py) | Тишина, TTL, goal CAS, background IO и overload уже есть. Fast/main ещё две модели. **Прямой конфликт на исходной базе:** periodic character maintenance и model update могут менять personality/principles без запроса владельца. | 23,30,31,36; запрет auto-character независим | Программно доказать регулярную итерацию в тишине/stale context/разные goals; запретить model/background character mutation, оставить явный owner update; device acceptance отдельная. |
+| 35 | Т; частота/хранилище Г; reflection П | [autonomous/runtime.py:Scheduler.advance](../src/reachy_companion/autonomous/runtime.py); [autonomous/state.py:snapshot](../src/reachy_companion/autonomous/state.py); [autonomous/services.py:update,advance](../src/reachy_companion/autonomous/services.py); [autonomous/durable.py](../src/reachy_companion/autonomous/durable.py); [tests/test_production_cycle.py](../tests/test_production_cycle.py) | Тишина, TTL, goal CAS, background IO и overload уже есть. Fast/main ещё две модели. **Конфликт исходной базы:** модель может напрямую менять профиль. CHAR-01 закрывает прямое применение, но по уточнению владельца разрешает отдельные предложения через PR без auto reviewer; принятие и применение остаются явными действиями владельца. | 23,30,31,36; запрет auto-character независим | Программно доказать регулярную итерацию в тишине/stale context/разные goals; запретить прямую model/background character mutation; проверить отдельный proposal→PR→owner acceptance→apply и owner update; device acceptance отдельная. |
 | 36 | Т редактируемой памяти; recognition П/Г | [autonomous/memory.py:MemoryStore.commit,recall](../src/reachy_companion/autonomous/memory.py); [autonomous/context.py:ContextProvider](../src/reachy_companion/autonomous/context.py); [autonomous/durable.py](../src/reachy_companion/autonomous/durable.py) memory string; [tests/test_memory_context.py](../tests/test_memory_context.py) | Provenance/CAS/forget для записей есть отдельно от character summary. Готового знакомства/связывания лица/голоса с записью нет. | 9,28,30,35 | Owner confirmation→recall→correction/delete; спорное сходство не перезаписывает личность, слова не приписываются присутствующему автоматически. |
 | 37 | Действующее разрешение | [docs/REVIEW-NOTES.md](REVIEW-NOTES.md) §37; [scripts/factory_ssh.py](../scripts/factory_ssh.py); [scripts/production-control](../scripts/production-control); [deploy/current/release.py](../deploy/current/release.py); [deploy/autonomous/robot_inventory.py](../deploy/autonomous/robot_inventory.py) | Доступ разрешён владельцем; аудит не проверял connectivity и запущенный SHA. | Координация ведущего | Перед каждым опытом узел/версия/занятость; не повторное согласование разрешённого опыта. |
 | 38 | Действующий процесс | [AGENTS.md](../AGENTS.md); [docs/REVIEW-NOTES.md](REVIEW-NOTES.md) §38; git baseline | MAP-01 принята в origin/main, роли и CHAR-01 назначены; процесс каждого следующего изменения проверяется отдельно. | MAP-01, reviewer | По каждому diff base/head/checks/reviewer verdict, свежий main; только ведущий merge и карта, автор исправляет замечания. |
