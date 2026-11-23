@@ -48,7 +48,10 @@
 Свежий видимый кадр и движение с measured feedback подтверждены. Hub/device
 accepted=true, Hub cleanup_verified=true; mic/camera off, production PIDs и
 Mac jobs/ports закрыты, moves пусты, профиль неизменен. В 22:49 reviewer явно
-освободил стенд; новых запусков нет. Протокол независимого опыта готовит автор.
+освободил стенд; новых запусков нет. [Протокол независимого опыта](releases/2026-11-23-3a0f076bac35-independent.md)
+принят через PR #23: exact reviewed `18c00c5ed9f57db71384a0f7395ac2917a600cf5`,
+оба CI 45242772245/45242813299 успешны, merge
+`d739e1598f5142a88584d2632a335c7a6416aa51` подтверждён в origin/main.
 
 Акустическая приёмка остаётся открытой: владелец услышал из Ричи с большой
 задержкой неверный ответ на контрольный вопрос 2+2. Raw STT/model text в
@@ -64,7 +67,7 @@ Mac jobs/ports закрыты, moves пусты, профиль неизмене
 
 | Карточка | Статус, владелец и ревьюер | Следующий шаг и контакт |
 |---|---|---|
-| [RELEASE-01, Issue #9](https://github.com/notanonenough/reachy-companion/issues/9) | Автор `/root/implementer` пишет протокол независимого 90 s опыта; reviewer `/root/reviewer` | Protocol PR offline к 23:00 Asia/Baku. Стенд освобождён в 22:49; новый старт только после выбора кандидата и отдельного окна. |
+| [RELEASE-01, Issue #9](https://github.com/notanonenough/reachy-companion/issues/9) | PR #23 принят; автор `/root/implementer` готовит следующий harness offline, reviewer `/root/reviewer` | Согласованный lifecycle одного explicit `production_start.py hub` с trace после принятия #22: прежние Mac/device services, tracked foreground Hub PID, bound HTTP stop и verified exit до shutdown. Контроль 23:00 Asia/Baku. Стенд освобождён в 22:49; новый старт только после выбора кандидата и отдельного окна. |
 | [AUDIO-TRACE-01, Issue #22](https://github.com/notanonenough/reachy-companion/issues/22) | Автор `/root/ci_implementer`, независимый reviewer `/root/reviewer`; контракт согласован до старта | Default-off private trace real STT→admission→model→TTS с lineage/временами, без IO в reducer и без публикации текста. Код/проверка через PR; контроль 23:00 Asia/Baku. Hardware не используется. |
 
 Прежняя предпосылка sleep→disabled оказалась неверна: Hub sleep выполняет
