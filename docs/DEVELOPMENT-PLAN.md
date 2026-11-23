@@ -57,8 +57,8 @@ STT-end→first-TTS-PCM11.209s по Hub clock; main client interval7.650s не �
 
 | Карточка | Статус, владелец и ревьюер | Следующий шаг и контакт |
 |---|---|---|
-| [PERF-01, Issue #30](https://github.com/notanonenough/reachy-companion/issues/30) | Новый приоритет владельца; автор `/root/implementer`, независимый reviewer `/root/reviewer`; контракт согласован до назначения | Offline evidence table по motion start/duration и voice chain, воспроизведение управляемой задержки, затем связный fix через normal entrypoint и PR. Fresh `reachy-performance` / `codex/response-performance`; контроль **24.11 00:40 Asia/Baku**, раньше bottleneck/fix boundary. Модели/архитектура/guards/TTL/физические limits пока прежние; hardware не запускается. |
-| [BASELINE-02, Issue #26](https://github.com/notanonenough/reachy-companion/issues/26) | Подготовка PR #27 и зависимость OBSERVE-01 PR #29 приняты. Владелец `/root/ci_implementer`, reviewer `/root/reviewer`; карточка открыта | Первая реплика досрочно остановлена: Mac acquisition_failed, полноценного baseline нет. Штатный cleanup завершён, окно освобождено **24.11 00:22:24**. Автор сохраняет протокол/manifest и воспроизводит причину offline; reviewer независимо проверяет terminal/evidence. Никаких новых starts или probes. Контроль **00:35**, раньше причина/PR. |
+| [PERF-01, Issue #30](https://github.com/notanonenough/reachy-companion/issues/30) | На независимом ревью [PR #32](https://github.com/notanonenough/reachy-companion/pull/32), exact `7d8d7a20cdde4c8b7d31df510c09c8fdd754b3b2`; автор `/root/implementer`, reviewer `/root/reviewer` | Controlled production probe: event→fast .98s→0; bounded coalesced wake через прежний single fast Job/State.apply. Survey5°/4° duration .8→.35 по прежней формуле/validator, following прежний. Targeted/build PASS, exact full/CI и formal review ожидаются. Автор готовит offline deployment/trial plan; hardware не используется. Контроль **24.11 00:40 Asia/Baku**, раньше review/CI/препятствие. Карточка включает будущую physical acceptance и пока не закрывается. |
+| [BASELINE-02, Issue #26](https://github.com/notanonenough/reachy-companion/issues/26) | Протокол прерванной реплики принят через PR #31; владелец `/root/ci_implementer`, reviewer `/root/reviewer`; baseline неполон, карточка открыта и ожидает зависимость | Штатный cleanup независимо подтверждён, окно освобождено **24.11 00:22:24**. Полный resource baseline ждёт отложенной OBSERVE-02; по новому указанию владельца приоритет #30. Автор #26 завершил текущий шаг, новых starts/probes/observer edits нет. Следующая сверка зависимости с ведущим при контроле #30 **00:40**. |
 
 PR #27 принят: exact reviewed `a5a296061a51cf45dd5a8af42493bb45133bea40`,
 30 независимых целевых/negative/parity checks; local full1866/26 skipped PASS,
@@ -97,12 +97,19 @@ readiness: actual worker coverage и новая motion-envelope certification н
 → адресный SIGINT supervisor00:22:17 → authSTOP00:22:19, known Hub exit0,
 terminal00:22:24. По авторским receipts Hub elapsed34.074s accepted/cleanup true,
 busy false, no first invalid/expiry; trace36records complete; Hub/robot observers
-32ticks complete, Mac acquisition failed. Независимая проверка этих результатов
-идёт; это неполный baseline и основание прекратить серию, не новый выпуск.
+32ticks complete, Mac acquisition failed. Независимая проверка результатов завершена; это неполный baseline и основание прекратить серию, не новый выпуск.
 Evidence `~/reachy-release-backups/20261124-baseline02-replica-001`,
 own-supervisor receipts `20261124-baseline02-runner-001`. Точный исторический exception/count Mac не сохранён. Offline воспроизведена
 несовместимость healthy topology: шесть logger+worker пар дают≥12 targets при cap8;
 это конкретный defect, но не доказательство первого exception в том опыте.
+
+[Протокол replica001](releases/2026-11-24-baseline02-replica-001.md) принят через
+PR #31: exact `8907e639f134f1ff452f50a52a1b9a90ea2e569e`,
+independent APPROVED6029004224; CI45259964117/45259978521 SUCCESS,
+merge `66af447fda03c530a70b318c71c26c17c80126db` подтверждён в origin/main.
+Remote branch удалена; #26 остаётся OPEN. Final private replica manifest
+`e4c2ead91259583011e4b1b654699483c0491fafbc1e4669909532dc09163f21`.
+Пригодные paired voice/motion intervals переданы #30; raw evidence не публикуется.
 
 Принятый observer snapshot v3 сохранён в
 `~/reachy-release-backups/20261124-observer-harness-review-v3`; все10 файлов и
