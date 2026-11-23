@@ -57,7 +57,7 @@ STT-end→first-TTS-PCM11.209s по Hub clock; main client interval7.650s не �
 
 | Карточка | Статус, владелец и ревьюер | Следующий шаг и контакт |
 |---|---|---|
-| [PERF-01, Issue #30](https://github.com/notanonenough/reachy-companion/issues/30) | Software PR #32 принят; выбран candidate `fc55460668816122f1a2062e499f77a943965078`. Автор `/root/implementer`, reviewer `/root/reviewer`; physical acceptance открыта | Установка независимо принята, окно освобождено00:48. Единственный owner `/root/implementer`, **один90s опыт24.11 00:51–01:05 Asia/Baku**, checkpoint **01:00**. Original44ee0 harness/штатные camera+speech+motion, без observerv3; fresh preflight, exact helper/own-PID abort delta review доstart, затем один start. Failure→штатный cleanup, безповтора/автоматической pose recovery. Reviewer проверит evidence после освобождения. |
+| [PERF-01, Issue #30](https://github.com/notanonenough/reachy-companion/issues/30) | Software PR #32 принят; выбран candidate `fc55460668816122f1a2062e499f77a943965078`. Автор `/root/implementer`, reviewer `/root/reviewer`; physical acceptance открыта | 90s опыт завершён с gate failure `motion_stop_unknown`: accepted/cleanup false, физическая приёмка не засчитана. Owner `/root/implementer` завершает только bounded terminal/pose read-only checks в прежнем окне до01:05, затем offline audit; reviewer проверяет локальные receipts. Новых starts/motions/recovery нет. Контроль **01:00**, раньше terminal/cause; #30 остаётся открыта. |
 | [MODEL-TIMING-01, Issue #35](https://github.com/notanonenough/reachy-companion/issues/35) | Принят аудит #33/PR #34; автор `/root/ci_implementer`, независимый reviewer `/root/reviewer` | Same-call числовые этапы tokenize/completion/validation, exact usage и typed reported native fields через existing bounded trace. Никаких новых inference/RPC/streaming/model/settings/outcome changes; только offline code/tests. Fresh `reachy-model-timing` / `codex/model-stage-timing`; контроль **24.11 01:10 Asia/Baku**, раньше contract/PR/препятствие. Hardware #30 не затрагивается. |
 | [BASELINE-02, Issue #26](https://github.com/notanonenough/reachy-companion/issues/26) | Протокол прерванной реплики принят через PR #31; владелец `/root/ci_implementer`, reviewer `/root/reviewer`; baseline неполон, карточка открыта и ожидает зависимость | Штатный cleanup независимо подтверждён, окно освобождено **24.11 00:22:24**. Полный resource baseline ждёт отложенной OBSERVE-02; по новому указанию владельца приоритет #30. Автор #26 завершил текущий шаг, новых starts/probes/observer edits нет. Следующая сверка зависимости с ведущим при контроле #30 **01:00**. |
 
@@ -91,6 +91,17 @@ Reviewer сверил все688archive/124wheel/60module/config/terminal receipt
 Generated untracked Mac egg-info обратимо перенесён в verified backup; canonical
 metadata/.pth/modules сохранены, singlemetadata/import подтверждены. Это установка,
 не physical acceptance. Условия TV/расположения пока не подтверждены владельцем.
+
+PERF trial001: launch00:52:31, ACTIVE00:52:50.619, stimulus00:52:58.654–00:53:02.968.
+90s bound STOP00:54:21.761, known Hub47055 exitrc2 at00:54:22.793,
+shutdown00:54:24.565/cameraoff00:54:25.226. По авторским receipts trace65records
+complete/drop0, no first invalid/expiry, runtime jobs false/handlers0/listener
+closed/peerstop known; accepted=false/cleanup=false из-за motion_stop_unknown.
+Independent final показывает0moves/miccameraoff/PIDs0/Macjobs0/portsclosed;
+это не заменяет отсутствующее stop confirmation. Физическая приёмка не выполнена,
+повтора нет. Reviewer ведёт local audit, автор добирает bounded terminal evidence
+в исходном окне и затем устанавливает причину offline.
+Evidence `~/reachy-release-backups/20261124-fc5546066881/performance-trial-001`.
 
 Принятый private rollout snapshot:
 `~/reachy-release-backups/20261124-performance-offline-prep`,
