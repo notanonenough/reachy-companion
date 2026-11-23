@@ -6,7 +6,7 @@ import time
 from types import SimpleNamespace as NS
 import unittest
 from unittest.mock import patch
-from reachy_companion.private_audio_trace import PrivateAudioTrace,main_call
+from reachy_companion.private_audio_trace import PrivateAudioTrace,main_call,project
 from reachy_companion.autonomous.contracts import Authority
 
 
@@ -17,6 +17,12 @@ class PrivateTraceTests(unittest.TestCase):
     def trace(self,**kw):
         trace=PrivateAudioTrace(self.path,seconds=kw.pop('seconds',30),**kw)
         self.addCleanup(trace.close);trace.start(threading.Event());return trace
+    def test_typed_large_source_sequence_and_authority_are_preserved_exactly(self):
+        maximum=2**63-1
+        value=project(dict(sequence=maximum,authority={'microphone_epoch':maximum},audio_s=float('nan')))
+        self.assertEqual(value['sequence'],maximum);self.assertEqual(value['authority']['microphone_epoch'],maximum)
+        self.assertIsNone(value['audio_s']);self.assertIsNone(project(dict(sequence=2**100))['sequence'])
+
     def test_private_immutable_records_and_stop_privacy_redaction(self):
         trace=self.trace();authority={'hub_boot_id':'hub','secret':'PRIVATE-SECRET'}
         trace.emit('stt_result',text='known raw result',authority=authority,token='PRIVATE-TOKEN')

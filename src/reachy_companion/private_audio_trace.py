@@ -27,9 +27,8 @@ FINAL=('kind','role','backend','model_id_sha256','request_sha256','output_sha256
 def scalar(value):
     if value is None or type(value) is bool:return value
     if type(value) is str:return value if len(value)<=256 else None
-    if type(value) in (int,float):
-        try:return value if math.isfinite(value) and abs(value)<=1e15 else None
-        except OverflowError:return None
+    if type(value) is int:return value if -(2**63)<=value<2**63 else None
+    if type(value) is float:return value if math.isfinite(value) and abs(value)<=1e15 else None
     return None
 
 
