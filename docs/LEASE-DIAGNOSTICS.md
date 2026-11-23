@@ -50,3 +50,58 @@ PYTHONPATH=src:tests .venv-review/bin/python -m unittest test_companion_session 
 Scheduler/SpeechAdapter/AudioPolling. Standalone remote probe проверяется в
 локальном subprocess без SSH. Эта карточка добавляет диагностику; причину
 предыдущего аппаратного завершения и исправленный hardware E2E она не доказывает.
+
+## Первый reducer expiry
+
+`first_reducer_expiry` отвечает на более узкий вопрос: какой этап и Python-стек
+reducer наблюдались при первом закрытии с `reducer_expired`. `run_session`
+регистрирует собственный thread ident только внутри процесса. На границах
+startup/status control, speech advance, Scheduler.advance, peer polling,
+playback control, lease gate, publication, ожидания и cleanup он присваивает
+immutable пару `(stage, entered_monotonic)`. Метка не является progress tick,
+не обновляет authority или deadline и не принимает решений о продлении.
+
+`PeerLease` сначала выполняет прежние присваивания withdrawal reason,
+first_close и closed. Только при первичном `reducer_expired` он один раз
+снимает диагностику. Существующий lease lock уже удерживается; sampler не
+берёт новых или reducer locks, не вызывает IO и не ждёт завершения reducer.
+`sys._current_frames()` выбирает только зарегистрированный поток; обход
+`f_back` ограничен 16 кадрами. Ссылки на frames сразу освобождаются. Locals,
+globals, аргументы, source lines и абсолютные пути не читаются и не выводятся.
+Модули внутри локального package превращаются в относительные dotted names,
+остальные кадры — `external`. Function — ограниченное имя доверенного code
+object; это метаданные установленного кода, не пользовательский текст.
+
+Запись содержит fixed-enum stage, `stage_age_ms`, `progress_age_ms` из прежнего
+first_close, `capture_delay_ms` от локальной отметки сразу после closed,
+`trigger=worker|tick`, `capture_status=captured|thread_missing|unregistered|capture_failed`,
+`stage_changed_during_capture`, `stack_truncated` и максимум 16 записей
+`{module,function,line}`. Numeric bounds совпадают с остальной диагностикой;
+module ≤160, function ≤96, line — integer 1..1,000,000 либо null. Проекция
+занимает менее 8192 байт JSON. Она хранится immutable JSON и выдаётся свежими
+копиями в lease status, live/STOPPED publish, final report, краткий log и
+standalone `production_status` probe / last_session. Capture failure не
+отменяет latch, не запускает повтор и не подменяет withdrawal reason.
+При valid progress, initial unarmed и других первых причинах поле равно null.
+
+Это **stack at detection**, не доказательство причины stall. `worker` может
+наблюдать ещё удерживаемый reducer; `tick` обнаруживает expiry уже после его
+возвращения и обычно показывает lease gate. Stage и stack не атомарный снимок:
+flag отмечает смену tuple во время capture, но false не доказывает отсутствие
+движения внутри этапа. Поток может исчезнуть, а внешние/C frames не объясняются
+этим снимком. По одному снимку нельзя приписывать задержку SQLite, сети, модели,
+CPU или OS. Порог 200 ms, validity checks, renewal/close и reconnect не изменены.
+
+```sh
+PYTHONPATH=src:tests .venv-review/bin/python -m unittest test_reducer_diagnostics -v
+```
+
+Основной тест запускает настоящий run_session, Scheduler, loopback HTTP и
+независимый PeerLease worker. Event удерживает reducer в scheduler_advance;
+worker синхронизируется между ACK и следующей итерацией и возобновляется после
+истечения реального неизменного бюджета. Поэтому проверяется именно worker
+expiry, а не случайный late ACK. Reducer всё ещё удержан, когда worker закрывает
+lease и сохраняет стек. Отдельно проверяются tick detection, остальные reasons,
+capture failure/missing thread, неизменность первой записи и privacy/size bounds.
+Это управляемый scheduling probe, а не измерение аппаратной нагрузки. Следующий
+аппаратный опыт и выбор установленного candidate принадлежат RELEASE-01.
