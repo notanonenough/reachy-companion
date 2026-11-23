@@ -50,8 +50,8 @@ verified cleanup пока не приняты. Следующий запуск �
 
 | Карточка | Статус, владелец и ревьюер | Следующий шаг и контакт |
 |---|---|---|
-| [RELEASE-01, Issue #9](https://github.com/notanonenough/reachy-companion/issues/9) | Опыт 15b завершён, стенд остановлен; автор — `/root/implementer`, reviewer — `/root/reviewer` | [Протокол 15b](releases/2026-11-23-15b784eeafd4.md) и еженедельный порядок приняты через PR #19. Ожидает #18; cleanup triage выполнен без продуктовых правок. Резервирование до 22:35, новых запусков нет. Контроль 22:30 Asia/Baku. |
-| [REDUCER-01, Issue #18](https://github.com/notanonenough/reachy-companion/issues/18) | PR #20 на review/CI; автор — `/root/ci_implementer`, независимый reviewer — `/root/reviewer` | Exact `7690e730`: однократный stage/stack, worker/tick различены, прежний latch/200ms guard без изменений. Reviewer воспроизводит ключевой путь; полный CI ожидается. Контроль 22:30 Asia/Baku. |
+| [RELEASE-01, Issue #9](https://github.com/notanonenough/reachy-companion/issues/9) | Опыт 15b завершён, стенд остановлен; автор — `/root/implementer`, reviewer — `/root/reviewer` | [Протокол 15b](releases/2026-11-23-15b784eeafd4.md) и еженедельный порядок приняты через PR #19. Ожидает #18; cleanup triage выполнен без продуктовых правок. Резервирование до 22:35, новых запусков нет. Контроль 22:35 Asia/Baku. |
+| [REDUCER-01, Issue #18](https://github.com/notanonenough/reachy-companion/issues/18) | PR #20: core одобрен, test-only delta на review/CI; автор — `/root/ci_implementer`, reviewer — `/root/reviewer` | Exact `3ff1ecc3`: исправлен воспроизведённый на базе/новом коде UDP ACK test race; один управляемый in-flight ACK и отдельное success equality. Runtime/200 ms guard неизменны. Контроль 22:35 Asia/Baku. |
 
 Ведущий работает в `reachy-development-map`, исполнитель — в `reachy-audit-map`,
 ревьюер — в `/tmp/reachy-review-map`; рабочие ветки короткоживущие `codex/*`.
