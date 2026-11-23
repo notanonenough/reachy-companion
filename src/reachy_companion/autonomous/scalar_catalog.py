@@ -21,9 +21,13 @@ SUPPORTED = {'metric.scalar': {'major': 1, 'max_minor': 0}}
 
 @lru_cache(maxsize=3)
 def validator(kind):
-    from jsonschema import Draft202012Validator
+    from jsonschema import Draft202012Validator, validators
     schema = decode((Path(__file__).parents[1]/'assets/scalar-catalog.json').read_text())
-    return Draft202012Validator({**schema, '$ref': '#/$defs/'+kind})
+    # JSON Schema calls 499.0 an integer; State and sequence guards require a
+    # Python int. Use the actual consumer type throughout every nested field.
+    strict = validators.extend(Draft202012Validator, type_checker=
+        Draft202012Validator.TYPE_CHECKER.redefine('integer', lambda _, value: type(value) is int))
+    return strict({**schema, '$ref': '#/$defs/'+kind})
 
 
 def checked(kind, value):
@@ -219,7 +223,12 @@ class ScalarRegistry:
 
     def commit(self, candidate, scheduler, now):
         events, ids, boot, generation, fingerprint, sequences = candidate
-        for name in self.ids-ids:scheduler.ingest(dict(type='sensor_remove', id=name), now)
+        removed = self.ids-ids
+        # Reserve cleanup ownership before the first ingest. If any consumer
+        # unexpectedly fails, Services.withdraw removes the entire union,
+        # including new IDs that have not reached the successful commit yet.
+        self.ids |= ids
+        for name in removed:scheduler.ingest(dict(type='sensor_remove', id=name), now)
         for event in events:scheduler.ingest(event, now)
         if self.boot is not None and self.boot != boot:self.retired_boots.add(self.boot)
         self.ids, self.boot, self.generation = ids, boot, generation

@@ -135,6 +135,33 @@ class ScalarProductionTests(unittest.TestCase):
             return value
         self.fail_next(mutate)
         self.assertFalse(any(k.startswith('scalar:') for k in self.scheduler.state.sensors))
+    def test_integral_float_in_second_descriptor_never_partially_commits(self):
+        self.source.caps.append(dict(descriptor('room.humidity'),ttl_ms=499.0))
+        self.fail_next(lambda value:value)
+        self.assertEqual(self.service.scalar_catalogs['weather'].ids,set())
+        self.assertFalse(any(s.get('scalar') for s in self.scheduler.state.snapshot(time.monotonic())['sensors']))
+    def test_unexpected_second_ingest_failure_withdraws_all_new_ids(self):
+        from unittest.mock import patch
+        self.source.caps.append(descriptor('room.humidity'))
+        original=self.scheduler.ingest
+        def fail_second(event,now=None):
+            if event['type']=='sensor' and event['id']==runtime_id('weather','room.humidity'):
+                raise ValueError('Synthetic consumer failure')
+            return original(event,now)
+        with patch.object(self.scheduler,'ingest',fail_second):self.fail_next(lambda value:value)
+        self.assertFalse(any(k.startswith('scalar:') for k in self.scheduler.state.sensors))
+    def test_scalar_decimal_ttl_deadline_equality_is_stale(self):
+        self.ready()
+        for ttl_ms in (100,1):
+            with self.subTest(ttl_ms=ttl_ms):
+                self.service.sensors['weather'][0].settings['policy_ttl_ms']=ttl_ms
+                self.service.next_poll['weather']=0
+                self.pump(lambda:self.scheduler.state.sensors[self.identity].ttl==ttl_ms/1000)
+                sensor=self.scheduler.state.sensors[self.identity]
+                boundary=sensor.captured+sensor.ttl
+                self.assertEqual(sensor.view(boundary-.0000001,False)['state'],'ready')
+                item=next(s for s in self.scheduler.state.snapshot(boundary)['sensors'] if s['id']==self.identity)
+                self.assertEqual(item['state'],'stale');self.assertIsNone(item['scalar']['value'])
     def test_duplicate_and_out_of_order_sequence_do_not_restore_ready(self):
         self.ready();sequence=self.source.sequence
         def mutate(value):

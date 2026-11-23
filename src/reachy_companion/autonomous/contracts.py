@@ -81,7 +81,7 @@ class Sensor:
         age = None if self.captured is None else max(0, int((now - self.captured) * 1000))
         state = self.availability
         if state == 'available':
-            fresh = self.captured is not None and (now - self.captured < self.ttl if self.scalar else now - self.captured <= self.ttl)
+            fresh = self.captured is not None and (now < self.captured + self.ttl if self.scalar else now - self.captured <= self.ttl)
             state = 'no_data' if age is None else ('ready' if fresh else 'stale')
         result = dict(id=self.sensor_id, state=state, age_ms=age,
                     summary=self.summary if state == 'ready' else '', source_id=self.source_id, ttl_ms=int(self.ttl*1000),
