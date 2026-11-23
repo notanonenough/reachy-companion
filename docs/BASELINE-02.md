@@ -47,6 +47,10 @@ camera/stimulus. Последующие175s/90s/90s не воспроизвел�
 
 ## Офлайн-команды и форматы
 
+Нужно окружение проекта с Python≥3.11; `python3` ниже обозначает его interpreter,
+а не системный macOS Python3.9. Для локальной проверки использован
+`/Users/notanonenough/workspaces/reachy-companion/.venv-review/bin/python`.
+
 Коллектор только читает локальные файлы; нет запуска процессов, подключения к
 сети, запуска hardware или импортов alternate probes. Стандартный stdout —
 JSON фиксированных полей; paths, raw text, IDs, prompt, digests и profile не
