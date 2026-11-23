@@ -57,9 +57,27 @@ STT-end→first-TTS-PCM11.209s по Hub clock; main client interval7.650s не �
 
 | Карточка | Статус, владелец и ревьюер | Следующий шаг и контакт |
 |---|---|---|
-| [PERF-01, Issue #30](https://github.com/notanonenough/reachy-companion/issues/30) | Software PR #32 принят; выбран candidate `fc55460668816122f1a2062e499f77a943965078`. Автор `/root/implementer`, reviewer `/root/reviewer`; physical acceptance открыта | 90s gate failure `motion_stop_unknown`, физическая приёмка не засчитана; окно освобождено **00:57**. Причина не восстановлена по existing logs. Автор сохраняет протокол и добавляет agreed bounded first stock failure/stop receipt через existing status/final path; reviewer проверяет unchanged control/STOP semantics. Только offline, без clear/retry/timeout/guard changes или новых starts. Контроль **24.11 01:15**, раньше shape/PR/препятствие. |
-| [MODEL-TIMING-01, Issue #35](https://github.com/notanonenough/reachy-companion/issues/35) | Повторное ревью [PR #36](https://github.com/notanonenough/reachy-companion/pull/36), exact `56ccc9d89a1c1e340ec9f53e2d70db24df0bae99`; автор `/root/ci_implementer`, reviewer `/root/reviewer` | Исправлены найденные missing diagnostic containers/late422 receipt и forwarding всех actual gateway/backend wrappers; focused36 PASS. Старый full1912 с4errors не является gate; новый exact full/CI и independent review ожидаются. Same-call stages/usage/reported fields + one-shot metadata-only main_transport при quarantine, no extraRPC/control/outcome changes. Только offline; контроль **24.11 01:10 Asia/Baku**, раньше review/CI/препятствие. |
-| [BASELINE-02, Issue #26](https://github.com/notanonenough/reachy-companion/issues/26) | Протокол прерванной реплики принят через PR #31; владелец `/root/ci_implementer`, reviewer `/root/reviewer`; baseline неполон, карточка открыта и ожидает зависимость | Штатный cleanup независимо подтверждён, окно освобождено **24.11 00:22:24**. Полный resource baseline ждёт отложенной OBSERVE-02; по новому указанию владельца приоритет #30. Автор #26 завершил текущий шаг, новых starts/probes/observer edits нет. Следующая сверка зависимости с ведущим при контроле #30 **01:15**. |
+| [PERF-01, Issue #30](https://github.com/notanonenough/reachy-companion/issues/30) | Installedfc554 остаётся stopped; protocol PR #37 принят, physical gate failed. Автор `/root/implementer`, reviewer `/root/reviewer` | На независимом ревью [PR #38](https://github.com/notanonenough/reachy-companion/pull/38), exact `8e03fbf5423d93ef91da2ba6a0f83b7e263affff` отfreshc995: bounded first stock failure/stop receipt, control semantics прежние.98 targeted/build/package126/canonical61 PASS, exact full/CI ожидаются. Только offline; контроль **24.11 01:25**, раньше review/CI/препятствие. |
+| [MODEL-TIMING-01, Issue #35](https://github.com/notanonenough/reachy-companion/issues/35) | Software PR #36 принят, автор `/root/ci_implementer`, reviewer `/root/reviewer`; карточка открыта для normal-chain evidence | Ожидает accepted diagnostic #30 и отдельный общий quiet hardware window одного владельца. После него автор проверяет same-call model stage/usage/provenance receipts offline. Новых starts/tests/builds в аппаратном окне не выполняет. Контроль вместе с #30 **24.11 01:25**. |
+| [BASELINE-02, Issue #26](https://github.com/notanonenough/reachy-companion/issues/26) | Протокол прерванной реплики принят через PR #31; владелец `/root/ci_implementer`, reviewer `/root/reviewer`; baseline неполон, карточка открыта и ожидает зависимость | Штатный cleanup независимо подтверждён, окно освобождено **24.11 00:22:24**. Полный resource baseline ждёт отложенной OBSERVE-02; по новому указанию владельца приоритет #30. Автор #26 завершил текущий шаг, новых starts/probes/observer edits нет. Следующая сверка зависимости с ведущим при контроле #30 **01:25**. |
+
+PR #36 software принят: exact `56ccc9d89a1c1e340ec9f53e2d70db24df0bae99`,
+[independent APPROVED](https://github.com/notanonenough/reachy-companion/pull/36#pullrequestreview-6029554003),
+local full1915/26 skipped PASS, CI45266022580/45266035147 SUCCESS;
+merge `698d8032af5c1effb6be35905ac8c9526fb62a9b` подтверждён в origin/main,
+remote branch удалена. Actual caller/late422/malformed metadata defects исправлены.
+Новый canonical scope61, полный package identity включает nested modules.
+Аппаратный model-stage receipt ещё не получен; #35 не закрыта.
+
+[Протокол fc554](releases/2026-11-24-fc5546066881-performance.md) принят PR #37:
+exact `4bad6963de9d0206d4001c15f1e2c634a11754b8`, independent APPROVED6029550149,
+CI45266207900/45266242171 SUCCESS; merge
+`c995820a45fd260245731d31e7fa1bda529d23cd` подтверждён в origin/main,
+remote branch удалена. Принята правдивая запись неудачной приёмки, не новый release.
+Дополнительный offline target audit: yaw near≤1° two-samples0/23, pitch17/23,
+body23/23; sampled yaw−target +1.66…+6.20° (median+5.91°).
+Причина (FK/lag/calibration/coordinates) не установлена, offset не меняется.
+Raw audit/extractor остаются private; #30 проверяет точный factory contract offline.
 
 MODEL-LATENCY-01 #33 закрыта после [PR #34](https://github.com/notanonenough/reachy-companion/pull/34):
 exact `72aefec1fe1af65bdf00ec6ebb228c43e9f7a144`,
