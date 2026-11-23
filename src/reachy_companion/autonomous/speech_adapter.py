@@ -2,12 +2,14 @@
 import base64
 import json
 import math
+import hashlib
 import threading
 import time
 from urllib.request import Request,build_opener,ProxyHandler
 from .contracts import decode,Authority
 from .pcm_controls import PcmGain
 from .voice_chain import digest
+from ..private_audio_trace import emit
 
 
 class HttpTTS:
@@ -100,6 +102,8 @@ class SpeechAdapter:
                     or time.monotonic()>=started+.3 or 'error' in result):
                 self.rejected_refreshes+=1;return
             actual=result['actual'];policy=actual['motion_policy']
+            trace=getattr(self,'private_trace',None)
+            if trace is not None and policy.get('privacy_all') is True:trace.disable('privacy')
             binding=(actual['agent_boot_id'],actual['microphone_epoch'],policy['epoch'])
             if (not isinstance(binding[0],str) or not binding[0] or type(binding[1]) is not int or binding[1]<0
                     or type(binding[2]) is not int or binding[2]<0 or actual.get('microphone_state_error')):
@@ -158,6 +162,14 @@ class SpeechAdapter:
             if proposal['authority']!=self.current_authority:raise RuntimeError('Stale speech proposal authority')
             if self.closed or self.pending or self.worker and self.worker.is_alive() or self.cancel_job and self.cancel_job.is_alive():raise RuntimeError('TTS execution busy/closed')
             self.pending=dict(proposal)
+            if getattr(self,'private_trace',None) is not None:
+                main=proposal.get('main_receipt');main=main if type(main) is dict else {}
+                trace=getattr(self,'private_trace',None)
+                linked=trace is not None and trace.audio_link(main.get('input_ref'))
+                emit(self,'speech_commit',text=proposal['text'] if linked else None,request_id=proposal['request_id'],
+                    task_id=main.get('task_id'),attempt_id=main.get('attempt_id'),input_ref=main.get('input_ref'),
+                    authority=proposal['authority'].wire() if isinstance(proposal['authority'],Authority) else None,
+                    final=main.get('final'),deadline=proposal['deadline'],disposition='speech_admitted')
 
     def _execute(self,proposal):
         self.cancelled=threading.Event();cancel=self.cancelled
@@ -165,6 +177,7 @@ class SpeechAdapter:
         def work():
             started=time.monotonic()
             report=dict(request_id=proposal['request_id'],tts_complete=False,tts_frames=0,producer_started_at=started)
+            pcm_digest=hashlib.sha256() if getattr(self,'private_trace',None) is not None else None
             try:
                 report.update(main_receipt=proposal.get('main_receipt'),
                     authority=proposal['authority'].wire() if isinstance(proposal['authority'],Authority) else None,
@@ -180,6 +193,7 @@ class SpeechAdapter:
                     for offset in range(0,len(pcm),size):
                         if not self.playback.push(stream,pcm[offset:offset+size]):raise RuntimeError('Late TTS chunk withdrawn')
                         report['tts_frames']+=len(pcm[offset:offset+size])//2
+                        if pcm_digest is not None:pcm_digest.update(pcm[offset:offset+size])
                 if not cancel.is_set():report['tts_complete']=self.playback.finish(stream)
             except Exception as exc:
                 report['error']=type(exc).__name__
@@ -188,6 +202,12 @@ class SpeechAdapter:
                 report['cancelled']=cancel.is_set()
                 report['producer_elapsed_s']=time.monotonic()-started
                 with self.lock:self.receipts=(self.receipts+[report])[-32:]
+                if getattr(self,'private_trace',None) is not None:
+                    main=proposal.get('main_receipt');main=main if type(main) is dict else {}
+                    emit(self,'speech_terminal',**{key:report.get(key) for key in ('request_id','stream_id','authority','operator_binding',
+                        'output_sha256','deadline','tts_frames','tts_complete','cancelled','producer_started_at','producer_elapsed_s','tts_first_pcm_s')},
+                        task_id=main.get('task_id'),attempt_id=main.get('attempt_id'),input_ref=main.get('input_ref'),
+                        tts_pcm_sha256=pcm_digest.hexdigest() if pcm_digest is not None else None,error_kind=report.get('error'))
         self.worker=threading.Thread(target=work,daemon=True);self.worker.start()
 
     def interrupt(self,reason,preserve=True):

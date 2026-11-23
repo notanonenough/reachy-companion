@@ -7,6 +7,7 @@ from pathlib import Path
 import shlex
 import subprocess
 from urllib.request import Request, urlopen
+from .private_audio_trace import project_summary
 from .lease_diagnostics import project_first_lease_invalid,project_lease_withdrawal_reason,project_first_reducer_expiry
 
 HOSTS = {
@@ -17,7 +18,7 @@ HOSTS = {
 }
 PORTS = {'llm': 18097, 'router': 18098, 'worker': 8082, 'gateway': 8097, 'vlm':18099}
 # Self-contained so a stopped, old or broken installation can still be inspected.
-REMOTE_PROBE = inspect.getsource(project_first_lease_invalid) + inspect.getsource(project_lease_withdrawal_reason) + inspect.getsource(project_first_reducer_expiry) + r'''
+REMOTE_PROBE = inspect.getsource(project_first_lease_invalid) + inspect.getsource(project_lease_withdrawal_reason) + inspect.getsource(project_first_reducer_expiry) + inspect.getsource(project_summary) + r'''
 import json,pathlib,shutil,subprocess,sys,urllib.request
 root=pathlib.Path(sys.argv[1]); role=sys.argv[2]; names=sys.argv[3:]
 def command(args):
@@ -33,6 +34,7 @@ for p in reports[:3]:
  try:
   if p.stat().st_size>8*1024*1024:continue
   d=json.loads(p.read_text());result['last_session']={k:d.get(k) for k in ('reason','failure_code','errors','accepted','cleanup_verified','cleanup_issues','elapsed_s','peer_close_reason','cleanup_error')}
+  result['last_session']['private_audio_trace']=project_summary(d.get('private_audio_trace'))
   result['last_session']['first_reducer_expiry']=project_first_reducer_expiry(d.get('first_reducer_expiry'))
   result['last_session']['first_lease_invalid']=project_first_lease_invalid(d.get('first_lease_invalid'))
   result['last_session']['lease_withdrawal_reason']=project_lease_withdrawal_reason(d.get('lease',{}).get('withdrawal_reason')) if isinstance(d.get('lease'),dict) else None

@@ -9,6 +9,7 @@ import math
 import threading
 import time
 from .contracts import uid
+from ..private_audio_trace import emit
 
 
 class Playback:
@@ -144,6 +145,14 @@ class Playback:
                     submitted_frames=s['queued_frames'],written_frames=s['written'],consumed_frames=s['consumed'],
                     stop_known=known,complete=s['done'] and s['queued_frames']==s['written']==s['consumed'])
                 self.record('speech_stopped',stream_id=s['stream_id'],stop_known=known)
+                if getattr(self,'private_trace',None) is not None:
+                    operation=self.audio_stops.get(s['stream_id']);receipt=operation[1].get('receipt',{}) if operation else {}
+                    streams=getattr(self.backend,'stream_map',None)
+                    emit(self,'playback_stop',**self.terminal,request_id=s['request_id'],
+                        source_boot=getattr(self.backend,'source_boot',None),
+                        device_stream_id=streams.get(s['stream_id']) if type(streams) is dict else None,
+                        stop_consumed_frames=receipt.get('consumed_frames'),
+                        **{key:receipt.get(key) for key in ('verified','verified_stopped','provenance')})
 
     def terminal_receipt(self,stream=None,generation=None):
         """One retained terminal; a finally block is not a returned worker."""
