@@ -55,8 +55,7 @@ STT-end→first-TTS-PCM11.209s по Hub clock; main client interval7.650s не �
 
 | Карточка | Статус, владелец и ревьюер | Следующий шаг и контакт |
 |---|---|---|
-| [BASELINE-02, Issue #26](https://github.com/notanonenough/reachy-companion/issues/26) | Offline подготовка принята через PR #27; владелец `/root/ci_implementer`, reviewer `/root/reviewer`; карточка остаётся открытой | До аппаратных реплик ждёт #28: в717 отсутствовали CPU/RSS/pressure, без observer joint-load baseline неполон. Collector сейчас редактирует только автор #28. После accepted observer/readiness ведущий назначит одно аппаратное окно; до этого hardware не используется. |
-| [OBSERVE-01, Issue #28](https://github.com/notanonenough/reachy-companion/issues/28) | Повторное независимое ревью [PR #29](https://github.com/notanonenough/reachy-companion/pull/29), новый exact `ae581296dc628c2016d2046a98e5d02b37bcbf4c`; автор `/root/implementer`, reviewer `/root/reviewer` | После исправления lifecycle обнаружен Mac runner shadowing, прежнее одобрение отозвано. Новый exact исправляет его и добавляет actual runner paths всех трёх узлов: targeted37 PASS. Reviewer проверяет новый snapshot v3; exact full выполняется в immutable копии, новые CI ожидаются. Hardware не используется, runtime717 неизменён. Контроль **24.11 00:20 Asia/Baku**, раньше review/CI/full/препятствие. |
+| [BASELINE-02, Issue #26](https://github.com/notanonenough/reachy-companion/issues/26) | Подготовка PR #27 и зависимость OBSERVE-01 PR #29 приняты. Владелец `/root/ci_implementer`, reviewer `/root/reviewer`; карточка открыта | Единственное readiness окно **24.11 00:15–00:30 Asia/Baku**, владелец `/root/ci_implementer`: только read-only installed717/config/identity/services/availability и terminal state. Никаких starts, camera/mic/motion или реальных worker probes. Контроль **00:25**, раньше результат/препятствие. Первый 120s опыт будет назначен отдельно после readiness. |
 
 PR #27 принят: exact reviewed `a5a296061a51cf45dd5a8af42493bb45133bea40`,
 30 независимых целевых/negative/parity checks; local full1866/26 skipped PASS,
@@ -65,13 +64,30 @@ CI45252465406/45252477590 SUCCESS. Merge `cab202eb5db52e4e7f9b9678d32f9e3b652d23
 и план, не выполненный hardware baseline. Предложенные3×120s — отдельные будущие
 реплики с остановкой серии при первом отказе, не доказательство долгой автономности.
 
-Ведущий — `reachy-development-map`; автор #28 — `reachy-observer`,
-ветка `codex/resource-observer` от принятой fresh origin/main; reviewer —
-`/tmp/reachy-review-map`. Автор #26 ожидает зависимость и не правит общий collector
-параллельно. Рабочие ветки #22/#25/#27 слиты и удалены в origin.
+OBSERVE-01 #28 закрыта после PR #29: exact reviewed `ae581296dc628c2016d2046a98e5d02b37bcbf4c`,
+[независимое APPROVED](https://github.com/notanonenough/reachy-companion/pull/29#pullrequestreview-6028717357),
+37 целевых проверок, immutable full1886/26 skipped PASS; оба CI45256580573/45256591707
+SUCCESS. Merge `dab21fc09b8a32ebb7cd8698a66ba56eeb1ecec4` подтверждён в origin/main;
+remote branch удалена. Lifecycle finish и Mac runner blockers исправлены и
+перепроверены. Это подготовка observer, не измеренное покрытие трёх узлов.
+
+Ведущий — `reachy-development-map`; автор #26 создаёт `reachy-baseline` от fresh
+origin/main для протокола результатов; reviewer — `/tmp/reachy-review-map`.
+Автор #28 завершил работу; одновременных редакторов collector и владельцев стенда нет.
 Production checkout `reachy-companion` остаётся exact717; для правок его не используют.
-До выполнения принятого измерительного плана ведущий назначает одного hardware
-owner и отдельное окно. Наличие карточек #26/#28 не запускает стенд.
+После read-only readiness ведущий отдельно назначит одну120s реплику. Stopped
+workers не дают positive acquisition receipts; полнота после старта потребует
+реальных process instances/CPU deltas/status gauges, трёх успешных footer и terminal
+receipts. Pre-stimulus automatic coverage gate отсутствует; observed failure
+прерывает серию, safety STOP не ждёт observer. Автоматических повторов нет.
+
+Принятый observer snapshot v3 сохранён в
+`~/reachy-release-backups/20261124-observer-harness-review-v3`; все10 файлов и
+private modes0700/0600 сверены независимо и ведущим. Manifest SHA256
+`a53af67437d6335b7194981ca24295eb6e8d559c00cf89aaa88a7670ef04cc67`,
+local harness `1b82ff08da41faa5e7265dfabb7e2244c7b83d7ed23757096fd326109a25b180`,
+runner `ecd3d3744fb34a2574e5df0e11154696fd367e4220592cf8be9af40f3b99c8cd`.
+Предыдущие v1/v2 для аппаратного запуска не использовать.
 
 Одобренный односеансовый harness сохранён вне Git в закрытом
 `~/reachy-release-backups/20261123-private-trace-harness-approved`.
