@@ -10,8 +10,10 @@
 Цель проекта — личный автономный компаньон: непрерывное восприятие и выбор
 поведения в активном сеансе, включая тишину, с памятью и управляемой владельцем
 личностью. Карта всех 38 решений опубликована; первый ограниченный стендовый
-выпуск принят. Следующий этап — измерить устойчивость и задержки общей нагрузки
-перед сравнением технологий и переходом к одной диалоговой модели.
+выпуск принят. **Новый приоритет владельца24 ноября — быстрее начинать и
+завершать поворот головы, раньше начинать голосовой ответ.** PERF-01 использует уже
+сохранённые измерения и не ждёт полного resource baseline. Проверка устойчивости
+и переход к одной диалоговой модели остаются в карте; модель/архитектура пока прежние.
 
 В main приняты [CHAR-01 #3](https://github.com/notanonenough/reachy-companion/pull/3),
 [CI-01 #6](https://github.com/notanonenough/reachy-companion/pull/6),
@@ -55,6 +57,7 @@ STT-end→first-TTS-PCM11.209s по Hub clock; main client interval7.650s не �
 
 | Карточка | Статус, владелец и ревьюер | Следующий шаг и контакт |
 |---|---|---|
+| [PERF-01, Issue #30](https://github.com/notanonenough/reachy-companion/issues/30) | Новый приоритет владельца; автор `/root/implementer`, независимый reviewer `/root/reviewer`; контракт согласован до назначения | Offline evidence table по motion start/duration и voice chain, воспроизведение управляемой задержки, затем связный fix через normal entrypoint и PR. Fresh `reachy-performance` / `codex/response-performance`; контроль **24.11 00:40 Asia/Baku**, раньше bottleneck/fix boundary. Модели/архитектура/guards/TTL/физические limits пока прежние; hardware не запускается. |
 | [BASELINE-02, Issue #26](https://github.com/notanonenough/reachy-companion/issues/26) | Подготовка PR #27 и зависимость OBSERVE-01 PR #29 приняты. Владелец `/root/ci_implementer`, reviewer `/root/reviewer`; карточка открыта | Первая реплика досрочно остановлена: Mac acquisition_failed, полноценного baseline нет. Штатный cleanup завершён, окно освобождено **24.11 00:22:24**. Автор сохраняет протокол/manifest и воспроизводит причину offline; reviewer независимо проверяет terminal/evidence. Никаких новых starts или probes. Контроль **00:35**, раньше причина/PR. |
 
 PR #27 принят: exact reviewed `a5a296061a51cf45dd5a8af42493bb45133bea40`,
@@ -71,9 +74,10 @@ SUCCESS. Merge `dab21fc09b8a32ebb7cd8698a66ba56eeb1ecec4` подтверждён
 remote branch удалена. Lifecycle finish и Mac runner blockers исправлены и
 перепроверены. Это подготовка observer, не измеренное покрытие трёх узлов.
 
-Ведущий — `reachy-development-map`; автор #26 создаёт `reachy-baseline` от fresh
-origin/main для протокола результатов; reviewer — `/tmp/reachy-review-map`.
-Автор #28 завершил работу; одновременных редакторов collector и владельцев стенда нет.
+Ведущий — `reachy-development-map`; автор #26 — `reachy-baseline` для отдельного
+нового протокола результатов; автор #30 — `reachy-performance`; reviewer —
+`/tmp/reachy-review-map`. #26 не редактирует runtime/observer/collector; #30 работает
+над задержками. Одновременных редакторов одного модуля и владельцев стенда нет.
 Production checkout `reachy-companion` остаётся exact717; для правок его не используют.
 Read-only readiness независимо принята; одна назначенная120s реплика досрочно завершена. Stopped
 workers не дают positive acquisition receipts; полнота после старта потребует
@@ -96,7 +100,9 @@ busy false, no first invalid/expiry; trace36records complete; Hub/robot observer
 32ticks complete, Mac acquisition failed. Независимая проверка этих результатов
 идёт; это неполный baseline и основание прекратить серию, не новый выпуск.
 Evidence `~/reachy-release-backups/20261124-baseline02-replica-001`,
-own-supervisor receipts `20261124-baseline02-runner-001`. Причина Mac пока не установлена.
+own-supervisor receipts `20261124-baseline02-runner-001`. Точный исторический exception/count Mac не сохранён. Offline воспроизведена
+несовместимость healthy topology: шесть logger+worker пар дают≥12 targets при cap8;
+это конкретный defect, но не доказательство первого exception в том опыте.
 
 Принятый observer snapshot v3 сохранён в
 `~/reachy-release-backups/20261124-observer-harness-review-v3`; все10 файлов и
@@ -117,6 +123,27 @@ remote `aa2310807750870c8c2bc3cf205f046e122e3404de40d4cc2999885daac3298d`.
 `~/reachy-release-backups/20261123-717a6577a9f7`, содержимое в Git не переносится.
 
 ## Ближайшая очередь и препятствия
+
+**Текущий приоритет — PERF-01 #30 по прямому указанию владельца.** Первые
+сохранённые client intervals показывают main6.69–7.83s и очередь admission→main
+до7.50s в replica001; два surveying motion receipts: RPC dispatch≈1.58s при
+заданной duration0.8s и frame age≈0.83–0.96s. Это направления проверки, не
+доказанная причина и не физическое время до движения/звука. #30 воспроизводит
+причину, фиксирует требование в REVIEW-NOTES и даёт проверяемое исправление.
+
+**OBSERVE-02 отложена, исполнителя нет.** Зависимость полного #26 baseline,
+не блокирует #30. Согласованный с reviewer контракт: сохранить cap8 и выбирать
+fixed configured compute-provider trees llm/fast/worker/gateway/vlm из известных
+production_logs roots; ровно один direct child PID=PGID (run_logged создаёт
+new session), его потомки включаются. Logger/tunnels/caffeinate явно исключены
+как support. Только PID/PPID/PGID/known-label receipts и Mach identity fences,
+никаких argv/env; missing/ambiguous/reused/overcap — incomplete, без truncation.
+Нужны fixed stage/reason enums и required/discovered/selected/excluded counts
+(unknown=null), отдельные coverage labels; byte/record caps учитывают receipt+
+footer. Проверка через actual helper/runner и synthetic accepted topology,
+с прежними finish/STOP regressions. Перед назначением создать отдельную карточку
+и указать одного автора/reviewer; пока никаких code changes или аппаратных проб.
+
 
 1. **CHAR-01 принята; контракт уточнён владельцем.** Модель может предложить
    изменение personality/principles через отдельный черновик и настоящий GitHub PR
