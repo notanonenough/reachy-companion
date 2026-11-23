@@ -41,7 +41,7 @@ verified cleanup не приняты; текущие процессы и outputs
 | Карточка | Статус, владелец и ревьюер | Следующий шаг и контакт |
 |---|---|---|
 | [RELEASE-01, Issue #9](https://github.com/notanonenough/reachy-companion/issues/9) | Опыт остановлен, ожидает диагностику #15; автор стенда — `/root/implementer`, reviewer — `/root/reviewer` | Кандидат `362002991` установлен, E2E не прошёл. [Протокол](releases/2026-11-23-362002991d9c.md) принят через PR #16. Подготовлен один bounded повтор после нового SHA; контроль22:00 Asia/Baku. Окно до22:10 остаётся только за автором, новых запусков пока нет. |
-| [LEASE-01, Issue #15](https://github.com/notanonenough/reachy-companion/issues/15) | PR #17 одобрен, ожидает CI; автор — `/root/ci_implementer`, независимый reviewer — `/root/reviewer` | Exact `b55cc1ba`: исправлена регистрация helper в строгом code_identity; reviewer подтвердил 59 runtime и 25 identity/diagnostic tests. Guard/TTL/close неизменны. Полный CI и контроль23.11.2026 22:00 Asia/Baku. |
+| [LEASE-01, Issue #15](https://github.com/notanonenough/reachy-companion/issues/15) | PR #17: runtime одобрен, разбирается CI failure; автор — `/root/ci_implementer`, reviewer — `/root/reviewer` | Exact `b55cc1ba`: local1824/26skip и PR CI успешны, branch CI получил 2 model calls вместо3 в тесте с60ms timer после peer withdrawal. Автор воспроизводит причину, без blind rerun/ослабления assertions. Контроль23.11.2026 22:10 Asia/Baku или раньше новая версия. |
 
 Ведущий работает в `reachy-development-map`, исполнитель — в `reachy-audit-map`,
 ревьюер — в `/tmp/reachy-review-map`; рабочие ветки короткоживущие `codex/*`.
