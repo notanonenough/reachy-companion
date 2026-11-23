@@ -20,6 +20,7 @@ DIRECTORY=Path(__file__).resolve().parents[1]/'deploy/autonomous';sys.path.inser
 import assemble_observer_harness as assembler
 from observer_attachment import ObserverGroup
 import observer_runner
+import resource_observer
 
 BASE=Path(os.environ.get('REACHY_APPROVED_HARNESS',str(Path.home()/'reachy-release-backups/20261123-private-trace-harness-approved')))
 
@@ -48,6 +49,42 @@ class GroupTests(unittest.TestCase):
         with patch.object(observer_runner,'ProcessReader',side_effect=AssertionError('resource')),patch.object(subprocess,'Popen',side_effect=AssertionError('process')),patch.object(socket,'socket',side_effect=AssertionError('network')),contextlib.redirect_stdout(io.StringIO()) as out:
             self.assertEqual(observer_runner.main(['--node','hub','--candidate','7'*40]),0)
         self.assertFalse(json.loads(out.getvalue())['probes'])
+
+    def test_actual_runner_all_acquisition_branches_keep_finish_control(self):
+        for node in ('mac','hub','robot'):
+            with self.subTest(node=node),tempfile.TemporaryDirectory() as directory:
+                root=Path(directory);(root/'current').mkdir();(root/'current/release.json').write_text(json.dumps({'commit':'7'*40}))
+                (root/'token').write_text('fixture');(root/'config.local.json').write_text(json.dumps({'paths':{'token_file':'token'}}))
+                read_fd,write_fd=os.pipe();stream=os.fdopen(read_fd,'rb',buffering=0);buffer=io.BytesIO();calls=[]
+                binding=dict(controller='owner',source_boot='source',session_boot='session')
+                class Reader:
+                    host_boot='fixture';basis='linux_start_ticks'
+                    def read(self,pid):
+                        calls.append(('read',pid));return dict(process_start_identity='12',cpu_s=1,rss_bytes=4096,units={})
+                helpers={'mac_owned_processes':lambda domain:{42:'known-receipt'},'process_identity':lambda pid:'known-receipt'}
+                def path(value):
+                    if str(value) in ('/home/deploy/reachy-companion','/home/pollen/reachy-companion'):return root
+                    return Path(value)
+                def run(reader,targets,node,writer,**kw):
+                    self.assertIsInstance(kw['control'],resource_observer.FinishControl)
+                    self.assertTrue(kw['control'].worker.is_alive())
+                    timer=threading.Timer(.05,lambda:os.write(write_fd,b'finish\n'));timer.start()
+                    try:return resource_observer.run(reader,targets,node,writer,ticks=2,**kw)
+                    finally:timer.join(1)
+                def status_factory(receipt,*,provenance):
+                    self.assertTrue(provenance());self.assertEqual(receipt['binding'],binding)
+                    return lambda:dict(kind='status',poll_outcome='response',hub_request_end=time.monotonic())
+                original_handlers={sig:signal.getsignal(sig) for sig in (signal.SIGTERM,signal.SIGINT,signal.SIGHUP)}
+                try:
+                    with patch.object(observer_runner,'Path',side_effect=path),patch.object(observer_runner,'ProcessReader',Reader),patch.object(observer_runner.runpy,'run_path',return_value=helpers),patch.object(observer_runner.subprocess,'check_output',return_value='42\n') as commands,patch.object(observer_runner,'run',side_effect=run),patch.object(observer_runner,'StatusPoll',side_effect=status_factory),patch.dict(sys.modules,{'observer_listener':types.SimpleNamespace(listener_owned=lambda pid,start:pid==42 and start=='12')}),patch.object(sys,'stdin',types.SimpleNamespace(buffer=stream)),patch.object(sys,'stdout',types.SimpleNamespace(buffer=buffer)):
+                        result=observer_runner.main(['--execute','--node',node,'--root',str(root),'--candidate','7'*40,'--owner',json.dumps(dict(pid=42,start_ticks='12',binding=binding))])
+                    self.assertEqual(result,0)
+                    rows=[json.loads(x) for x in buffer.getvalue().splitlines()];self.assertTrue(rows[-1]['finish_accepted']);self.assertFalse(rows[-1]['incomplete'])
+                    self.assertTrue(any(x.get('kind')=='resource' for x in rows));self.assertTrue(calls)
+                    if node=='robot':self.assertEqual(commands.call_count,2)
+                finally:
+                    for sig,handler in original_handlers.items():signal.signal(sig,handler)
+                    stream.close();os.close(write_fd)
 
     def test_unknown_base_rejected_before_output(self):
         with tempfile.TemporaryDirectory() as directory:

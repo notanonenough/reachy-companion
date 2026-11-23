@@ -109,6 +109,10 @@ network/process probes. Assembly отдельно читает helpers и зап
 новый private0700 directory/files0600 + manifest SHA256. Снимок и exact hashes
 независимо проверяются до любого hardware окна.
 
+Отдельный regression исполняет actual `observer_runner.main` acquisition→run→
+finally для всех трёх узлов с fake known receipts и реальным FinishControl/pipe.
+Это проверяет wiring entrypoint, включая Mac service-helper namespace.
+
 Exact approved-base integration tests локально собирают этот snapshot и
 исполняют actual start/finally AST с fake transports/processes: normal,
 early spawn failure, hanging observer, diskfull, SSH loss. В этих сценариях

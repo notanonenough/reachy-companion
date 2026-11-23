@@ -22,14 +22,14 @@ def main(argv=None):
         with probe_deadline(3):
             if a.node=='mac':
                 root=a.root
-                control=runpy.run_path(str(root/'scripts/production-control'),run_name='observer_receipt_helpers')
+                receipt_helpers=runpy.run_path(str(root/'scripts/production-control'),run_name='observer_receipt_helpers')
                 # Existing fixed launchd-label + descendant PID receipts; no argv scan.
-                receipts=control['mac_owned_processes']('gui/'+str(os.getuid()))
+                receipts=receipt_helpers['mac_owned_processes']('gui/'+str(os.getuid()))
                 if not 1<=len(receipts)<=8:raise ValueError('targets')
                 targets=[]
                 for pid,receipt in sorted(receipts.items()):
                     item=bind_receipt(reader,role='mac_provider',pid=pid)
-                    if control['process_identity'](pid)!=receipt:raise ValueError('receipt_changed')
+                    if receipt_helpers['process_identity'](pid)!=receipt:raise ValueError('receipt_changed')
                     targets.append(item)
             else:
                 root=Path('/home/deploy/reachy-companion' if a.node=='hub' else '/home/pollen/reachy-companion')
