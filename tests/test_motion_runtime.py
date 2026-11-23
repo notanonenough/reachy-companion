@@ -134,17 +134,22 @@ class RuntimeTests(unittest.TestCase):
         self.assertFalse(self.proxy.handle(self.request('heartbeat',lease_id=lease,sequence=1))['accepted'])
 
     def test_more_than_256_heartbeats_use_one_persisted_watermark_and_revoke_remains_available(self):
-        lease=self.arm()
-        for sequence in range(600):
-            self.assertTrue(self.proxy.handle(self.request('heartbeat',lease_id=lease,sequence=sequence))['accepted'])
-            if sequence%50==0:time.sleep(.01)
-        self.assertEqual(self.runtime.guard.db.execute('SELECT count(*) FROM ordered_watermark').fetchone()[0],1)
-        self.assertEqual(self.runtime.guard.db.execute('SELECT count(*) FROM commands').fetchone()[0],0)
-        self.assertTrue(self.proxy.status()['ready'])
-        trajectory=self.request('trajectory',lease_id=lease,offset_radians=.01,duration_s=1)
-        self.assertTrue(self.proxy.handle(trajectory)['accepted'])
-        self.assertTrue(self.proxy.handle(self.request('revoke',lease_id=lease))['result']['verified_stopped'])
-        self.assertFalse(self.proxy.handle(trajectory)['accepted'])
+        from unittest.mock import patch
+        guard=self.runtime.guard;now=time.monotonic()
+        # This verifies ledger capacity and withdrawal, not heartbeat cadence.
+        # Real-time trajectory/expiry tests remain separate; HoldActor's clock
+        # and measured stop receipt are not replaced here.
+        with patch.object(guard,'clock',lambda:now),patch.object(guard.output,'clock',lambda:now):
+            lease=self.arm()
+            for sequence in range(600):
+                self.assertTrue(self.proxy.handle(self.request('heartbeat',lease_id=lease,sequence=sequence))['accepted'])
+            self.assertEqual(guard.db.execute('SELECT count(*) FROM ordered_watermark').fetchone()[0],1)
+            self.assertEqual(guard.db.execute('SELECT count(*) FROM commands').fetchone()[0],0)
+            self.assertEqual(guard.high_watermark,self.sequence)
+            self.assertTrue(self.proxy.status()['ready'])
+            pending=self.request('heartbeat',lease_id=lease,sequence=600)
+            self.assertTrue(self.proxy.handle(self.request('revoke',lease_id=lease))['result']['verified_stopped'])
+            self.assertFalse(self.proxy.handle(pending)['accepted'])
 
     def test_emergency_socket_stops_while_normal_ipc_is_blocked_on_sqlite(self):
         import sqlite3

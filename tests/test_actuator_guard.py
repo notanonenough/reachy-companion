@@ -54,7 +54,9 @@ class GuardTests(unittest.TestCase):
     def test_revoke_between_intent_and_enqueue_cannot_dispatch_and_duplicate_cannot_repeat(self):
         with tempfile.TemporaryDirectory() as directory:
             stopped=[];enqueued=[]
-            guard=ActuatorGuard(directory,lambda:stopped.append(True) or True)
+            # Ordering/deduplication must not race fsync against lease expiry;
+            # watchdog timing is exercised separately with the real clock.
+            guard=ActuatorGuard(directory,lambda:stopped.append(True) or True,clock=lambda:0.)
             try:
                 lease=arm(guard)
                 self.assertTrue(guard.dispatch(lease,'first',lambda:enqueued.append(True) or True))

@@ -171,6 +171,8 @@ class State:
             if len(self.candidates)>=self.config['candidate_cap']:
                 self.record('candidate_admission_rejected'); return
             ref=uid(); self.candidates[ref]=value; self.candidate_kinds[ref]='research'
+        elif kind == 'sensor_remove':
+            self.sensors.pop(event['id'],None)
         elif kind == 'sensor':
             name, summary = event.get('id'), event.get('summary', '')
             availability = event.get('availability', 'available')
@@ -188,7 +190,11 @@ class State:
             source=event.get('source_id','unspecified')
             if not isinstance(source,str) or not 1<=len(source)<=128:raise ValueError('Sensor source bound')
             captured = now - age / 1000 if availability == 'available' else None
-            self.sensors[name] = Sensor(name, summary if captured is not None else '', captured, ttl / 1000, availability, event.get('source_id','unspecified'))
+            scalar=event.get('scalar')
+            if scalar is not None:
+                json.dumps(scalar,allow_nan=False)
+                validate('ScalarMetadata',scalar)
+            self.sensors[name] = Sensor(name, summary if captured is not None else '', captured, ttl / 1000, availability, event.get('source_id','unspecified'),scalar)
         else:
             raise ValueError('unknown replay event')
         self.revision += 1
