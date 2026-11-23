@@ -67,13 +67,21 @@ Mac jobs/ports закрыты, moves пусты, профиль неизмене
 
 | Карточка | Статус, владелец и ревьюер | Следующий шаг и контакт |
 |---|---|---|
-| [RELEASE-01, Issue #9](https://github.com/notanonenough/reachy-companion/issues/9) | PR #23 принят; автор `/root/implementer` готовит следующий harness offline, reviewer `/root/reviewer` | Согласованный lifecycle одного explicit `production_start.py hub` с trace после принятия #22: прежние Mac/device services, tracked foreground Hub PID, bound HTTP stop и verified exit до shutdown. Черновик готов; доработка no-owner preflight и identity-checked fallback, затем review. Контроль 23:10 Asia/Baku. Стенд освобождён в 22:49; новый старт только после выбора кандидата и отдельного окна. |
+| [RELEASE-01, Issue #9](https://github.com/notanonenough/reachy-companion/issues/9) | PR #23 и offline lifecycle harness приняты; автор `/root/implementer`, reviewer `/root/reviewer` | Harness выдержал 7 независимых fault/positive сценариев и zero-IO dry-run. Следующий шаг автора — rollout и один trace-опыт только после принятия #22, выбора exact candidate и аппаратного окна. Пока стенд остановлен; контакт 23:15 Asia/Baku вместе с зависимостью. |
 | [AUDIO-TRACE-01, Issue #22](https://github.com/notanonenough/reachy-companion/issues/22) | Автор `/root/ci_implementer`, независимый reviewer `/root/reviewer`; контракт согласован до старта | Default-off private trace real STT→admission→model→TTS с lineage/временами. Авторский normal production loopback и 24 проверки PASS; завершаются STOP/default-off/limits/failure/final-summary и runbook, затем PR/CI/review. Следующий контроль 23:15 Asia/Baku, раньше готовый PR. Hardware не используется. |
 
 Прежняя предпосылка sleep→disabled оказалась неверна: Hub sleep выполняет
 stock pose и не выключает моторы. После sleep body≈−0.5°, neutral expression
 через существующий Hub маршрут дал measured yaw0.413°, pitch4.194°, body−0.352°.
 Guard и motor mode не менялись, прямого factory setter не было.
+
+Одобренный harness и зависимости сохранены вне Git в закрытом
+`~/reachy-release-backups/20261123-private-trace-harness-approved`.
+Manifest SHA-256 `7f81c398a93619f4eaa2329b6870cbdcfd9214fb2bcb6b08456d6d083c66ec36`;
+ведущий повторно проверил hashes и private modes всех 8 файлов. Reviewed helper
+SHA-256: local `44ee0de5f498a4dcdd3f4da25dbf5eb55f8952f8b663e32f0b7be7eb790486bc`,
+remote `aa2310807750870c8c2bc3cf205f046e122e3404de40d4cc2999885daac3298d`.
+Любое изменение требует delta review; одобрение helper не разрешает новый start.
 
 Ведущий работает в `reachy-development-map`, автор протокола — в `reachy-release-protocol`,
 автор #22 — в `reachy-ci-temp` на `codex/private-audio-trace`, ревьюер — в
