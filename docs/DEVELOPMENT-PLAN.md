@@ -42,7 +42,12 @@
 пакет, actual imports/metadata и canonical identity 60 модулей проверены.
 Runtime8+7+6 byte-equal, пять sensor readers остаются legacy. Backup прежнего3a0
 проверен по hashes; project base services перезапущены, factory/tunnel сохранены.
-Начат один approved 90s trace-опыт; фактический результат пока ожидается.
+Один approved 90s trace-опыт завершён: raw STT/admitted/main связаны с единственным
+правильным TTS «4», слышимость подтвердил владелец, trace полная без потерь.
+Hub/device accepted и cleanup true, owners завершены, mic/camera off,
+Mac jobs/ports закрыты. Reviewer принял bounded stand gates; конфигурации
+21 файлов независимо подтверждены, read-only окно освобождено в 23:28:33.
+Протокол PR #25 прошёл exact review, ожидается CI перед слиянием и публикацией.
 
 На прежнем `3a0f076bac3575ccc6504e8bd320ad5a50554b7f` авторский опыт достиг
 175 s без reducer expiry. [Протокол](releases/2026-11-23-3a0f076bac35.md)
@@ -68,8 +73,8 @@ Mac jobs/ports закрыты, moves пусты, профиль неизмене
 98 независимых проверок, local full 1849/26 skipped PASS, оба Linux CI
 45246690234/45246700289 успешны. Выбран новый кандидат из main
 `717a6577a9f7c2b3ff6dd22045761866678b37bc`, наличие reviewed head проверено.
-Автор завершил установку и выполняет один диагностический опыт. Диагностика
-не является исправлением голоса; выпуск, тег и GitHub Release не приняты.
+Диагностика не является исправлением голоса. Первый bounded stand release
+принят reviewer; тег и GitHub Release ещё не опубликованы.
 История предыдущих отказов: [362](releases/2026-11-23-362002991d9c.md),
 [15b](releases/2026-11-23-15b784eeafd4.md); первичный reducer expiry 15b пока не
 имеет установленного конкретного блокирующего вызова.
@@ -78,7 +83,7 @@ Mac jobs/ports закрыты, moves пусты, профиль неизмене
 
 | Карточка | Статус, владелец и ревьюер | Следующий шаг и контакт |
 |---|---|---|
-| [RELEASE-01, Issue #9](https://github.com/notanonenough/reachy-companion/issues/9) | Единственный hardware owner и автор `/root/implementer`; независимый reviewer `/root/reviewer` читает локальные evidence | Exact717 установлен и проверен; идёт один approved 90s trace-опыт с отдельным trace window150s. Затем bound stop/known Hub PID exit, device/Mac shutdown и terminal checks; приватный causal разбор. Окно 23:18–23:40, контроль 23:25 Asia/Baku. Без autoretry/recovery по умолчанию. |
+| [RELEASE-01, Issue #9](https://github.com/notanonenough/reachy-companion/issues/9) | Автор `/root/implementer`, независимый reviewer `/root/reviewer`; hardware освобождён, runtime остановлен | [PR #25](https://github.com/notanonenough/reachy-companion/pull/25), exact `39a2a8b2f140f4eaee29f6f87458ddb89abaf477` независимо APPROVED. Автор отслеживает CI; ведущий после green принимает протокол и публикует `stand-2026-11-23.1` на испытанный717, затем закрывает #9. Контроль 23:35 Asia/Baku. |
 
 AUDIO-TRACE-01 #22 закрыта после PR #24; remote branch удалена, автор
 `/root/ci_implementer` ожидает конкретный causal результат для следующей offline
@@ -97,8 +102,8 @@ SHA-256: local `44ee0de5f498a4dcdd3f4da25dbf5eb55f8952f8b663e32f0b7be7eb790486bc
 remote `aa2310807750870c8c2bc3cf205f046e122e3404de40d4cc2999885daac3298d`.
 Любое изменение требует delta review; одобрение helper не разрешает новый start.
 
-Ведущий работает в `reachy-development-map`, автор протокола — в `reachy-release-protocol`,
-автор #22 — в `reachy-ci-temp` на `codex/private-audio-trace`, ревьюер — в
+Ведущий работает в `reachy-development-map`, автор протокола — в `reachy-trace-protocol`,
+рабочая ветка #22 слита и удалена; ревьюер — в
 `/tmp/reachy-review-map`; рабочие ветки короткоживущие `codex/*`.
 Основную рабочую копию `reachy-companion` не используют для продуктовых правок.
 Read-only инвентаризация закончена; прежнее окно reviewer завершилось в 21:18:20.
@@ -106,9 +111,8 @@ Read-only инвентаризация закончена; прежнее окн
 Сверены origin/main, открытая Issue #9 и отсутствие открытых PR после принятия
 #21; затем создана #22 и автор фактически начал работу от fresh main.
 Mac production checkout и оба Linux узла — exact `717a6577a`.
-Reviewer освободил стенд в 22:49 после независимого опыта; в 23:18 ведущий
-передал его одному автору #9 для нового точного кандидата. Reviewer и второй
-автор работают offline; повторных назначений нет.
+После нового опыта автор освободил стенд; reviewer завершил отдельную read-only
+сверку и явно освободил окно в 23:28:33. Все работают offline; новых starts нет.
 CATALOG входит в новый кандидат, но реальные readers остаются в прежнем legacy mode.
 CI-01 принята в 21:03 Asia/Baku: [PR #6](https://github.com/notanonenough/reachy-companion/pull/6),
 проверенный head `bc63ac863b64194e70a04510f0fdae0f0f2395d0`, merge в origin/main
