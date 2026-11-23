@@ -560,7 +560,7 @@
       "kind": "ssh",
       "mode": "0600",
       "scope": "network",
-      "sha256": "716e402f9ed1bcb06b5e0d70300cf10c2fab592e16436f4a1f6d0a0f3e1e81e7",
+      "sha256": "27d3244cde63897534889cc2ea7e67cee485a96bf26235d10eddd70c6a4fc616",
       "owner": "notanonenough"
     },
     {
