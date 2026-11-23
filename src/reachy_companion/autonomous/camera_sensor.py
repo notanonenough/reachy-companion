@@ -24,11 +24,13 @@ class Measurements:
         self.binding=None
         self.sequence=None
         self.jpeg=None;self.generation=str(uuid4())
+        self.metric_boot=str(uuid4());self.metric_generation=0;self.metric_sequence=0
 
     def clear(self):
         with self.lock:
             self.latest=self.previous=self.binding=self.sequence=None
             self.jpeg=None;self.generation=str(uuid4())
+            self.metric_generation+=1;self.metric_sequence+=1
 
     def publish(self, pixels, sequence, binding, now, jpeg=None):
         import numpy as np
@@ -39,13 +41,42 @@ class Measurements:
             if binding!=self.binding:
                 self.previous=None;self.sequence=None
                 self.generation=str(uuid4())
+                self.metric_generation+=1
             if sequence is None or self.sequence is not None and sequence<=self.sequence:return False
             change=None if self.previous is None else float(np.abs(grid-self.previous).mean()/255)
             brightness=float(grid.mean()/255)
             self.latest=(now,brightness,change)
             self.previous=grid;self.binding=binding;self.sequence=sequence
             self.jpeg=jpeg
+            self.metric_sequence+=1
             return True
+
+    def metrics(self, request, now, binding=None):
+        """Scalar projection of the existing cache; never opens a capture device."""
+        import math
+        from .scalar_catalog import source_response
+        with self.lock:
+            allowed=binding is not None and binding==self.binding
+            capabilities=[];observations=[]
+            for name,index,description in (
+                    ('camera.brightness',1,'Mean brightness of the received stream frame; exposure age unknown.'),
+                    ('camera.image_change',2,'Mean pixel change of received frames; may be robot motion, not object identity.')):
+                cap=dict(kind='capability',protocol=1,id=name,source_boot_id=self.metric_boot,
+                         catalog_generation=self.metric_generation,module='metrics',direction='source',
+                         semantic='metric.scalar',version=dict(major=1,minor=0,min_minor=0),
+                         description=description,unit='ratio',range=[0,1],period_ms=500,ttl_ms=1500,
+                         availability='available',required_for=[],operations=[],coordinate_frame=None)
+                capabilities.append(cap)
+                value=self.latest[index] if allowed and self.latest else None
+                age=math.ceil(max(0,now-self.latest[0])*1000) if allowed and self.latest else None
+                availability='disabled' if not allowed else 'unknown' if value is None else 'offline' if age>=1500 else 'available'
+                observations.append(dict(kind='observation',protocol=1,capability_id=name,
+                    source_boot_id=self.metric_boot,catalog_generation=self.metric_generation,
+                    sequence=self.metric_sequence,sample_mono_ms=None,time_basis='source_receipt',
+                    age_at_send_ms=min(age,60000) if age is not None else None,ttl_ms=1500,
+                    availability=availability,value=value if availability=='available' else None,
+                    confidence=None,reason=None if availability=='available' else availability))
+            return source_response(request,capabilities,observations,self.metric_boot,self.metric_generation)
 
     def frame(self,now,binding=None):
         with self.lock:
@@ -167,17 +198,31 @@ class CameraSensor:
             raise RuntimeError('Camera close unconfirmed')
 
 
-def main():
-    parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--config',type=Path,required=True)
-    parser.add_argument('--port',type=int,default=8794)
-    args=parser.parse_args()
-    from ..config import Config
-    config=Config(args.config);sensor=CameraSensor(config)
+def create_server(config, sensor, port):
     class Handler(BaseHTTPRequestHandler):
         def setup(self):
             super().setup();self.connection.settimeout(1)
         def log_message(self,*args):pass
+        def do_POST(self):
+            if not hmac.compare_digest(self.headers.get('Authorization',''),'Bearer '+config.token):
+                self.send_error(403);return
+            if self.path!='/metrics':self.send_error(404);return
+            from .contracts import decode
+            try:
+                size=int(self.headers.get('Content-Length','0'))
+                if not 1<=size<=16384:raise ValueError('Scalar request byte bound')
+                request=decode(self.rfile.read(size))
+                try:binding=sensor.operator()
+                except Exception:binding=None
+                if binding is None:
+                    with sensor.cache.lock:cached=sensor.cache.latest is not None or sensor.cache.binding is not None
+                    if cached:sensor.cache.clear()
+                value=sensor.cache.metrics(request,time.monotonic(),binding)
+                body=json.dumps(value,allow_nan=False).encode()
+                if len(body)>16384:raise ValueError('Scalar response byte bound')
+            except (ValueError,KeyError,TypeError):self.send_error(400);return
+            self.send_response(200);self.send_header('Content-Type','application/json')
+            self.send_header('Content-Length',str(len(body)));self.end_headers();self.wfile.write(body)
         def do_GET(self):
             if not hmac.compare_digest(self.headers.get('Authorization',''),'Bearer '+config.token):
                 self.send_error(403);return
@@ -191,9 +236,19 @@ def main():
             body=json.dumps(value).encode()
             self.send_response(200);self.send_header('Content-Type','application/json')
             self.send_header('Content-Length',str(len(body)));self.end_headers();self.wfile.write(body)
+    return HTTPServer(('127.0.0.1',port),Handler)
+
+
+def main():
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--config',type=Path,required=True)
+    parser.add_argument('--port',type=int,default=8794)
+    args=parser.parse_args()
+    from ..config import Config
+    config=Config(args.config);sensor=CameraSensor(config)
     for number in (signal.SIGTERM,signal.SIGINT):signal.signal(number,lambda *_:sensor.done.set())
     worker=threading.Thread(target=sensor.run,daemon=True,name='camera-stream-measurements')
-    with HTTPServer(('127.0.0.1',args.port),Handler) as server:
+    with create_server(config,sensor,args.port) as server:
         server.timeout=.2;worker.start()
         try:
             while not sensor.done.is_set():server.handle_request()

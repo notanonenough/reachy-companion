@@ -3276,6 +3276,9 @@
             "null"
           ],
           "format": "date-time"
+        },
+        "scalar": {
+          "$ref": "#/$defs/ScalarMetadata"
         }
       },
       "required": [
@@ -3315,6 +3318,112 @@
       "required": [
         "patch",
         "reason"
+      ],
+      "additionalProperties": false
+    },
+    "ScalarMetadata": {
+      "type": "object",
+      "properties": {
+        "reader": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "capability_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "unit": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 128
+        },
+        "source_boot_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "connection_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "catalog_generation": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "sequence": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "support": {
+          "enum": [
+            "supported",
+            "limited",
+            "unsupported"
+          ]
+        },
+        "minor": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 65535
+        },
+        "semantic": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "time_basis": {
+          "enum": [
+            "sample",
+            "source_receipt",
+            "unknown"
+          ]
+        },
+        "value": {
+          "type": [
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "major": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        }
+      },
+      "required": [
+        "reader",
+        "capability_id",
+        "description",
+        "unit",
+        "source_boot_id",
+        "connection_id",
+        "catalog_generation",
+        "sequence",
+        "support",
+        "minor",
+        "semantic",
+        "time_basis",
+        "value",
+        "major"
       ],
       "additionalProperties": false
     }

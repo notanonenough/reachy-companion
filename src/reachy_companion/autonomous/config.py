@@ -212,8 +212,8 @@ def load(path):
             if not isinstance(entries,dict) or len(entries)>(12 if group=='sensors' else 16):raise ValueError('IO capacity')
             for name,item in entries.items():
                 if not isinstance(name,str) or not 1<=len(name)<=128 or not isinstance(item,dict):raise ValueError('IO identity')
-                from .production import http_reader
-                http_reader(item,tool=group=='tools') # validates only; performs no IO
+                from .production import http_reader,sensor_reader
+                (sensor_reader(item) if group=='sensors' else http_reader(item,tool=True)) # validates only; performs no IO
                 if group=='sensors' and (not isinstance(item.get('source_id'),str) or not 1<=len(item['source_id'])<=128):raise ValueError('Sensor source')
                 for key,default,low,high in [('period_s',.5,.05,60),('timeout_s',2,.05,30)]:
                     value=item.get(key,default)

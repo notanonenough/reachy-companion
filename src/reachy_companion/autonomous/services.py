@@ -11,6 +11,7 @@ class Services:
         self.scheduler=scheduler;self.store=store;self.last_depth=0;self.unresolved=store.tool_pending()
         self.sensors=sensors or {};self.deliveries=deliveries or {};self.tools=tools or {}
         self.polls={};self.next_poll={};self.exports={};self.next_export={}
+        self.scalar_catalogs={};self.scalar_requests={}
         self.tool_jobs={};self.maintenance=None;self.next_memory=0
         self.errors={};self.latency={};self.closed=False
         self.outbox_summary={}
@@ -93,18 +94,41 @@ class Services:
         state=self.scheduler.state
         self.unresolved=self.store.tool_pending()
         if self.store.current()[0]!=state.durable_revision:self.reload()
+        from .scalar_catalog import ScalarReader,ScalarRegistry
+        for name,registry in list(self.scalar_catalogs.items()):
+            configured=self.sensors.get(name)
+            if (not configured or configured[0] is not registry.reader or configured[2]!=registry.source
+                    or not registry.reader.enabled or state.privacy or state.stopped):
+                if registry.ids or registry.pending:registry.withdraw(self.scheduler,now)
+                if not configured or configured[0] is not registry.reader or configured[2]!=registry.source:
+                    del self.scalar_catalogs[name]
+        # A configured scalar reader owns one pending Job, even across withdrawal.
+        # Do not clear occupied slots: late completion must be fenced, not replaced.
+        for name,(poll,period,source) in self.sensors.items():
+            if isinstance(poll,ScalarReader) and name not in self.scalar_catalogs:
+                self.scalar_catalogs[name]=ScalarRegistry(name,poll,source)
         # All callbacks return values to this owner; IO threads never mutate State/SQLite.
         for name,(job,started,authority) in list(self.polls.items()):
             if not job.future.done():continue
             try:
                 event=job.future.result()
                 if authority!=state.authority or state.privacy:raise ValueError('Sensor authority changed')
-                event={**event,'type':'sensor','id':name,'source_id':self.sensors[name][2]}
-                event['age_ms']=event.get('age_ms',0)+max(0,int((now-started)*1000))
-                self.scheduler.ingest(event,now)
+                if name in self.scalar_requests:
+                    registry,request=self.scalar_requests[name]
+                    if (self.scalar_catalogs.get(name) is not registry or not registry.reader.enabled
+                            or state.stopped):raise ValueError('Scalar reader withdrawn')
+                    candidate=registry.accept(event,request,started,now,state)
+                    registry.commit(candidate,self.scheduler,now)
+                else:
+                    event={**event,'type':'sensor','id':name,'source_id':self.sensors[name][2]}
+                    event['age_ms']=event.get('age_ms',0)+max(0,int((now-started)*1000))
+                    self.scheduler.ingest(event,now)
                 self.latency[name]=now-started
                 self.errors.pop(name,None)
-            except Exception as exc:self.errors[name]=type(exc).__name__
+            except Exception as exc:
+                self.errors[name]=type(exc).__name__
+                if name in self.scalar_requests:self.scalar_requests[name][0].withdraw(self.scheduler,now)
+            self.scalar_requests.pop(name,None)
             del self.polls[name]
         for name,(job,started,authority) in list(self.tool_jobs.items()):
             if not job.future.done():continue
@@ -158,9 +182,15 @@ class Services:
         # Perception continues while outputs drain. Each reader still has one
         # occupied slot, so a stalled read cannot accumulate replacement jobs.
         for name,(poll,period,source) in self.sensors.items():
+            if isinstance(poll,ScalarReader) and not poll.enabled:continue
             if state.muted and name.startswith('audio'):continue
             if name not in self.polls and now>=self.next_poll.get(name,0):
-                self.polls[name]=(Job(poll),now,state.authority);self.next_poll[name]=now+period
+                if isinstance(poll,ScalarReader):
+                    registry=self.scalar_catalogs[name];request=registry.request()
+                    self.scalar_requests[name]=(registry,request)
+                    job=Job(poll,request)
+                else:job=Job(poll)
+                self.polls[name]=(job,now,state.authority);self.next_poll[name]=now+period
         for destination,send in self.deliveries.items():
             if destination not in self.exports and now>=self.next_export.get(destination,0):
                 if getattr(send,'settings',{}).get('relay'):
