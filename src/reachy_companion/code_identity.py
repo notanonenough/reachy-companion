@@ -16,7 +16,7 @@ MODULES = {'reachy_companion'} | {'reachy_companion.' + name for name in (
     'barge_candidate barge_trial camera_permission caption_initiative conversation_mode durable_intent initiative '
     'config control_diagnostics control_page conversation_context deployment experience finite_alice_trial '
     'emotion_library expression_player expressions firewall hub intents logging_utils microphone '
-    'imu_readout motion_limits motion_policy motion_proxy owned_http provisional_stt '
+    'imu_readout lease_diagnostics motion_limits motion_policy motion_proxy owned_http provisional_stt '
     'production_logs production_status recognition replay router sound_events sound_monitor '
     'semantic_observer sensory_bridge sensory_loop snapshot_vision '
     'speech_clock speech_motion spoken_reply spoken_reply_sdk spoken_vision token_stream transcription voice volume worker_container').split()}
