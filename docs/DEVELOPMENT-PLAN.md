@@ -25,7 +25,7 @@
 | Карточка | Статус, владелец и ревьюер | Следующий шаг и контакт |
 |---|---|---|
 | [RELEASE-01, Issue #9](https://github.com/notanonenough/reachy-companion/issues/9) | На стенде; единственный автор — `/root/implementer`, независимый ревьюер — `/root/reviewer` | Prep PR #13 принят. Кандидат `362002991d9c7d8f623af7ed28b91aad365e1bb8`: backup, rollout, физическая приёмка. Окно автора 21:36–22:10, контроль 23.11.2026 в 21:45 Asia/Baku. |
-| [CATALOG-01, Issue #12](https://github.com/notanonenough/reachy-companion/issues/12) | Готова и назначена; единственный автор — `/root/ci_implementer`, независимый ревьюер — `/root/reviewer` | 13 новых actual HTTP→production→model tests и 55 existing проходят; автор завершает camera/config и PR. Следующий контакт 23.11.2026 в 21:50 Asia/Baku. Стенд не занимает. |
+| [CATALOG-01, Issue #12](https://github.com/notanonenough/reachy-companion/issues/12) | На исправлении ревью PR #14; единственный автор — `/root/ci_implementer`, независимый ревьюер — `/root/reviewer` | Reviewer воспроизвёл partial ready после ошибки второго элемента и ошибку точной TTL-границы; автор исправляет, затем новый exact review/CI. Следующий контакт 23.11.2026 в 21:50 Asia/Baku или раньше новая версия. Стенд не занимает. |
 
 Ведущий работает в `reachy-development-map`, исполнитель — в `reachy-audit-map`,
 ревьюер — в `/tmp/reachy-review-map`; рабочие ветки короткоживущие `codex/*`.
