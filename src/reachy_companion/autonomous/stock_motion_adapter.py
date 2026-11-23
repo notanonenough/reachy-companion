@@ -95,10 +95,13 @@ class StockMotionAdapter:
             binding=dict(agent_boot_id=operator['agent_boot_id'],microphone_epoch=operator['microphone_epoch'],
                 microphone_enabled=operator['microphone_enabled'],policy_epoch=policy['epoch'],expression_version=operator['expression_version'])
             phase='dispatch';dispatch_at=time.monotonic()
-            report.update(frame_age_s=round(dispatch_at-proposal.get('captured',began),3),
+            report.update(dispatch_started_at=dispatch_at,
+                          frame_age_s=round(dispatch_at-proposal.get('captured',began),3),
                           duration_s=step['duration'],planning_s=round(dispatch_at-began,3))
             result=self.hub.expression(dict(steps=[step],operator_binding=binding),follow=True)
-            report['dispatch_s']=round(time.monotonic()-dispatch_at,3)
+            finished_at=time.monotonic()
+            report['dispatch_finished_at']=finished_at
+            report['dispatch_s']=round(finished_at-dispatch_at,3)
             report.update(result);report['accepted']=result.get('ok') is True and result.get('steps_observed')==1
             moved=report['accepted']
             if moved:

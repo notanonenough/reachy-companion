@@ -47,6 +47,18 @@ p95/p99 или обещать величину ускорения всему д�
 исчезновения UUID. Это не чистый network-submit latency и не доказанное время
 достижения позы. Frame age — возраст receipt, не подтверждённое время экспозиции.
 
+Новый receipt дополнительно сохраняет `dispatch_started_at` и, при успешном
+возврате вызова, `dispatch_finished_at` в Hub monotonic clock. Это вход/выход
+`Hub.expression`, включая его проверки и wait, не физический onset/arrival.
+`dispatch_s` вычисляется из тех же двух значений; при исключении finished
+отсутствует, а не равен0. Existing sampler получает receipt и измеренную позу
+с Hub-local request begin/end без дополнительного опроса. В будущем опыте
+это позволит связать первый наблюдённый сдвиг позы с command request и дать
+sampling bracket с учётом длительности RPC/неизвестного возраста FK. В baseline717
+такой absolute anchor отсутствует; полное before/after физического onset из
+старого журнала невозможно. Точность sampler порядка .2s плюс время запросов,
+не точный момент начала движения.
+
 ## Причина и граница исправления
 
 Штатный путь голоса: `Scheduler.ingest/advance` → `gateway.fast` → `State.apply`

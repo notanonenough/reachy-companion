@@ -5,7 +5,7 @@ import threading
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import Mock
+from unittest.mock import Mock,patch
 
 from reachy_companion.autonomous.person_follow import PersonFollow,checked_sample
 from reachy_companion.autonomous.contracts import Sensor
@@ -194,6 +194,35 @@ class AdapterTests(unittest.TestCase):
         self.assertTrue(a.follow(r)['accepted']);self.assertEqual(self.hub.expression.call_args.kwargs,dict(follow=True))
         a.follow_due=0
         self.assertIsNone(a.follow_request(self.sensor(3,.5),time.monotonic(),True))
+
+    def test_follow_receipt_anchors_expression_call_in_one_clock(self):
+        a=self.adapter;r=a.follow_request(self.sensor(1),time.monotonic(),True)
+        self.assertTrue(a.follow(r)['skipped']);a.follow_due=0
+        r=a.follow_request(self.sensor(2),time.monotonic(),True)
+        clock=[time.monotonic()]
+        def expression(*args,**kwargs):
+            clock[0]+=.413789
+            return dict(ok=True,steps_observed=1)
+        self.hub.expression.side_effect=expression
+        with patch('reachy_companion.autonomous.stock_motion_adapter.time.monotonic',side_effect=lambda:clock[0]):
+            report=a.follow(r)
+        self.assertTrue(report['accepted'])
+        self.assertLess(report['dispatch_started_at'],report['dispatch_finished_at'])
+        self.assertEqual(report['dispatch_finished_at'],clock[0])
+        self.assertEqual(report['dispatch_s'],round(report['dispatch_finished_at']-report['dispatch_started_at'],3))
+        self.assertEqual(report['dispatch_s'],.414)
+        self.assertFalse(report['pose_verified'])
+
+    def test_failed_expression_does_not_invent_completion_timestamp(self):
+        a=self.adapter;r=a.follow_request(self.sensor(1),time.monotonic(),True)
+        a.follow(r);a.follow_due=0
+        r=a.follow_request(self.sensor(2),time.monotonic(),True)
+        self.hub.expression.side_effect=RuntimeError('fixture transport failure')
+        report=a.follow(r)
+        self.assertFalse(report['accepted']);self.assertEqual(report['error_phase'],'dispatch')
+        self.assertIn('dispatch_started_at',report)
+        self.assertNotIn('dispatch_finished_at',report)
+        self.assertNotIn('dispatch_s',report)
 
     def test_privacy_epoch_and_expired_frame_reject_without_dispatch(self):
         a=self.adapter;r=a.follow_request(self.sensor(1),time.monotonic(),True)
