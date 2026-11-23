@@ -235,6 +235,16 @@ class DatagramTests(unittest.TestCase):
         failed=transport.status()['first_failed_attempt']
         self.assertEqual(failed['phase'],'challenge_wait');self.assertEqual(failed['error_kind'],'ValueError')
 
+    def test_successful_udp_ack_matches_server_accepted_sequence(self):
+        peer=Peer();server=LeaseDatagramServer(peer,'t'*32,'127.0.0.1',0);self.addCleanup(server.close)
+        client=PeerClient('http://127.0.0.1:1','t'*32,'owner')
+        transport=DatagramRenewal(client,peer.boot_id,server.socket.getsockname()[1]);self.addCleanup(transport.close)
+        transport.renew()
+        self.assertEqual(peer.calls,1);self.assertEqual(server.last_sequence,1)
+        self.assertEqual(transport.ack_sequence,server.last_sequence)
+        self.assertLessEqual(transport.last_send,transport.last_receive)
+        self.assertLessEqual(transport.last_receive,transport.last_ack)
+
     def test_actual_udp_exchange_does_not_renew_after_scheduler_stall(self):
         actual=dict(agent_boot_id='agent',microphone_epoch=2,microphone_owner_id='owner',microphone_enabled=True,
             phase='paused',listening=False,motion_policy=dict(epoch=1,quiet=False,privacy_all=False))
@@ -246,10 +256,38 @@ class DatagramTests(unittest.TestCase):
         server=LeaseDatagramServer(peer,'t'*32,'127.0.0.1',0);self.addCleanup(server.close)
         client=PeerClient('http://127.0.0.1:1','t'*32,'controller')
         transport=DatagramRenewal(client,peer.boot_id,server.socket.getsockname()[1])
-        lease=PeerLease(client,datagram=transport);self.addCleanup(lease.close)
-        end=time.monotonic()+.45
-        while time.monotonic()<end:lease.tick();time.sleep(.005)
-        self.assertGreater(peer.lease_requests,10);self.assertFalse(peer.closed)
+        received=threading.Event();release=threading.Event();pending=[];rejected=[]
+        original_receive=transport.receive_for;original_check=transport.check_send
+        def receive(kind,field,expected):
+            value=original_receive(kind,field,expected)
+            if kind=='accepted' and expected==12:
+                # Hold one real ACK after recv, before the final progress check.
+                pending.append(dict(sequence=expected,prior_ack=transport.ack_sequence,
+                    sent=transport.last_send,received=transport.last_receive,
+                    prior_ack_at=transport.last_ack,server_accepted=server.last_accepted))
+                received.set();release.wait(3)
+            return value
+        def check():
+            try:original_check()
+            except RuntimeError:
+                if pending:
+                    rejected.append(dict(sequence=transport.sequence,age=time.monotonic()-lease.last_tick))
+                raise
+        transport.receive_for=receive;transport.check_send=check
+        lease=PeerLease(client,datagram=transport)
+        def cleanup():
+            release.set();lease.close();lease.worker.join(1)
+        self.addCleanup(cleanup)
+        end=time.monotonic()+3
+        while not received.is_set() and time.monotonic()<end:lease.tick();time.sleep(.005)
+        self.assertTrue(received.is_set(),'Twelfth real ACK was not received')
+        self.assertEqual(peer.lease_requests,12);self.assertFalse(peer.closed)
+        self.assertEqual(server.last_sequence,12);self.assertEqual(transport.ack_sequence,11)
+        self.assertEqual(len(pending),1);packet=pending[0]
+        self.assertEqual((packet['sequence'],packet['prior_ack']),(12,11))
+        self.assertLess(packet['prior_ack_at'],packet['sent'])
+        self.assertLessEqual(packet['sent'],packet['server_accepted'])
+        self.assertLessEqual(packet['server_accepted'],packet['received'])
         end=time.monotonic()+1
         while not peer.closed and time.monotonic()<end:time.sleep(.005)
         self.assertTrue(peer.closed);requests=peer.lease_requests
@@ -269,11 +307,26 @@ class DatagramTests(unittest.TestCase):
         self.assertLessEqual(len(phases),16);self.assertGreaterEqual(frozen['max_handle_ms'],0)
         self.assertNotIn('nonce',json.dumps(frozen));self.assertNotIn('t'*32,json.dumps(frozen))
         time.sleep(.02);self.assertEqual(server.status()['first_withdrawal'],frozen)
+        self.assertEqual(frozen['ack_sequence'],12);self.assertEqual(transport.ack_sequence,11)
+        self.assertEqual(peer.lease_requests,12);self.assertFalse(release.is_set())
+        release.set()
+        end=time.monotonic()+1
+        while transport.first_failed_attempt is None and time.monotonic()<end:time.sleep(.002)
+        failed=transport.status()['first_failed_attempt']
+        self.assertIsNotNone(failed);self.assertEqual(failed['phase'],'ack_wait')
+        self.assertEqual(failed['error_kind'],'RuntimeError')
+        self.assertEqual((failed['sequence'],failed['ack_sequence']),(12,11))
+        self.assertEqual(len(rejected),1);self.assertEqual(rejected[0]['sequence'],12)
+        self.assertGreaterEqual(rejected[0]['age'],lease.progress_timeout_s)
         lease.tick();time.sleep(.05);self.assertEqual(peer.lease_requests,requests)
         lease.close();lease.worker.join(timeout=.2);self.assertFalse(lease.status()['execution_busy'])
         status=lease.status();self.assertEqual(status['worker_exit'],'closed')
         self.assertIsNone(status['worker_exception']);self.assertIsNotNone(status['timing']['last_send_age_ms'])
-        self.assertEqual(status['datagram']['ack_sequence'],frozen['ack_sequence'])
+        # Server acceptance and client ACK adoption are different events.
+        # The one in-flight ACK must not become fresh after progress expires.
+        self.assertEqual(status['datagram']['sequence'],12)
+        self.assertEqual(status['datagram']['ack_sequence'],11)
+        self.assertEqual(server.last_sequence,12);self.assertEqual(peer.lease_requests,12)
         for _ in range(20):server.reject('Datagram authentication')
         self.assertEqual(len(server.status()['timing']['rejection_tail']),8)
 
