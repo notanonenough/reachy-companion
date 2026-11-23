@@ -33,6 +33,19 @@ class AudioTests(unittest.TestCase):
         while adapter.status()['execution_busy']:
             self.assertLess(time.monotonic(),end);time.sleep(.002)
 
+    def test_errors_empty_results_and_latency_are_distinct_without_transcripts(self):
+        for outcome,key in (('', 'empty'),(TimeoutError('private error text'),'timeouts'),('private utterance','completed')):
+            def callback(pcm):
+                if isinstance(outcome,Exception):raise outcome
+                return outcome
+            adapter=self.setup_adapter(callback);self.poll(adapter);self.submit(adapter)
+            self.poll(adapter);self.drain(adapter);self.poll(adapter)
+            status=adapter.status()
+            self.assertEqual(status['counts'][key],1)
+            self.assertEqual(status['counts']['errors'],int(isinstance(outcome,Exception)))
+            self.assertIn('capture_to_result_s',status['recent'][0])
+            self.assertNotIn('private',str(status))
+
     def test_configured_recognition_deadline_accepts_slow_result_but_expires(self):
         for elapsed,accepted in ((3,True),(8.01,False)):
             clock=[0.];release=threading.Event()
@@ -55,6 +68,41 @@ class AudioTests(unittest.TestCase):
         self.assertEqual(event['audio']['lineage_id'],'capture:1')
         self.assertEqual(event['audio']['speaker_identity'],'unknown')
         self.assertFalse(event['audio']['confirmed'])
+
+    def test_drain_accepts_running_result_and_level_but_defers_next_stt(self):
+        release=threading.Event();entered=threading.Event();calls=[];clock=[0.]
+        def transcribe(pcm):
+            calls.append(pcm);entered.set();release.wait(1);return 'result'
+        adapter=self.setup_adapter(transcribe,clock=lambda:clock[0],continuous_input=True)
+        self.poll(adapter);self.submit(adapter);self.poll(adapter)
+        try:
+            self.assertTrue(entered.wait(.5));self.assertTrue(self.submit(adapter,seq=2))
+            adapter.advance('authority',operator(clock[0]),allow_start=False)
+            release.set();self.drain(adapter)
+            event=adapter.advance('authority',operator(clock[0]),allow_start=False)
+            self.assertEqual(event['audio']['sequence'],1)
+            self.assertEqual(len(calls),1)
+            self.assertTrue(adapter.status()['pending']);self.assertTrue(adapter.status()['allowed'])
+            self.assertTrue(adapter.status()['processing_paused'])
+            self.assertTrue(adapter.observe_level(dict(rms=.01,delta=.001,capture_age_s=0),
+                started=clock[0],source_boot='capture',authority='authority',operator_binding=('agent',1,0)))
+            self.assertIsNotNone(adapter.drain_level('authority'))
+            self.poll(adapter);self.drain(adapter)
+            self.assertEqual(len(calls),2)
+            self.assertFalse(adapter.status()['processing_paused'])
+        finally:release.set()
+
+    def test_drain_never_renews_capture_ttl_or_revives_withdrawn_input(self):
+        for mode in ('expired','privacy'):
+            with self.subTest(mode=mode):
+                calls=[];clock=[0.]
+                adapter=self.setup_adapter(lambda pcm:calls.append(pcm) or '',clock=lambda:clock[0])
+                self.poll(adapter);self.submit(adapter)
+                adapter.advance('authority',operator(clock[0]),allow_start=False)
+                if mode=='expired':clock[0]=10.
+                else:adapter.advance('authority',dict(operator(clock[0]),privacy_all=True),allow_start=False)
+                self.poll(adapter)
+                self.assertEqual(calls,[]);self.assertFalse(adapter.status()['pending'])
 
     def test_continuous_input_keeps_question_when_next_clip_is_noise(self):
         from dataclasses import replace

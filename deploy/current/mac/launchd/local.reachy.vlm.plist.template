@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>PYTHONPATH</key>
+		<string>@@ROOT@@/src</string>
+	</dict>
+	<key>KeepAlive</key>
+	<true/>
+	<key>Label</key>
+	<string>local.reachy.vlm</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>@@ROOT@@/.venv/bin/python</string>
+		<string>-m</string>
+		<string>reachy_companion.production_logs</string>
+		<string>run</string>
+		<string>--log</string>
+		<string>@@ROOT@@/data/mac-runtime/vlm.log</string>
+		<string>--</string>
+		<string>@@HOME@@/.local/bin/llama</string>
+		<string>serve</string>
+		<string>-m</string>
+		<string>@@ROOT@@/models/smolvlm2-500m/SmolVLM2-500M-Video-Instruct-Q8_0.gguf</string>
+		<string>--mmproj</string>
+		<string>@@ROOT@@/models/smolvlm2-500m/mmproj-SmolVLM2-500M-Video-Instruct-Q8_0.gguf</string>
+		<string>--host</string>
+		<string>127.0.0.1</string>
+		<string>--port</string>
+		<string>18099</string>
+		<string>-c</string>
+		<string>2048</string>
+		<string>-np</string>
+		<string>1</string>
+		<string>-ngl</string>
+		<string>0</string>
+		<string>--no-mmproj-offload</string>
+		<string>-t</string>
+		<string>2</string>
+		<string>-tb</string>
+		<string>2</string>
+		<string>--prio</string>
+		<string>-1</string>
+		<string>--alias</string>
+		<string>reachy-vision</string>
+		<string>--slots</string>
+		<string>--cache-ram</string>
+		<string>0</string>
+	</array>
+	<key>RunAtLoad</key>
+	<false/>
+	<key>StandardErrorPath</key>
+	<string>/dev/null</string>
+	<key>StandardOutPath</key>
+	<string>/dev/null</string>
+	<key>WorkingDirectory</key>
+	<string>@@ROOT@@</string>
+</dict>
+</plist>

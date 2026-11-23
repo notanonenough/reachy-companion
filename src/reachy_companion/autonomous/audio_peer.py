@@ -445,6 +445,14 @@ def create_server(peer, token, bind='127.0.0.1', port=8780, *, stop_port=None):
                 else:control=0
                 return dict(media_handlers=media,stop_handlers=control,
                     stop_listener_busy=bool(self.stop_worker and self.stop_worker.is_alive()))
+            def wait_transport_closed(self,timeout=1):
+                """After listener shutdown, observe actual handler exit, without hiding stalls."""
+                deadline=time.monotonic()+timeout
+                status=self.transport_status()
+                while any(status.values()) and time.monotonic()<deadline:
+                    time.sleep(.005)
+                    status=self.transport_status()
+                return status
         class Handler(BaseHTTPRequestHandler):
             protocol_version='HTTP/1.1'
             def setup(self):
@@ -729,7 +737,12 @@ class PeerLease:
         # Allow ordinary Wi-Fi/SSH jitter while leaving 200 ms of the device's
         # 300 ms lease for withdrawal. Unknown completion still latches closed.
         self.connection=http.client.HTTPConnection(endpoint.hostname,endpoint.port,timeout=min(client.timeout,.1))
+        if self.datagram:self.datagram.send_allowed=self._renewal_allowed
         self.worker=threading.Thread(target=self._run,daemon=True);self.worker.start()
+    def _renewal_allowed(self):
+        with self.lock:
+            return (not self.closed and self.armed
+                and time.monotonic()-self.last_tick<self.progress_timeout_s)
     def tick(self,authority=None):
         with self.lock:
             now=time.monotonic()

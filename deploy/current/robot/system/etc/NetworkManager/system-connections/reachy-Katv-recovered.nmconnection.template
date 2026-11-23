@@ -1,0 +1,25 @@
+[connection]
+id=reachy-Katv-recovered
+uuid=95aef2a9-3064-4669-be59-fbbdbc4b386b
+type=wifi
+autoconnect-priority=50
+interface-name=wlan0
+timestamp=1793321739
+
+[wifi]
+bssid=CC:2D:21:2A:6E:E5
+mode=infrastructure
+powersave=2
+ssid=Katv 8_5G
+
+[wifi-security]
+key-mgmt=wpa-psk
+psk=@@SECRET_WIFI_KATV_8_5G_PSK@@
+
+[ipv4]
+method=auto
+
+[ipv6]
+method=auto
+
+[proxy]

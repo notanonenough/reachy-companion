@@ -17,6 +17,37 @@ def context_mode(context):
 
 def load(path):
     config = decode(Path(path).read_text())
+    vision=config.get('gateway',{}).get('vision')
+    if vision is not None:
+        import math
+        if (not isinstance(vision,dict) or type(vision.get('enabled')) is not bool
+                or set(vision)-{'enabled','camera_url','camera_token_file','model_url','poll_s','interval_s','ttl_s','timeout_s','detector_model','detector_backend'}):
+            raise ValueError('Vision configuration')
+        if vision['enabled']:
+            if vision.get('detector_backend','auto') not in ('auto','cpu','coreml'):raise ValueError('Detector backend')
+            if 'detector_model' in vision:
+                value=vision['detector_model']
+                if not isinstance(value,str) or not 1<=len(value)<=2048:raise ValueError('Detector model path')
+                vision['detector_model']=str(Path(path).resolve().parent/value)
+            for key in ('camera_url','model_url'):
+                endpoint=urlsplit(vision.get(key,''))
+                if (endpoint.scheme!='http' or endpoint.hostname not in ('127.0.0.1','localhost','::1')
+                        or endpoint.username or endpoint.password or endpoint.query or endpoint.fragment):
+                    raise ValueError('Vision requires local endpoints (SSH for camera)')
+            if not isinstance(vision.get('camera_token_file'),str) or not vision['camera_token_file']:
+                raise ValueError('Vision source token file required')
+            vision['camera_token_file']=str(Path(path).resolve().parent/vision['camera_token_file'])
+            for key,default,low,high in [('poll_s',.5,.2,1),('interval_s',2,.5,30),('ttl_s',12,2,30),('timeout_s',20,2,60)]:
+                value=vision.get(key,default)
+                if type(value) not in (int,float) or not math.isfinite(value) or not low<=value<=high:
+                    raise ValueError('Vision timing bound '+key)
+    relay=config.get('gateway',{}).get('log_s3')
+    if relay is not None:
+        if not isinstance(relay,dict) or not relay.get('bucket'):raise ValueError('S3 relay bucket required')
+        from .durable import Delivery
+        Delivery('s3',relay)
+        for key in ('access_key_file','secret_key_file','session_token_file'):
+            if relay.get(key):relay[key]=str(Path(path).resolve().parent/relay[key])
     native = config.get('native_agent', {})
     if (type(native) is not dict or set(native) - {'enabled', 'operator_goal', 'stock_profile', 'goal_ttl_s'}
             or ('enabled' in native and type(native['enabled']) is not bool)):
@@ -47,6 +78,8 @@ def load(path):
     if config['version'] != 1 or config['actuators'] not in ('simulated','bounded_native_antenna17','bounded_stock') or (config['export_enabled'] and not config.get('production')):
         raise ValueError('Unsupported actor mode/export')
     motion=config.get('motion',{'enabled':False})
+    if ('follow_person' in motion and (type(motion['follow_person']) is not bool
+            or motion['follow_person'] and config['actuators']!='bounded_stock')):raise ValueError('Stock person follow opt-in')
     if type(motion.get('enabled')) is not bool or (config['actuators'] in ('bounded_native_antenna17','bounded_stock'))!=motion['enabled']:
         raise ValueError('Explicit bounded native motion opt-in required')
     if motion['enabled']:
@@ -167,10 +200,11 @@ def load(path):
     production=config.get('production',{})
     if production:
         import math
-        if not isinstance(production,dict) or set(production)-{'state_path','outbox_cap','overload_latency_s','overload_queue','memory_refresh_s','character_refresh_s','sensors','tools','delivery','updates','stt_deadline_s'}:
+        if not isinstance(production,dict) or set(production)-{'state_path','outbox_cap','overload_latency_s','overload_queue','memory_refresh_s','character_refresh_s','sensors','tools','delivery','updates','stt_deadline_s','compute_health_timeout_s','maintenance_idle_s','stt_diagnostics'}:
             raise ValueError('Production settings')
+        if type(production.get('stt_diagnostics',False)) is not bool:raise ValueError('STT diagnostics flag')
         if not isinstance(production.get('state_path'),str) or not production['state_path']:raise ValueError('Durable state path required')
-        for key,default,low,high in [('stt_deadline_s',2,.5,15),('overload_latency_s',10,.1,120),('overload_queue',6,1,16),('outbox_cap',10000,10,1000000),('memory_refresh_s',60,10,86400),('character_refresh_s',3600,60,604800)]:
+        for key,default,low,high in [('compute_health_timeout_s',3,.5,10),('maintenance_idle_s',10,0,120),('stt_deadline_s',2,.5,15),('overload_latency_s',10,.1,120),('overload_queue',6,1,16),('outbox_cap',10000,10,1000000),('memory_refresh_s',60,10,86400),('character_refresh_s',3600,60,604800)]:
             value=production.get(key,default)
             if type(value) not in (int,float) or not math.isfinite(value) or not low<=value<=high:raise ValueError('Production bound '+key)
         for group in ('sensors','tools'):

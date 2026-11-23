@@ -207,7 +207,7 @@ def main():
             report['capture_closed']=capture.close()
         if server:
             server.shutdown();server.server_close()
-            if a.stop_port is not None:report['stop_transport']=server.transport_status()
+            if a.stop_port is not None:report['stop_transport']=server.wait_transport_closed()
         if datagram:
             datagram.close();report['lease_datagram']=datagram.status()
             report['lease_datagram_execution_busy']=datagram.worker.is_alive()
@@ -239,7 +239,8 @@ def main():
             report['accepted']=(report['accepted'] and transport.get('media_handlers')==0
                 and transport.get('stop_handlers')==0 and transport.get('stop_listener_busy') is False)
         with a.output.open('x') as f:json.dump(report,f,ensure_ascii=False,indent=2)
-    print(json.dumps(report,ensure_ascii=False),flush=True)
+    from reachy_companion.production_logs import report_summary
+    print(json.dumps(report_summary(report) if a.lifetime=='lease' else report,ensure_ascii=False),flush=True)
     if not report['accepted']:raise SystemExit(2)
 
 

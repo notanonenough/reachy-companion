@@ -33,6 +33,7 @@ class Checks(unittest.TestCase):
 
         class Config(dict):
             token = 'x' * 32
+        a.camera_permission = SimpleNamespace(path=Path('/fixture/camera-state.json'))
         a.config = Config(a.config)
         a.listening.set()
         a.audio_lock.acquire()

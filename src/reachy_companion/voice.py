@@ -396,10 +396,10 @@ class Pipeline:
         yield terminal
 
 
-def main(config, worker=False):
-    from .logging_utils import configure
-    configure(config, 'compute' if worker else 'voice')
-    pipeline = Pipeline(config)
+def create_server(config, worker=False, *, pipeline=None):
+    pipeline = pipeline if pipeline is not None else Pipeline(config)
+    from .transcription import TranscriptionSlot,TranscriptionBusy
+    transcription=TranscriptionSlot()
 
     class Handler(BaseHTTPRequestHandler):
         def setup(self):
@@ -422,7 +422,8 @@ def main(config, worker=False):
 
         def do_GET(self):
             if self.path == '/health':
-                self.reply(200, {'ok': True, 'phase': pipeline.phase, 'service': 'compute-worker' if worker else 'local-voice'})
+                self.reply(200, {'ok': True, 'phase': pipeline.phase, 'service': 'compute-worker' if worker else 'local-voice',
+                                 'transcription':transcription.status()})
             elif self.path == '/status' and self.authorized():
                 try:
                     robot = {'via': 'hub'} if worker else pipeline.request(pipeline.config['network']['agent_url'] + '/status', authenticated=True)
@@ -448,13 +449,29 @@ def main(config, worker=False):
                 except Exception:
                     LOG.exception('sound_classification_failed');self.reply(503, {'error': 'Sound analysis unavailable'})
                 return
-            if self.path == '/transcribe':
+            if self.path in ('/transcribe','/transcribe/reserve','/transcribe/settle'):
                 try:
                     size = int(self.headers.get('Content-Length', 0))
                     if not 0 < size <= config['limits']['max_request_bytes']:
                         raise ValueError('Invalid audio request size')
                     payload = json.loads(self.rfile.read(size))
-                    self.reply(200, pipeline.transcribe_response(payload))
+                    if self.path=='/transcribe/reserve':
+                        if payload!={}:raise ValueError('Empty reservation body required')
+                        result=dict(execution=transcription.reserve())
+                    elif self.path=='/transcribe/settle':
+                        result=transcription.settle(payload)
+                    else:
+                        if type(payload) is not dict:raise ValueError('Typed audio request required')
+                        ticket=payload.get('execution')
+                        tracked=ticket is not None
+                        if not tracked:ticket=transcription.reserve()
+                        result=transcription.run(ticket,lambda:pipeline.transcribe_response(payload))
+                        if tracked:result=dict(result,execution=ticket)
+                    self.reply(200,result)
+                except TranscriptionBusy:
+                    self.reply(409, {'error':'Transcription execution busy'})
+                except (BrokenPipeError,ConnectionResetError):
+                    LOG.info('transcription_client_disconnected')
                 except (ValueError, KeyError, TypeError) as exc:
                     self.reply(400, {'error': str(exc)})
                 except Exception:
@@ -561,5 +578,12 @@ def main(config, worker=False):
     address = config['servers']['worker' if worker else 'voice']
     server = ThreadingHTTPServer((address['listen'], address['port']), Handler)
     server.daemon_threads = True
+    return server
+
+
+def main(config, worker=False):
+    from .logging_utils import configure
+    configure(config, 'compute' if worker else 'voice')
+    server=create_server(config,worker)
     LOG.info('listening %s:%s', *server.server_address)
     server.serve_forever()

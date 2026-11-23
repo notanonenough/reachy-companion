@@ -20,6 +20,8 @@ function fixture() {
     policy: {motor_enabled: false, quiet: false, privacy_all: false,
       microphone_owner_id: null, motion_policy_owner_id: null},
     volume: {percent: 70, enabled: true},
+    camera: {enabled: false, generation: 0, error: null},
+    capabilities: {motion_on: true, motion_off: true, camera_control: true},
     conversation_mode: {version: 1, mode: 'normal', generation: 3, error: null}, phase: 'paused'};
   let respond = async () => ({ok: true, status: 200, json: async () => structuredClone(state)});
   const context = vm.createContext({document: {getElementById: element},
@@ -91,5 +93,38 @@ function fixture() {
   assert.equal(f.run('state.microphone.enabled'), false);
   assert.deepEqual(f.calls.filter(c => c.options.method === 'POST').map(c => JSON.parse(c.options.body).action),
     ['mode_alice_test', 'stop']);
-  process.stdout.write('PASS: mode render, explicit bound command, MIC OFF, privacy/owners, offline, concurrent STOP\n');
+  f = fixture(); await flush();
+  assert.equal(f.element('camera-on').disabled, false);
+  assert.equal(f.element('motion-on').disabled, false);
+  assert.equal(f.element('camera-off').disabled, true);
+  f.respond = async (path, options) => ({ok: true, status: 200, json: async () => {
+    if (options.method === 'POST') {
+      const body = JSON.parse(options.body);
+      if (body.action === 'camera_on') f.state.camera = {enabled: true, generation: 1, error: null};
+      if (body.action === 'motion_on') f.state.policy.motor_enabled = true;
+      if (body.action === 'motion_off') f.state.policy.motor_enabled = false;
+      if (body.action === 'camera_off') f.state.camera = {enabled: false, generation: 2, error: null};
+      return {accepted: true, action: body.action, state: f.state};
+    }
+    return f.state;
+  }});
+  await f.element('camera-on').onclick();
+  assert.deepEqual(JSON.parse(f.calls.find(c => c.options.method === 'POST').options.body),
+    {action: 'camera_on', binding: f.state.binding, camera_generation: 0});
+  assert.equal(f.element('camera-on').disabled, true);
+  assert.equal(f.element('camera-off').disabled, false);
+  await f.element('motion-on').onclick();
+  assert.equal(f.element('motion-off').disabled, false);
+  await f.element('motion-off').onclick();
+  await f.element('camera-off').onclick(); await flush();
+  assert.equal(f.state.microphone.enabled, false);
+  f.run('state.policy.microphone_owner_id="session";render()');
+  assert.equal(f.element('motion-on').disabled, true);
+  assert.equal(f.element('camera-on').disabled, false);
+  f.respond = async () => {throw Error('offline');};
+  await f.run('refresh()');
+  assert.equal(f.element('camera-on').disabled, true);
+  assert.equal(f.element('motion-on').disabled, true);
+
+  process.stdout.write('PASS: mode, camera/motion bound commands, MIC OFF, privacy/owners, offline, concurrent STOP\n');
 })().catch(error => {console.error(error); process.exitCode = 1;});

@@ -46,6 +46,53 @@ class DatagramTests(unittest.TestCase):
         with self.assertRaises(ValueError):transport.renew()
         self.assertEqual(transport.exchange.call_count,1)
 
+    def test_two_lost_challenge_replies_recover_inside_same_lease_window(self):
+        peer=Peer();server=LeaseDatagramServer(peer,'t'*32,'127.0.0.1',0);self.addCleanup(server.close)
+        original=server.handle;hellos=[]
+        def drop_two(body):
+            answer=original(body)
+            if body['kind']=='hello':
+                hellos.append(body['echo'])
+                if len(hellos)<=2:raise socket.timeout() # response lost after device handling
+            return answer
+        server.handle=drop_two
+        client=PeerClient('http://127.0.0.1:1','t'*32,'owner')
+        transport=DatagramRenewal(client,'boot',server.socket.getsockname()[1],retries=2)
+        self.addCleanup(transport.close);transport.send_allowed=lambda:True
+        started=time.monotonic();transport.renew()
+        self.assertLess(time.monotonic()-started,.3)
+        self.assertEqual(len(hellos),3);self.assertEqual(len(set(hellos)),3)
+        self.assertEqual(peer.calls,1);self.assertEqual(transport.ack_sequence,1)
+        self.assertEqual(server.accepted,1)
+
+    def test_reducer_withdrawal_after_challenge_prevents_renew_and_retry(self):
+        peer=Peer();server=LeaseDatagramServer(peer,'t'*32,'127.0.0.1',0);self.addCleanup(server.close)
+        original=server.handle;allowed=[True]
+        def revoke(body):
+            answer=original(body)
+            if body['kind']=='hello':allowed[0]=False
+            return answer
+        server.handle=revoke
+        client=PeerClient('http://127.0.0.1:1','t'*32,'owner')
+        transport=DatagramRenewal(client,'boot',server.socket.getsockname()[1],retries=2)
+        self.addCleanup(transport.close);transport.send_allowed=lambda:allowed[0]
+        with self.assertRaises(RuntimeError):transport.renew()
+        self.assertEqual(peer.calls,0);self.assertEqual(server.received,1)
+        self.assertIsNone(transport.last_ack)
+
+    def test_retries_share_one_bounded_window_and_require_progress_guard(self):
+        peer=Peer();server=LeaseDatagramServer(peer,'t'*32,'127.0.0.1',0);self.addCleanup(server.close)
+        server.handle=Mock(side_effect=socket.timeout())
+        client=PeerClient('http://127.0.0.1:1','t'*32,'owner')
+        transport=DatagramRenewal(client,'boot',server.socket.getsockname()[1],retries=2)
+        self.addCleanup(transport.close)
+        with self.assertRaises(RuntimeError):transport.renew()
+        self.assertEqual(server.received,0)
+        transport.send_allowed=lambda:True;started=time.monotonic()
+        with self.assertRaises(socket.timeout):transport.renew()
+        self.assertLess(time.monotonic()-started,.3)
+        self.assertEqual(server.received,3);self.assertEqual(peer.calls,0)
+
     def test_real_socket_receipt_survives_failure_close_and_caller_mutation(self):
         sink=socket.socket(socket.AF_INET,socket.SOCK_DGRAM);sink.bind(('127.0.0.1',0));self.addCleanup(sink.close)
         client=PeerClient('http://127.0.0.1:1','t'*32,'controller')

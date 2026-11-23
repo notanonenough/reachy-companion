@@ -19,6 +19,7 @@ class OverlayTests(unittest.TestCase):
             self.assertEqual(set(manifest['outputs']),{'voice.py','brains.py','spoken_reply.py'})
             self.assertIn('autonomous/contracts.py',manifest['required_existing_dependencies'])
             self.assertNotIn('def transcribe_diagnostic',(target/'voice.py').read_text())
+            self.assertNotIn('TranscriptionSlot',(target/'voice.py').read_text())
             self.assertFalse(manifest['actual_model_capability_verified'])
             marker=target/'foreign';marker.write_text('keep')
             with self.assertRaises(FileExistsError):prepare.build(target)

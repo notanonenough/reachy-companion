@@ -53,6 +53,7 @@ class SpokenVisionTests(unittest.TestCase):
             operator_status=Mock(side_effect=lambda:copy.deepcopy(self.value)),audio_lock=threading.Lock(),
             stopping=threading.Event(),current_reply_text='',pending_pcm=b'old',resume_audio=dict(old=True),
             voice=Mock(return_value=dict(ok=True,reply='Описание кадра.')))
+        self.agent.camera_permission=SimpleNamespace(path=Path('/fixture/camera-state.json'),snapshot=lambda:dict(enabled=True,generation=1,error=None))
         self.agent.audio_lock.acquire()
         self.result=dict(kind='companion-vision-snapshot',final_text='Описание кадра.',expires_at_monotonic=150)
         self.process=Mock(returncode=0)

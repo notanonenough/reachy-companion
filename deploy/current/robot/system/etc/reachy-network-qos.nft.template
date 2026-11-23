@@ -1,0 +1,8 @@
+table inet reachy_network_qos {}
+flush table inet reachy_network_qos
+table inet reachy_network_qos {
+ chain output {
+  type route hook output priority mangle; policy accept;
+  ip saddr 192.168.0.184 ip daddr 192.168.0.186 udp sport 8782 counter ip dscp set cs6
+ }
+}

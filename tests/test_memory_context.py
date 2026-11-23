@@ -364,11 +364,11 @@ class ContextTests(unittest.TestCase):
             finally:server.shutdown();thread.join(2);server.server_close()
 
     def test_async_context_integration_does_not_block_l0_and_reaches_l1(self):
-        owner=self
+        owner=self;entered=threading.Event();release=threading.Event()
         class Transport(ReplayGateway):
             prompts=[]
             def context(self,request_id,query,privacy,authority):
-                time.sleep(.03)
+                entered.set();release.wait(5)
                 return dict(output=owner.context([item()]),request_id=request_id,compute_boot_id=self.boot_id)
             def revoke_context(self,authority,terminal=False):return dict(revoked=True)
             def main(self,task):
@@ -378,10 +378,21 @@ class ContextTests(unittest.TestCase):
         cfg.update(period_s=.01,fast_deadline_s=.1)
         cfg['context']=dict(enabled=True,refresh_s=.1)
         gateway=Transport();scheduler=Scheduler(cfg,gateway)
-        report=scheduler.run(.3,[dict(at_s=.08,type='utterance',text='fixture query')])
-        self.assertGreaterEqual(report['counts']['fast_requested'],10)
-        self.assertEqual(gateway.prompts[0]['memory'][0]['id'],'fixture-item')
-        self.assertEqual(report['counts']['simulated_speech'],1)
+        def until(predicate):
+            deadline=time.monotonic()+2
+            while not predicate() and time.monotonic()<deadline:
+                scheduler.advance();time.sleep(.002)
+            self.assertTrue(predicate())
+        try:
+            # Prove progress while context is actually blocked, instead of
+            # assuming three workers finish inside a 300 ms wall-clock window.
+            until(lambda:entered.is_set() and scheduler.state.counts['fast_requested']>=10)
+            self.assertFalse(scheduler.context_job.future.done())
+            release.set();until(lambda:bool(scheduler.state.memory_items))
+            scheduler.ingest(dict(type='utterance',text='fixture query'))
+            until(lambda:scheduler.state.counts['simulated_speech']==1)
+            self.assertEqual(gateway.prompts[0]['memory'][0]['id'],'fixture-item')
+        finally:release.set();scheduler.close()
 
     def test_main_context_bound_keeps_mandatory_turn_and_exact_budget(self):
         cfg=load(Path(__file__).resolve().parents[1]/'config.autonomous.example.json')

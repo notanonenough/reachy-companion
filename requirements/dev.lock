@@ -74,3 +74,9 @@ typing-inspection==0.4.4
     #   pydantic
 wheel==0.48.0
     # via reachy-companion (pyproject.toml)
+
+# Vision backend dependencies exercised by the review suite.
+flatbuffers==25.12.19
+onnxruntime==1.31.1
+pillow==12.3.0
+protobuf==7.36.2

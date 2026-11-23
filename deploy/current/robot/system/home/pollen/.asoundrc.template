@@ -1,0 +1,34 @@
+pcm.!default {
+    type hw
+    card 0
+}
+ctl.!default {
+    type hw
+    card 0
+}
+pcm.reachymini_audio_sink {
+    type dmix
+    ipc_key 4241
+    slave {
+        pcm "hw:0,0"
+        channels 2
+        period_size 1024
+        buffer_size 4096
+        rate 16000
+    }
+    bindings {
+        0 0
+        1 1
+    }
+}
+pcm.reachymini_audio_src {
+    type dsnoop
+    ipc_key 4242
+    slave {
+        pcm "hw:0,0"
+        channels 2
+        rate 16000
+        period_size 1024
+        buffer_size 4096
+    }
+}

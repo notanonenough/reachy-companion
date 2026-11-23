@@ -32,3 +32,36 @@ def validate_steps(steps, settings):
     if total > settings['max_total_seconds']:
         raise ValueError('Expression is too long')
     return steps
+
+
+def validate_follow_step(step, current=None):
+    """Separate internal stock capability; ordinary expression grants stay narrow."""
+    if (type(step) is not dict or set(step)!={'head_pose','body_yaw','antennas','duration','interpolation'}
+            or step['antennas'] is not None or step['interpolation']!='minjerk'
+            or not .35<=number(step['duration'])<=1.5):raise ValueError('Follow step contract')
+    head=step['head_pose']
+    if type(head) is not dict or set(head)!={'x','y','z','roll','pitch','yaw'}:raise ValueError('Follow head pose')
+    if any(number(head[k])!=0 for k in ('x','y','z','roll')):raise ValueError('Follow translations/roll disabled')
+    yaw=number(head['yaw']);pitch=number(head['pitch']);body=number(step['body_yaw'])
+    if (abs(yaw)>math.radians(60) or abs(body)>math.radians(50)
+            or abs(pitch)>math.radians(10) or abs(yaw-body)>math.radians(15.01)):
+        raise ValueError('Follow absolute limit')
+    if current is not None:
+        actual=current['head_pose']
+        # Measured FK has calibration error; command slew is separately bounded
+        # by the planner. Allow its small correction plus measured offset.
+        if (abs(yaw-number(actual['yaw']))>math.radians(12)
+                or abs(pitch-number(actual['pitch']))>math.radians(8)
+                or abs(body-number(current['body_yaw']))>math.radians(9)):
+            raise ValueError('Follow step delta limit')
+        # Average angular speed; minjerk peak is 1.875 times this value.
+        # Small margin over planner rates allows fresh measured-pose jitter.
+        if (abs(yaw-actual['yaw'])/step['duration']>math.radians(30)
+                or abs(pitch-actual['pitch'])/step['duration']>math.radians(14)
+                or abs(body-current['body_yaw'])/step['duration']>math.radians(23)):
+            raise ValueError('Follow angular speed limit')
+        for delta,limit in ((yaw-actual['yaw'],360),(pitch-actual['pitch'],190),
+                            (body-current['body_yaw'],290)):
+            if (10/math.sqrt(3))*abs(delta)/step['duration']**2>math.radians(limit):
+                raise ValueError('Follow angular acceleration limit')
+    return step

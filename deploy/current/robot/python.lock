@@ -1,0 +1,2 @@
+# Observed on 3.13.5 (main, Jun 25 2025, 18:55:22) [GCC 14.2.0]; install on this platform only.
+webrtcvad-wheels==2.0.14.post1

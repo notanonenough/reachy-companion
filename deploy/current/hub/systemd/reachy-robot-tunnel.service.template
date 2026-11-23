@@ -1,0 +1,18 @@
+[Unit]
+Description=Authenticated local connection to Reachy APIs
+Wants=network-online.target avahi-daemon.service
+After=network-online.target avahi-daemon.service
+StartLimitIntervalSec=0
+
+[Service]
+User=deploy
+ExecStart=/usr/bin/ssh -N -T -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=@@HOME@@/.ssh/reachy_robot_known_hosts -o HostKeyAlias=reachy-mini-device -o ExitOnForwardFailure=yes -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -i @@HOME@@/.ssh/reachy_robot_tunnel -L 127.0.0.1:18000:127.0.0.1:8000 -L 127.0.0.1:18090:127.0.0.1:8090 -L 127.0.0.1:18780:127.0.0.1:8780 -L 127.0.0.1:18781:127.0.0.1:8781 -L 127.0.0.1:18794:127.0.0.1:8794 reachy-tunnel@reachy-mini.local
+Restart=always
+RestartSec=5
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=read-only
+
+[Install]
+WantedBy=multi-user.target

@@ -21,7 +21,8 @@ def http_reader(settings, *, tool=False, updates=False):
     opener=build_opener(ProxyHandler({}))
     def call(argument=None):
         import json
-        token=os.environ.get(settings.get('token_env',''),'')
+        token=(Path(settings['token_file']).read_text().strip() if settings.get('token_file')
+               else os.environ.get(settings.get('token_env',''),''))
         headers={'Content-Type':'application/json'}
         if token:headers['Authorization']='Bearer '+token
         request=Request(url,headers=headers,data=json.dumps(argument).encode() if tool else None)
@@ -49,9 +50,17 @@ def attach(scheduler, config_path):
         raise ValueError('Production requires full object decision protocol')
     sensors={}
     for name,item in settings.get('sensors',{}).items():
+        if item.get('token_file'):
+            item={**item,'token_file':str(Path(config_path).resolve().parent/item['token_file'])}
         sensors[name]=(http_reader(item),item.get('period_s',.5),item['source_id'])
     tools={name:http_reader(item,tool=True) for name,item in settings.get('tools',{}).items()}
-    deliveries={name:Delivery(name,item) for name,item in settings.get('delivery',{}).items() if item.get('enabled') and scheduler.config['export_enabled']}
+    deliveries={}
+    for name,item in settings.get('delivery',{}).items():
+        if not item.get('enabled') or not scheduler.config['export_enabled']:continue
+        item=dict(item)
+        for key in ('access_key_file','secret_key_file','session_token_file'):
+            if item.get(key):item[key]=str(Path(config_path).resolve().parent/item[key])
+        deliveries[name]=Delivery(name,item)
     store=DurableStore(Path(config_path).resolve().parent/settings['state_path'],settings.get('outbox_cap',10000))
     try:
         scheduler.enable_production(store,sensors,deliveries,tools)

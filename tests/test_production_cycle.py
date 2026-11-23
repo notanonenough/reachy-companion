@@ -90,6 +90,7 @@ class CycleTests(unittest.TestCase):
 
     def test_outbox_retry_exact_ack_and_reopen(self):
         self.scheduler.config['export_enabled']=True
+        self.cfg['production']['delivery']={name:dict(enabled=True) for name in ('s3','vps')}
         self.scheduler.state.record('decision_accepted',request_id='r',activity='wait',text='private')
         event_id,body=self.store.pending('s3')
         self.assertNotIn('private',json.dumps(body))
@@ -105,6 +106,76 @@ class CycleTests(unittest.TestCase):
         other=DurableStore(Path(self.temp.name)/'state.sqlite3')
         try:self.assertEqual(other.pending('vps')[0],event_id)
         finally:other.close()
+
+    def test_s3_only_logs_never_wait_for_disabled_vps(self):
+        self.cfg['export_enabled']=True
+        self.cfg['production']['delivery']={'s3':dict(enabled=True),'vps':dict(enabled=False)}
+        self.scheduler.state.record('decision_accepted',activity='wait')
+        event_id,_=self.store.pending('s3')
+        self.assertIsNone(self.store.pending('vps'))
+        self.store.ack('s3',event_id)
+        self.assertIsNone(self.store.pending('s3'))
+        self.assertEqual(self.store.db.execute('SELECT count(*) FROM outbox WHERE id=?',(event_id,)).fetchone()[0],0)
+
+    def test_relay_batches_retry_without_losing_individual_event_ids(self):
+        self.cfg['export_enabled']=True
+        self.cfg['production']['delivery']={'s3':dict(enabled=True),'vps':dict(enabled=False)}
+        ids=[self.store.append(dict(kind='fixture'),destinations=('s3',)) for _ in range(70)]
+        calls=[]
+        class Relay:
+            settings={'relay':True}
+            fail=True
+            def __call__(inner,identity,body):
+                calls.append((identity,body))
+                return 'wrong-ack' if inner.fail else identity
+        relay=Relay();service=self.scheduler.services;service.deliveries['s3']=relay
+        def advance():
+            service.advance(time.monotonic())
+            service.exports['s3'][0].thread.join(1)
+            service.advance(time.monotonic())
+        advance()
+        self.assertEqual([i for i,_ in self.store.pending_batch('s3')],ids[:32])
+        relay.fail=False;service.next_export['s3']=0
+        advance()
+        self.assertEqual(calls[0],calls[1])
+        self.assertEqual([e['id'] for e in calls[1][1]['events']],ids[:32])
+        self.assertEqual(self.store.pending('s3')[0],ids[32])
+
+    def test_drain_preserves_ready_answer_and_new_request(self):
+        from reachy_companion.autonomous.contracts import Task
+        now=time.monotonic();state=self.scheduler.state
+        answer='Полный ответ после ожидания. '*20
+        task=Task('task','attempt','input','question',state.authority,now,now+30,
+                  status='ready',result=answer,expires=now+20)
+        task.durable_revision=state.durable_revision
+        state.tasks[task.task_id]=task
+        state.candidates['new']='new human request';state.candidate_kinds['new']='main'
+        state.overload='DRAINING'
+        self.scheduler.pressure(now)
+        self.assertEqual(state.overload,'CONSOLIDATING')
+        self.assertEqual(task.result,answer)
+        self.assertEqual(task.status,'ready')
+        self.assertEqual(state.candidates['new'],'new human request')
+        state.overload='ACTIVE'
+        state.apply(dict(a='converse',why='ready',commit='task'),state.bind(now,1),now)
+        self.assertEqual(state.ledger[-1]['text'],answer)
+
+    def test_context_is_not_restarted_during_drain_or_after_stop(self):
+        from reachy_companion.autonomous.runtime import Job
+        release=threading.Event();calls=[]
+        self.cfg['context']['enabled']=True
+        self.model.context=lambda *args:calls.append(args)
+        self.model.revoke_context=lambda *args:None
+        self.scheduler.state.overload='DRAINING'
+        job=Job(lambda:release.wait(2));self.scheduler.fast_job=job
+        self.scheduler.binding=self.scheduler.state.bind(time.monotonic(),5)
+        try:
+            for _ in range(3):self.scheduler.advance()
+            self.assertEqual(calls,[])
+            self.scheduler.state.stopped=True
+            self.scheduler.advance()
+            self.assertEqual(calls,[])
+        finally:release.set();job.thread.join(1)
 
     def test_local_only_log_is_bounded_without_discarding_pending_exports(self):
         self.store.cap=2
@@ -145,6 +216,59 @@ class CycleTests(unittest.TestCase):
         self.pump(lambda:self.scheduler.state.counts['consolidation_completed']==1)
         self.assertEqual(self.scheduler.state.overload,'ACTIVE')
         self.assertGreaterEqual(self.scheduler.state.counts['decision_stale'],1)
+
+    def test_perception_refreshes_during_drain_and_fresh_poll_does_not_block_resume(self):
+        from reachy_companion.autonomous.runtime import Job
+        gate=threading.Event();poll_gate=threading.Event();service=self.scheduler.services
+        self.cfg['production']['overload_latency_s']=.04
+        calls=[]
+        def sensor():
+            calls.append(len(calls)+1)
+            return dict(summary='measured frame '+str(calls[-1]),ttl_ms=2000)
+        service.sensors['camera']=(sensor,.005,'real-reader-contract')
+        job=Job(lambda:gate.wait(2));job.started=time.monotonic()-1
+        self.scheduler.context_job=job
+        try:
+            self.scheduler.pressure(time.monotonic())
+            self.assertEqual(self.scheduler.state.overload,'DRAINING')
+            self.assertIn('latency:context',self.scheduler.pressure_status(time.monotonic())['reasons'])
+            for _ in range(10):
+                service.advance(time.monotonic());time.sleep(.003)
+            self.assertGreater(len(calls),1)
+            self.assertIn('measured frame',self.scheduler.state.sensors['camera'].summary)
+            # Keep a fresh physical read occupied exactly when other work ends.
+            gate.set();job.thread.join(1);self.scheduler.context_job=None
+            for row in service.polls.values():row[0].thread.join(1)
+            service.polls.clear()
+            poll=Job(lambda:poll_gate.wait(2))
+            service.polls['camera']=(poll,time.monotonic(),self.scheduler.state.authority)
+            self.scheduler.pressure(time.monotonic())
+            self.assertEqual(self.scheduler.state.overload,'CONSOLIDATING')
+            self.assertFalse(poll.future.done())
+        finally:
+            gate.set();poll_gate.set();job.thread.join(1)
+            for row in service.polls.values():row[0].thread.join(1)
+
+    def test_stalled_sensor_retains_one_slot_and_blocks_drain_until_terminal(self):
+        from reachy_companion.autonomous.runtime import Job
+        release=threading.Event();service=self.scheduler.services;calls=[]
+        service.sensors['camera']=(lambda:calls.append('replacement'),.001,'camera')
+        self.cfg['production']['overload_latency_s']=.01
+        job=Job(lambda:(release.wait(2),dict(summary='frame',ttl_ms=1000))[1])
+        job.started=time.monotonic()-1
+        service.polls['camera']=(job,job.started,self.scheduler.state.authority)
+        try:
+            self.scheduler.pressure(time.monotonic())
+            self.assertEqual(self.scheduler.state.overload,'DRAINING')
+            service.advance(time.monotonic());self.scheduler.pressure(time.monotonic())
+            self.assertEqual(calls,[])
+            self.assertEqual(self.scheduler.state.overload,'DRAINING')
+            self.assertIn('latency:sensor:camera',self.scheduler.pressure_status(time.monotonic())['reasons'])
+            release.set();job.thread.join(1)
+            service.next_poll['camera']=time.monotonic()+10
+            service.advance(time.monotonic());self.scheduler.pressure(time.monotonic())
+            self.assertEqual(self.scheduler.state.overload,'CONSOLIDATING')
+        finally:release.set();job.thread.join(1)
 
     def test_stop_rejects_late_outputs_and_preserves_clock_withdrawal(self):
         self.scheduler.advance();self.scheduler.ingest(dict(type='stop'))
@@ -193,6 +317,18 @@ class CycleTests(unittest.TestCase):
         service.next_memory=0
         self.pump(lambda:state.character.get('memory')=='inference: calm room')
         self.assertGreater(state.durable_revision,1)
+
+    def test_recent_dialogue_defers_memory_and_autonomous_reflection(self):
+        now=time.monotonic();service=self.scheduler.services
+        service.next_memory=0;self.scheduler.ingest(dict(type='utterance',text='question'),now)
+        # Isolate cadence from the ordinary conversation candidate.
+        self.scheduler.state.candidates.clear()
+        service.advance(now+1)
+        self.assertIsNone(service.maintenance)
+        self.assertEqual(self.scheduler.next_autonomous,now+30)
+        service.advance(now+11)
+        self.assertIsNotNone(service.maintenance)
+        service.maintenance[0].thread.join(1)
 
     def test_periodic_memory_cadence_begins_after_slow_inference_completes(self):
         service=self.scheduler.services;release=threading.Event();entered=threading.Event()
@@ -371,7 +507,7 @@ class CycleTests(unittest.TestCase):
         playback=SimpleNamespace(backend=backend,status=lambda:dict(execution_busy=False))
         receipt=lambda:dict(binding=('agent',1,1),microphone_enabled=False,quiet=False,privacy_all=False,valid_until=time.monotonic()+1)
         self.scheduler.speech_adapter=SimpleNamespace(advance=lambda a:None,operator_view=receipt,status=speech_status,close=lambda:None,playback=playback,lock=threading.RLock(),operator_receipt=receipt())
-        self.scheduler.audio_adapter=SimpleNamespace(status=lambda:dict(execution_busy=False,source_boot=None),advance=lambda a,r:None,close=lambda:None,allowed=False)
+        self.scheduler.audio_adapter=SimpleNamespace(status=lambda:dict(execution_busy=False,source_boot=None),advance=lambda a,r,**kw:None,close=lambda:None,allowed=False)
         self.model.call=lambda path:dict(compute_boot_id=self.model.boot_id,quarantined=[])
         poller=SimpleNamespace(status=lambda:dict(execution_busy=False),close=lambda:None)
         lease=SimpleNamespace(source_boot='source',authority=dict(agent_boot_id='agent',microphone_epoch=0,policy_epoch=0),

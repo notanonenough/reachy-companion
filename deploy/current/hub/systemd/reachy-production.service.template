@@ -1,0 +1,15 @@
+[Unit]
+Description=Reachy production autonomous companion
+After=reachy-hub.service reachy-robot-tunnel.service
+Requires=reachy-hub.service reachy-robot-tunnel.service
+
+[Service]
+User=deploy
+WorkingDirectory=@@ROOT@@
+Environment="PYTHONPATH=@@SOURCE_ROOT@@/src"
+UMask=0077
+ExecStart=@@ROOT@@/.venv-router/bin/python @@SOURCE_ROOT@@/deploy/autonomous/production_start.py hub --root @@ROOT@@ --config @@ROOT@@/config.autonomous.mac.local.json --token-file @@ROOT@@/secrets/autonomous-mac.token --peer-url http://192.168.0.184:8780 --peer-stop-port 8781 --lease-datagram-port 8782 --trusted-private-lan
+Restart=no
+TimeoutStopSec=15
+LogRateLimitIntervalSec=30s
+LogRateLimitBurst=200

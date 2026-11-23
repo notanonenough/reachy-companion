@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>PYTHONPATH</key>
+		<string>@@ROOT@@/src</string>
+	</dict>
+	<key>KeepAlive</key>
+	<true/>
+	<key>Label</key>
+	<string>local.reachy.tunnels</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>@@ROOT@@/.venv/bin/python</string>
+		<string>-m</string>
+		<string>reachy_companion.production_logs</string>
+		<string>run</string>
+		<string>--log</string>
+		<string>@@ROOT@@/data/mac-runtime/local.reachy.tunnels.log</string>
+		<string>--</string>
+		<string>/usr/bin/ssh</string>
+		<string>-N</string>
+		<string>-T</string>
+		<string>-o</string>
+		<string>BatchMode=yes</string>
+		<string>-o</string>
+		<string>ExitOnForwardFailure=yes</string>
+		<string>-o</string>
+		<string>ServerAliveInterval=10</string>
+		<string>-R</string>
+		<string>127.0.0.1:18097:127.0.0.1:18097</string>
+		<string>-R</string>
+		<string>127.0.0.1:18082:127.0.0.1:8082</string>
+		<string>-L</string>
+		<string>127.0.0.1:18090:127.0.0.1:18090</string>
+		<string>-L</string>
+		<string>127.0.0.1:18000:127.0.0.1:18000</string>
+		<string>-R</string>
+		<string>127.0.0.1:8097:127.0.0.1:8097</string>
+		<string>-L</string>
+		<string>127.0.0.1:18080:127.0.0.1:8080</string>
+		<string>-L</string>
+		<string>127.0.0.1:18081:127.0.0.1:8081</string>
+		<string>-L</string>
+		<string>127.0.0.1:18794:127.0.0.1:18794</string>
+		<string>reachy-hub</string>
+	</array>
+	<key>RunAtLoad</key>
+	<false/>
+	<key>StandardErrorPath</key>
+	<string>/dev/null</string>
+	<key>StandardOutPath</key>
+	<string>/dev/null</string>
+	<key>ThrottleInterval</key>
+	<integer>5</integer>
+	<key>WorkingDirectory</key>
+	<string>@@ROOT@@</string>
+</dict>
+</plist>

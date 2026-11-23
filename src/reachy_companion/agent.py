@@ -92,6 +92,8 @@ class Agent:
         self.microphone_epoch = self.microphone.epoch
         self.microphone_owner_id = None
         self.microphone_lock = threading.Lock()
+        from .camera_permission import CameraPermission
+        self.camera_permission = CameraPermission(config.path(config['paths']['data_dir']) / 'camera-state.json')
         self.playback_process = None
         self.voice_response = None
         self.pending_pcm = None
@@ -243,7 +245,9 @@ class Agent:
     def motor_permitted(self):
         policy=self.motion_policy.snapshot()
         permitted=(self.config['guarded_motion']['enabled'] is True and policy['motor_enabled'] is True
-                and policy['quiet'] is False and policy['privacy_all'] is False)
+                and policy['quiet'] is False and policy['privacy_all'] is False
+                and getattr(self,'microphone_owner_id',None) is None
+                and getattr(self.motion_policy,'owner_id',None) is None)
         guard=getattr(self,'_sensory_expression_guard',None)
         if guard is not None and guard['version']==self.expressions.version:
             b=guard['authority'];mode=self.conversation_mode.snapshot();intent=self.durable_intent.snapshot()
@@ -337,7 +341,7 @@ class Agent:
             if process is not None and process.poll() is None:process.terminate()
             raise
 
-    def set_motion_policy(self,value):
+    def set_motion_policy(self,value,*,admission=None):
         if not isinstance(value,dict):raise ValueError('Policy object required')
         value=dict(value)
         parameters={key:value.pop(key) for key in ('expected_boot_id','expected_epoch','owner_id','expected_owner_id') if key in value}
@@ -347,7 +351,8 @@ class Agent:
             if any(key in parameters and parameters[key] is None for key in ('owner_id','expected_owner_id')):
                 raise ValueError('Policy owner cannot be null')
             parameters.pop('expected_boot_id')
-        with self.motion_policy.lock:
+        with (self.microphone_lock if admission else nullcontext()), self.motion_policy.lock, (self.initiative.lock if admission else nullcontext()), (self.durable_intent.lock if admission else nullcontext()):
+            if admission:admission()
             if (set(value)!={'motor_enabled','quiet','privacy_all'} or any(type(x) is not bool for x in value.values())):
                 raise ValueError('Expected boolean motion policy')
             epoch=parameters.get('expected_epoch')
@@ -424,7 +429,7 @@ class Agent:
                         if hasattr(self,'sensory'):self._sensory_withdraw()
                         if hasattr(self,'initiative'):self.initiative.cancel()
                         retired_capture = self._capture_retire() if self._capture_enabled() else None
-                        if not enabled or self.microphone.error is not None or not self.microphone.enabled:
+                        if not enabled or owner_id is not None or self.microphone.error is not None or not self.microphone.enabled:
                             self.expressions.hold();self.pending_pcm=None;self.resume_audio=None;self.stop_speaker()
                 self.sounds.reset()
             if retired_capture is not None: retired_capture.close()
@@ -1209,7 +1214,7 @@ class Agent:
             if not self.listening.wait(timeout=1):
                 if not self.audio_lock.locked():
                     self.phase = 'paused'
-                    if self.microphone.enabled:
+                    if self.microphone.enabled and self.microphone_owner_id is None:
                         self.expressions.set('neutral')
                     else:
                         self.expressions.hold(maintenance=True)
@@ -1471,28 +1476,42 @@ class Agent:
                 policy=dict(policy,microphone_owner_id=self.microphone_owner_id,motion_policy_owner_id=self.motion_policy.owner_id),
                 volume=dict(percent=self.volume.percent,enabled=self.audio.get('playback_mixer',{}).get('enabled',False)),
                 conversation_mode=self.conversation_mode.snapshot(),
-                capabilities=dict(microphone=True,automatic=True,stop=True,camera_control=False,motion_off=True,conversation_mode=True),phase=self.phase)
+                camera=self.camera_permission.snapshot() if hasattr(self,'camera_permission') else dict(enabled=False,generation=None,error='Camera control unavailable'),
+                capabilities=dict(microphone=True,automatic=True,stop=True,camera_control=hasattr(self,'camera_permission'),motion_on=True,motion_off=True,conversation_mode=True),phase=self.phase)
 
-    def panel_match(self,binding):
+    def panel_match(self,binding,*,allow_owned=False):
         # Called by the existing MIC mutation under MIC/policy/initiative/intent locks.
         p=self.motion_policy.snapshot();v=self.durable_intent.snapshot()
         generation=self.initiative.schedule_generation
         if (self.agent_boot_id!=binding['agent_boot_id'] or self.microphone_epoch!=binding['microphone_epoch']
             or p['epoch']!=binding['policy_epoch'] or v['generation']!=binding['intent_generation'] or generation!=binding['schedule_generation']
-            or self.microphone_owner_id is not None or self.motion_policy.owner_id is not None
+            or (not allow_owned and (self.microphone_owner_id is not None or self.motion_policy.owner_id is not None))
             or p['quiet'] or p['privacy_all'] or self.microphone.error is not None or self.durable_intent.error or self.stopping.is_set()):
             raise RuntimeError('Panel authority unavailable or changed')
 
     def panel_control(self,payload):
         if type(payload) is not dict or type(payload.get('action')) is not str:raise ValueError('Panel action required')
-        action=payload['action'];positive=action in ('microphone_on','automatic_on')
+        action=payload['action'];positive=action in ('microphone_on','automatic_on','motion_on','camera_on')
         mode_action=action in ('mode_normal','mode_alice_test')
-        if action not in ('microphone_on','microphone_off','automatic_on','automatic_off','stop','mode_normal','mode_alice_test'):raise ValueError('Panel action unavailable')
-        fields={'action','binding','mode_generation'} if mode_action else {'action','binding'} if positive else {'action'}
+        if action not in ('microphone_on','microphone_off','automatic_on','automatic_off','stop','mode_normal','mode_alice_test','motion_on','motion_off','camera_on','camera_off'):raise ValueError('Panel action unavailable')
+        fields={'action','binding','camera_generation'} if action=='camera_on' else {'action','binding','mode_generation'} if mode_action else {'action','binding'} if positive else {'action'}
         if set(payload)!=fields:raise ValueError('Exact panel action fields required')
         if positive or mode_action:binding=self.panel_binding(payload['binding'])
         motion_withdrawn=None
-        if mode_action:
+        if action in ('camera_on','camera_off'):
+            with self.microphone_lock,self.motion_policy.lock,self.initiative.lock,self.durable_intent.lock:
+                if action=='camera_on':
+                    self.panel_match(binding,allow_owned=True)
+                    if type(payload['camera_generation']) is not int:raise ValueError('Camera generation required')
+                self.camera_permission.save(action=='camera_on',payload.get('camera_generation'))
+            if action=='camera_off':self.initiative.cancel()
+        elif action in ('motion_on','motion_off'):
+            p=self.motion_policy.snapshot();owner=self.motion_policy.owner_id
+            value=dict(motor_enabled=action=='motion_on',quiet=p['quiet'],privacy_all=p['privacy_all'],expected_boot_id=self.agent_boot_id,expected_epoch=p['epoch'])
+            if action=='motion_off' and owner is not None:value.update(owner_id=owner,expected_owner_id=owner)
+            self.set_motion_policy(value,admission=(lambda:self.panel_match(binding)) if action=='motion_on' else None)
+            motion_withdrawn=action=='motion_off'
+        elif mode_action:
             with self.microphone_lock,self.motion_policy.lock,self.initiative.lock,self.durable_intent.lock:
                 self.panel_match(binding)
                 self.conversation_mode.save(action.removeprefix('mode_'),payload['mode_generation'])
@@ -1518,7 +1537,8 @@ class Agent:
                 if owner is not None:value.update(owner_id=owner,expected_owner_id=owner)
                 try:motion_withdrawn=self.set_motion_policy(value)['motor_enabled'] is False
                 except (ValueError,RuntimeError,OSError):motion_withdrawn=False
-        return dict(accepted=True,action=action,state=self.panel_state(),scope=['conversation_mode'] if mode_action else ['questions'] if action.startswith('automatic_') else ['audio','questions'],motion_permission_withdrawn=motion_withdrawn,camera_controlled=False)
+                if hasattr(self,'camera_permission'):self.camera_permission.save(False)
+        return dict(accepted=True,action=action,state=self.panel_state(),scope=['camera'] if action.startswith('camera_') else ['motion'] if action.startswith('motion_') else ['conversation_mode'] if mode_action else ['questions'] if action.startswith('automatic_') else ['audio','questions'],motion_permission_withdrawn=motion_withdrawn,camera_controlled=action.startswith('camera_') or action=='stop')
 
     def manual(self, path, payload):
         binding = payload.get('operator_binding')
@@ -1678,6 +1698,8 @@ def main(config, test_speaker=False):
                 return
             if self.path=='/panel-state':
                 self.reply(200,agent.panel_state());return
+            if self.path=='/camera-state':
+                self.reply(200,agent.camera_permission.snapshot());return
             if self.path not in ('/status','/operator'):
                 self.reply(404, {'error': 'Not found'})
                 return

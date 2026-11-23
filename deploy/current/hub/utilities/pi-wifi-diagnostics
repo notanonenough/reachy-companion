@@ -1,0 +1,27 @@
+#!/bin/sh
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+export PATH
+umask 077
+log=/boot/firmware/wifi-diagnostics.log
+exec >"$log" 2>&1
+printf 'Wi-Fi diagnostic report (no passwords)\n'
+for delay in 20 40 60; do
+    sleep "$delay"
+    printf '\n===== SNAPSHOT =====\n'
+    date -Is
+    printf 'Model: '; tr '\000' '\n' </proc/device-tree/model
+    printf '\nHostname: '; hostname
+    printf '\nUptime: '; cat /proc/uptime
+    printf '\nRadio state:\n'; rfkill list
+    printf '\nNetworkManager devices:\n'; nmcli -f DEVICE,TYPE,STATE,CONNECTION device status
+    printf '\nActive profiles:\n'; nmcli -f NAME,TYPE,DEVICE connection show --active
+    printf '\nWi-Fi device and IP:\n'; nmcli -f GENERAL,IP4,IP6 device show wlan0
+    printf '\nVisible Wi-Fi networks:\n'; timeout 20 nmcli -f IN-USE,SSID,CHAN,FREQ,SIGNAL,SECURITY device wifi list ifname wlan0 --rescan yes
+    printf '\nWi-Fi link:\n'; iw dev wlan0 link
+    printf '\nRegulatory domain:\n'; iw reg get
+    printf '\nAddresses and routes:\n'; ip -brief address; ip route
+    printf '\nServices:\n'; systemctl --no-pager is-active NetworkManager wpa_supplicant
+    printf '\nNetwork log:\n'; journalctl -b -u NetworkManager -u wpa_supplicant --no-pager -n 180 -o short-monotonic
+    printf '\nKernel Wi-Fi messages:\n'; journalctl -b -k --no-pager -o short-monotonic | grep -Ei 'brcm|wlan|rfkill|firmware|under.?voltage|mmc|error' | tail -80
+    sync "$log"
+done

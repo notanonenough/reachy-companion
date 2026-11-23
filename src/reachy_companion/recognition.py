@@ -3,6 +3,29 @@ import json
 import hashlib
 import re
 import threading
+import math
+
+
+class DecoderBudgetExceeded(RuntimeError):
+    """A capped decode is not a complete utterance and must never be acted on."""
+
+
+def bounded_whisper_class(base):
+    # faster-whisper is pinned. Check the raw generation before its timestamp
+    # splitter can turn an unfinished decode into apparently complete segments.
+    class BoundedWhisper(base):
+        def generate_with_fallback(self, encoder_output, prompt, tokenizer, options):
+            result = super().generate_with_fallback(encoder_output, prompt, tokenizer, options)
+            budget = options.max_new_tokens
+            tokens = result[0].sequences_ids[0]
+            # CTranslate2 may return fewer tokens than the cap when it cuts off
+            # a decode. Count alone is insufficient: require the closing audio
+            # timestamp too. The pinned recognizer keeps timestamps enabled.
+            if budget is not None and (len(tokens) >= budget - 1 or
+                    tokens and not options.without_timestamps and tokens[-1] < tokenizer.timestamp_begin):
+                raise DecoderBudgetExceeded('Incomplete bounded Whisper decode')
+            return result
+    return BoundedWhisper
 
 
 def expected_whisper_hash(settings):
@@ -40,7 +63,7 @@ class Recognizer:
             if not verified_whisper_cache(config.path(self.settings['path']),expected):
                 raise ValueError('Whisper cache is incomplete, unreadable or fails model.bin SHA256')
             from faster_whisper import WhisperModel
-            self.model = WhisperModel(str(config.path(self.settings['path'])),
+            self.model = bounded_whisper_class(WhisperModel)(str(config.path(self.settings['path'])),
                                       device=self.settings['device'], compute_type=self.settings['compute_type'],
                                       cpu_threads=self.settings['cpu_threads'], local_files_only=True)
             # Compile CUDA kernels before health becomes ready, not on the first user turn.
@@ -63,19 +86,33 @@ class Recognizer:
                 import numpy as np
                 samples = np.frombuffer(pcm, dtype='<i2').astype(np.float32) / 32768
                 s = self.settings
+                seconds = len(pcm) / (2 * audio['sample_rate'])
+                # Continuous capture sends at most four seconds. Keep ample room
+                # for rapid speech, but do not decode hundreds of tokens of noise.
+                # Preserve the existing long-utterance API for recordings >8s.
+                budget = max(32, 16 + math.ceil(20 * seconds)) if seconds <= 8 else None
                 if diagnostics is not None:
-                    diagnostics.update(backend='faster_whisper',whisper_invoked=True,segments_seen=0,segments_accepted=0,
+                    diagnostics.update(backend='faster_whisper',whisper_invoked=True,vad_filter=bool(self.settings['vad_filter']),decoder_budget_exceeded=False,segments_seen=0,segments_accepted=0,
                         segments_rejected=0,rejected_logprob=0,rejected_no_speech=0,accepted_empty_text=0)
                 segments, _ = self.model.transcribe(samples, language=s['language'], beam_size=s['beam_size'],
                     initial_prompt=s['initial_prompt'], vad_filter=s['vad_filter'],
                     condition_on_previous_text=False, temperature=0,
-                    no_speech_threshold=s['no_speech_threshold'], log_prob_threshold=s['log_prob_threshold'])
+                    no_speech_threshold=s['no_speech_threshold'], log_prob_threshold=s['log_prob_threshold'],
+                    max_new_tokens=budget)
                 parts=[]
-                for seg in segments:
+                def complete_segments():
+                    try:
+                        yield from segments
+                    except DecoderBudgetExceeded:
+                        # Clear previously emitted segments too: a lost ending
+                        # could contain a negation. Never expose a partial command.
+                        parts.clear()
+                        if diagnostics is not None:diagnostics['decoder_budget_exceeded']=True
+                for seg in complete_segments():
                     if s.get('diagnostics_enabled'):
                         import logging
-                        logging.getLogger('reachy-voice').info('stt_segment logprob=%.3f no_speech=%.3f text=%r',
-                            seg.avg_logprob,seg.no_speech_prob,seg.text)
+                        logging.getLogger('reachy-voice').info('stt_segment logprob=%.3f no_speech=%.3f chars=%d',
+                            seg.avg_logprob,seg.no_speech_prob,len(seg.text))
                     log_ok=seg.avg_logprob>=s['log_prob_threshold']
                     if diagnostics is None and not log_ok:continue # preserve original default short-circuit
                     speech_ok=seg.no_speech_prob<s['no_speech_threshold']

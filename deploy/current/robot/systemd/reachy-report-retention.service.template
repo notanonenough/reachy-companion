@@ -1,0 +1,9 @@
+[Unit]
+Description=Retain bounded completed Reachy session reports
+
+[Service]
+Type=oneshot
+User=pollen
+Environment="PYTHONPATH=@@SOURCE_ROOT@@/src"
+ExecStart=/usr/bin/python3 -m reachy_companion.production_logs prune --data @@ROOT@@/data --apply
+UMask=0077

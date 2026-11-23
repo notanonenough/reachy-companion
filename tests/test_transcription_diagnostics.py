@@ -7,7 +7,7 @@ import threading
 import types
 import unittest
 from unittest.mock import patch
-from reachy_companion.recognition import Recognizer
+from reachy_companion.recognition import Recognizer, bounded_whisper_class, DecoderBudgetExceeded
 
 class Segment:
     def __init__(self,text,logprob=-.5,no_speech=.1):self.text=text;self.avg_logprob=logprob;self.no_speech_prob=no_speech
@@ -25,6 +25,37 @@ class Sounds:
         return dict(kind=self.kind,speech=.12,music=.73,raw_audio='must-not-copy',steps=[dict(text='must-not-copy')])
 
 class DiagnosticsTests(unittest.TestCase):
+    def test_decoder_cap_rejects_raw_unfinished_generation_before_segment_split(self):
+        class Base:
+            def generate_with_fallback(self, encoder, prompt, tokenizer, options):
+                tokens=list(range(encoder));tokens[-1]=201 if prompt else 5
+                return (types.SimpleNamespace(sequences_ids=[tokens]), -.1, 0, 1)
+        model=bounded_whisper_class(Base)();options=types.SimpleNamespace(max_new_tokens=96,without_timestamps=False)
+        tokenizer=types.SimpleNamespace(timestamp_begin=200)
+        self.assertEqual(len(model.generate_with_fallback(94, [1], tokenizer, options)[0].sequences_ids[0]),94)
+        for count in (95,96,100):
+            with self.assertRaises(DecoderBudgetExceeded):model.generate_with_fallback(count, [1], tokenizer, options)
+        with self.assertRaises(DecoderBudgetExceeded):model.generate_with_fallback(12, [], tokenizer, options)
+        self.assertEqual(len(model.generate_with_fallback(100, [], tokenizer, types.SimpleNamespace(max_new_tokens=None))[0].sequences_ids[0]),100)
+
+    def test_budget_exhaustion_discards_prior_segments_and_preserves_long_api(self):
+        pipeline=self.pipeline(segments=[Segment('partial command')]);original=pipeline.stt.model.transcribe
+        def unfinished(samples,**kwargs):
+            stream,info=original(samples,**kwargs)
+            def fragments():
+                yield from stream
+                raise DecoderBudgetExceeded()
+            return fragments(),info
+        pipeline.stt.model.transcribe=unfinished
+        result=pipeline.transcribe_response(self.payload())
+        self.assertEqual(result['transcript'],'');self.assertTrue(result['diagnostics']['decoder_budget_exceeded'])
+        self.assertEqual(pipeline.stt.model.calls[0][1]['max_new_tokens'],96)
+        # Same conservative rejection without diagnostic opt-in.
+        self.assertEqual(pipeline.transcribe_response(self.payload(False))['transcript'],'')
+        normal=self.pipeline(segments=[Segment('complete')]);normal.config['audio']['max_input_seconds']=30
+        self.assertEqual(normal.stt.transcribe(b'\x01\x00'*16000*10),'complete')
+        self.assertIsNone(normal.stt.model.calls[-1][1]['max_new_tokens'])
+
     def setUp(self):
         try:import numpy
         except ImportError:
@@ -56,6 +87,14 @@ class DiagnosticsTests(unittest.TestCase):
     def payload(self,diagnostics=True):
         # Four seconds synthetic mono PCM; prefilter must see only the last 3s.
         return dict(pcm_base64=base64.b64encode(b'\x01\x00'*64000).decode(),diagnostics=diagnostics)
+    def test_segment_logging_has_metrics_without_text(self):
+        pipeline=self.pipeline(segments=[Segment('private-speech')])
+        pipeline.stt.settings['diagnostics_enabled']=True
+        with self.assertLogs('reachy-voice',level='INFO') as logs:
+            result=pipeline.transcribe_response(self.payload())
+        self.assertTrue(result['diagnostics']['vad_filter'])
+        self.assertIn('chars=',str(logs.output));self.assertNotIn('private-speech',str(logs.output))
+
     def test_music_skip_and_whisper_empty_are_distinct_on_same_admitted_pcm(self):
         payload=self.payload();music=self.pipeline(kind='music');empty=self.pipeline()
         skip=music.transcribe_response(payload);result=empty.transcribe_response(payload)

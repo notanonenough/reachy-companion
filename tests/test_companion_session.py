@@ -11,7 +11,7 @@ import unittest
 from unittest.mock import patch
 from reachy_companion.autonomous.audio_adapter import AudioAdapter,HttpSTT
 from reachy_companion.autonomous.audio_peer import AudioPeer,AudioPolling,PeerClient,PeerLease,RemotePCM,create_server
-from reachy_companion.autonomous.companion_session import run_session
+from reachy_companion.autonomous.companion_session import run_session,read_speech_operator
 from reachy_companion.autonomous.config import load
 from reachy_companion.autonomous.playback import Playback,ReplayPCM
 from reachy_companion.autonomous.runtime import ReplayGateway,Scheduler
@@ -91,12 +91,67 @@ class SessionTests(unittest.TestCase):
         self.assertTrue(report['cleanup_verified']);self.assertFalse(any(report['execution_busy'].values()))
         self.assertFalse(report['continuous']);self.assertEqual(report['device_lifetime_cap_s'],180)
         self.assertEqual(self.audio.status()['counts']['completed'],1);self.assertFalse(report['transcripts_retained'])
+    def test_transient_health_transport_error_does_not_reacquire_or_abort(self):
+        original=self.gateway.call;attempts=[]
+        def health(path):
+            attempts.append(path)
+            if len(attempts)==1:raise TimeoutError('temporary')
+            return original(path)
+        self.gateway.call=health
+        report=self.run_normal(1)
+        self.assertEqual(report['reason'],'duration')
+        self.assertGreater(len(attempts),1)
+        self.assertTrue(any(row.get('runtime',{}).get('compute_health_errors')==1 for row in self.latest))
+        networks=[row['runtime']['network'] for row in self.latest if 'runtime' in row]
+        self.assertTrue(any(row['compute']['state']=='failed' for row in networks))
+        self.assertTrue(any(row['compute']['state']=='reachable' for row in networks))
+        self.assertTrue(any(row['robot']['state']=='reachable' for row in networks))
+        self.assertTrue(all(row['internet']=='unknown' for row in networks))
+        self.assertEqual(self.scheduler.state.authority.compute_boot_id,self.gateway.boot_id)
+
+    def test_delayed_operator_http_read_does_not_occupy_refresh_slot_for_general_timeout(self):
+        from http.server import BaseHTTPRequestHandler,ThreadingHTTPServer
+        from reachy_companion.hub import Hub
+        calls=[];actual=self.operator
+        class Handler(BaseHTTPRequestHandler):
+            def log_message(self,*args):pass
+            def do_GET(self):
+                calls.append(time.monotonic())
+                if len(calls)==2:time.sleep(.6)
+                raw=json.dumps(actual).encode()
+                try:
+                    self.send_response(200);self.send_header('Content-Type','application/json')
+                    self.send_header('Content-Length',str(len(raw)));self.end_headers();self.wfile.write(raw)
+                except (BrokenPipeError,ConnectionResetError):pass
+        server=ThreadingHTTPServer(('127.0.0.1',0),Handler)
+        worker=threading.Thread(target=server.serve_forever,daemon=True);worker.start()
+        class Config(dict):token='t'*32
+        hub=Hub(Config(network={'agent_url':'http://127.0.0.1:'+str(server.server_port)},timeouts={'http':10}))
+        self.speech.operator=lambda:read_speech_operator(hub)
+        try:
+            report=self.run_normal(1)
+            self.assertEqual(report['reason'],'duration')
+            self.assertGreater(len(calls),3)
+            self.assertLess(calls[2]-calls[1],.3)
+            self.assertGreaterEqual(self.speech.status()['rejected_refreshes'],1)
+            self.assertFalse(any(row['reason']=='operator_expired' for row in self.playback.status()['timeline']))
+        finally:server.shutdown();server.server_close();worker.join(1)
+
     def test_changed_compute_boot_withdraws_instead_of_reconnect(self):
         self.gateway.changed=True
         report=self.run_normal()
         self.assertEqual(report['reason'],'runtime_error');self.assertFalse(report['accepted'])
         self.assertEqual(self.scheduler.state.authority.compute_boot_id,self.gateway.boot_id)
         self.assertTrue(self.peer.closed);self.assertTrue(self.scheduler.closed)
+    def test_explicit_peer_stop_precedes_slow_local_cleanup(self):
+        original=self.scheduler.close
+        def slow_close():
+            time.sleep(.4)
+            original()
+        self.scheduler.close=slow_close
+        report=self.run_normal(1)
+        self.assertEqual(self.peer.close_reason,'controller_stop')
+        self.assertTrue(report['cleanup_verified'])
     def test_expired_health_keeps_real_occupied_job_and_stops_renewal(self):
         self.gateway.health_release=threading.Event()
         report=self.run_normal(2)

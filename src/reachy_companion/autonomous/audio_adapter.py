@@ -4,6 +4,7 @@ Capture clock mapping and source boot binding belong to the authenticated
 transport owner. Model output cannot supply them. Unknown audio is dialogue
 data, never a confirmed human identity or operator permission.
 """
+from collections import deque
 import base64
 import hashlib
 import math
@@ -14,21 +15,61 @@ from .contracts import decode,Authority
 
 
 class HttpSTT:
-    def __init__(self, url, token, *, timeout=2):
+    def __init__(self, url, token, *, timeout=2, diagnostics=False):
         self.url = url.rstrip('/') + '/transcribe'
         self.token, self.timeout = token, timeout
+        self.diagnostics=diagnostics;self.last_diagnostics={}
         self.opener=build_opener(ProxyHandler({}))
+        self.execution_lock=threading.Lock();self.waiting_terminal=False
 
-    def transcribe(self, pcm):
-        request = Request(self.url, data=__import__('json').dumps(
-            dict(pcm_base64=base64.b64encode(pcm).decode())).encode(),
+    def request(self,path,payload,timeout):
+        request = Request(self.url+path, data=__import__('json').dumps(payload).encode(),
             headers={'Authorization': 'Bearer ' + self.token,
                      'Content-Type': 'application/json'})
-        with self.opener.open(request, timeout=self.timeout) as response:
+        with self.opener.open(request, timeout=timeout) as response:
             raw = response.read(8193)
         if len(raw) > 8192:
             raise ValueError('STT receipt cap')
-        text = decode(raw)['transcript']
+        return decode(raw)
+
+    def transcribe(self, pcm):
+        if not self.execution_lock.acquire(False):raise RuntimeError('STT client execution busy')
+        try:return self.transcribe_owned(pcm)
+        finally:self.execution_lock.release()
+
+    def transcribe_owned(self,pcm):
+        from ..transcription import checked_execution
+        self.last_diagnostics={}
+        ticket=checked_execution(self.request('/reserve',{},min(2,self.timeout))['execution'])
+        try:
+            receipt=self.request('',dict(execution=ticket,pcm_base64=base64.b64encode(pcm).decode(),
+                **({'diagnostics':True} if self.diagnostics else {})),self.timeout)
+            if receipt.get('execution')!=ticket:raise ValueError('STT execution receipt mismatch')
+            return self.receipt_text(receipt)
+        except Exception:
+            self.waiting_terminal=True
+            try:
+                while True:
+                    try:
+                        state=self.request('/settle',ticket,1)
+                        if (state.get('execution')==ticket and state.get('terminal') is True
+                                and state.get('state') in ('terminal','revoked')):break
+                    except Exception:pass
+                    # This remains the same occupied AudioAdapter worker. A newer
+                    # utterance can replace pending input, never launch more STT.
+                    time.sleep(.1)
+            finally:self.waiting_terminal=False
+            raise
+
+    def receipt_text(self,receipt):
+        text = receipt['transcript']
+        diagnostic=receipt.get('diagnostics',{})
+        if isinstance(diagnostic,dict):
+            for key in ('segments_seen','segments_accepted','segments_rejected','rejected_logprob','rejected_no_speech','prefilter_skip','recognizer_invoked','whisper_invoked','vad_filter','decoder_budget_exceeded'):
+                value=diagnostic.get(key)
+                if type(value) is bool or type(value) is int and 0<=value<=100000:self.last_diagnostics[key]=value
+            outcome=diagnostic.get('outcome')
+            if outcome in ('recognized','whisper_empty','recognizer_empty','music_prefilter_skipped_whisper'):self.last_diagnostics['outcome']=outcome
         if not isinstance(text, str) or len(text) > 1024:
             raise ValueError('Bounded STT text required')
         return text
@@ -49,12 +90,15 @@ class AudioAdapter:
         self.authority = self.operator_signature = None
         self.operator_deadline = 0
         self.allowed = False
+        self.processing_paused = False
         self.closed = False
         self.generation = 0
         self.level=None
         self.pending = self.result = self.job = None
         self.counts = dict(submitted=0, overwritten=0, stale=0, echo=0,
-                           started=0, completed=0, no_response=0)
+                           started=0, completed=0, no_response=0, empty=0, errors=0, timeouts=0)
+        self.diagnostics = deque(maxlen=32)
+        self.last_error = None
 
     def same_capture_scope(self,left,right):
         if self.continuous_input and isinstance(left,Authority) and isinstance(right,Authority):
@@ -78,10 +122,11 @@ class AudioAdapter:
         self.pending = self.result = None
         self.level=None
 
-    def advance(self, authority, operator):
+    def advance(self, authority, operator, *, allow_start=True):
         """Only local mailbox work; no HTTP/capture/STT waits on scheduler."""
         with self.lock:
             now = self.clock()
+            self.processing_paused = not allow_start
             signature = None
             allowed = False
             if operator:
@@ -102,8 +147,11 @@ class AudioAdapter:
                     if self._fresh(observation, generation):
                         if error or not text.strip():
                             self.counts['no_response'] += 1
+                            if not error:self.counts['empty'] += 1
+                            self.last_error = error
                         else:
                             self.counts['completed'] += 1
+                            self.last_error = None
                             event = dict(type='utterance', text=text, audio=dict(
                                 source_boot=observation['source_boot'], sequence=observation['sequence'],
                                 operator_binding=list(observation['operator_signature'][0]),
@@ -115,11 +163,12 @@ class AudioAdapter:
                             event['audio']['stt_provenance']='pc_http_stt' if type(self.stt) is HttpSTT else 'fixture_or_unverified_stt'
                     else:
                         self.counts['stale'] += 1
-            if self.pending and not self.job:
+            if self.pending and not self.job and allow_start:
                 observation, self.pending = self.pending, None
                 if self._fresh(observation, self.generation):
                     generation = self.generation
                     self.counts['started'] += 1
+                    started = self.clock()
                     def work():
                         text, error = '', None
                         pcm = observation.pop('pcm')
@@ -132,7 +181,18 @@ class AudioAdapter:
                         finally:
                             del pcm
                         with self.lock:
-                            if self._fresh(observation, generation):
+                            fresh = self._fresh(observation, generation)
+                            if error:
+                                self.counts['errors'] += 1
+                                if error in ('TimeoutError','socket.timeout'):self.counts['timeouts'] += 1
+                                self.last_error=error
+                            self.diagnostics.append(dict(lineage_id=observation['lineage_id'],
+                                outcome='stale' if not fresh else 'error' if error else 'recognized' if text.strip() else 'empty',
+                                error_class=error, stt_s=round(max(0,self.clock()-started),4),
+                                capture_to_result_s=round(max(0,self.clock()-observation['captured_end']),4),
+                                audio_s=observation['audio_s'],
+                                worker=dict(self.stt.last_diagnostics) if type(self.stt) is HttpSTT else {}))
+                            if fresh:
                                 self.result = observation, generation, text, error
                             else:
                                 self.counts['stale'] += 1
@@ -199,7 +259,7 @@ class AudioAdapter:
             self.latest_utterance_sequence=sequence
             if self.pending:
                 self.counts['overwritten'] += 1
-            self.pending = dict(pcm=pcm, pcm_sha256=hashlib.sha256(pcm).hexdigest(),
+            self.pending = dict(pcm=pcm, audio_s=len(pcm)/32000, pcm_sha256=hashlib.sha256(pcm).hexdigest(),
                 source_boot=source_boot, sequence=sequence, captured_end=captured_end,
                 deadline=captured_end+self.result_ttl_s, authority=authority,
                 operator_signature=self.operator_signature, echo_reference=echo_reference,
@@ -221,4 +281,7 @@ class AudioAdapter:
         with self.lock:
             return dict(execution_busy=bool(self.job and self.job.is_alive()),
                         pending=self.pending is not None, source_boot=self.source,
-                        last_sequence=self.sequence,latest_utterance_sequence=self.latest_utterance_sequence, counts=dict(self.counts))
+                        last_sequence=self.sequence,latest_utterance_sequence=self.latest_utterance_sequence, counts=dict(self.counts),
+                        last_error=self.last_error, recent=list(self.diagnostics),
+                        waiting_terminal=bool(type(self.stt) is HttpSTT and self.stt.waiting_terminal),
+                        allowed=self.allowed, processing_paused=self.processing_paused, result_ttl_s=self.result_ttl_s)

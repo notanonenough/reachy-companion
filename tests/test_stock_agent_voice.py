@@ -18,6 +18,20 @@ from reachy_companion.expressions import plan
 
 
 class StockAgentVoiceTests(unittest.TestCase):
+    def test_external_microphone_owner_retires_legacy_expression_lane(self):
+        expressions=self.agent.expressions
+        expressions.set('neutral')
+        epoch=self.agent.microphone_epoch
+        self.agent.set_microphone(True,listen=False,expected_boot_id=self.agent.agent_boot_id,
+            expected_epoch=epoch,owner_id='production-owner')
+        self.assertFalse(self.agent.motor_permitted())
+        self.assertIsNone(expressions.state)
+        version=expressions.version
+        expressions.set('neutral')
+        expressions.hold(maintenance=True)
+        self.assertIsNone(expressions.state)
+        self.assertEqual(expressions.version,version)
+
     setUpFixture = stock_fixture.StockMotionTests.setUp
     factory = stock_fixture.StockMotionTests.factory
 

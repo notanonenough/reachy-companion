@@ -1,0 +1,1052 @@
+{
+  "version": 1,
+  "captured_at": "2026-11-14",
+  "timezone": "Asia/Baku",
+  "hosts": {
+    "hub": {
+      "home": "/home/deploy",
+      "root": "/home/deploy/reachy-companion",
+      "source_root": "/home/deploy/reachy-companion/current",
+      "ssh_alias": "reachy-hub",
+      "user": "deploy"
+    },
+    "robot": {
+      "home": "/home/pollen",
+      "root": "/home/pollen/reachy-companion",
+      "source_root": "/home/pollen/reachy-companion/current",
+      "ssh_alias": "reachy-mini",
+      "user": "pollen"
+    },
+    "mac": {
+      "home": "/Users/notanonenough",
+      "root": "/Users/notanonenough/workspaces/reachy-companion",
+      "source_root": "/Users/notanonenough/workspaces/reachy-companion",
+      "ssh_alias": null,
+      "user": "notanonenough"
+    },
+    "router": {
+      "home": "/root",
+      "root": "/root/reachy-companion",
+      "source_root": "/root/reachy-companion/current",
+      "ssh_alias": "reachy-router-vuqar",
+      "user": "root"
+    }
+  },
+  "files": [
+    {
+      "host": "hub",
+      "source": "hub/config/config.local.json.template",
+      "destination": "@@ROOT@@/config.local.json",
+      "kind": "configuration",
+      "mode": "0600",
+      "scope": "runtime",
+      "sha256": "41312d3763367e560baca7cb19d51212635ebed131362975c148dd0abf910980",
+      "owner": "deploy"
+    },
+    {
+      "host": "hub",
+      "source": "hub/config/config.autonomous.mac.local.json.template",
+      "destination": "@@ROOT@@/config.autonomous.mac.local.json",
+      "kind": "configuration",
+      "mode": "0600",
+      "scope": "runtime",
+      "sha256": "a1847f270fec4891f92df70628f4d28fa5468174318f9646e965ce3db106b71a",
+      "owner": "deploy"
+    },
+    {
+      "host": "hub",
+      "source": "hub/systemd/pi-wifi-diagnostics.service.template",
+      "destination": "/etc/systemd/system/pi-wifi-diagnostics.service",
+      "kind": "systemd",
+      "mode": "0644",
+      "scope": "network",
+      "sha256": "3468c56763fcc21204bcf77af75959f07ec47d1090c6c14b4821a84c426459d4",
+      "owner": "root"
+    },
+    {
+      "host": "hub",
+      "source": "hub/systemd/reachy-hub.service.template",
+      "destination": "/etc/systemd/system/reachy-hub.service",
+      "kind": "systemd",
+      "mode": "0644",
+      "scope": "runtime",
+      "sha256": "3fe279422df0d253bfb7c46e6413944a50836baeb917017ec4c7d217fcbe14c3",
+      "owner": "root"
+    },
+    {
+      "host": "hub",
+      "source": "hub/systemd/reachy-network-qos.service.template",
+      "destination": "/etc/systemd/system/reachy-network-qos.service",
+      "kind": "systemd",
+      "mode": "0644",
+      "scope": "network",
+      "sha256": "d39dd576459be7175b6c521d428061b136b7e7f3fd144c6f5ba7ec582bd5a713",
+      "owner": "root"
+    },
+    {
+      "host": "hub",
+      "source": "hub/systemd/reachy-production.service.template",
+      "destination": "/etc/systemd/system/reachy-production.service",
+      "kind": "systemd",
+      "mode": "0644",
+      "scope": "runtime",
+      "sha256": "07365910c48b9d3a9a30af3665d3ab3c85b1431538af4a38a44aaf242bfb0613",
+      "owner": "root"
+    },
+    {
+      "host": "hub",
+      "source": "hub/systemd/reachy-report-retention.service.template",
+      "destination": "/etc/systemd/system/reachy-report-retention.service",
+      "kind": "systemd",
+      "mode": "0644",
+      "scope": "runtime",
+      "sha256": "4440f8c8eb10587839469dc5a30e72807877f17bb5be82cdbbe3261d5e632733",
+      "owner": "root"
+    },
+    {
+      "host": "hub",
+      "source": "hub/systemd/reachy-report-retention.timer.template",
+      "destination": "/etc/systemd/system/reachy-report-retention.timer",
+      "kind": "systemd",
+      "mode": "0644",
+      "scope": "runtime",
+      "sha256": "9635a5f9ab0bdb0ed96e613d32999ec52cc03873c811f6b19f55e7152981a048",
+      "owner": "root"
+    },
+    {
+      "host": "hub",
+      "source": "hub/systemd/reachy-robot-tunnel.service.template",
+      "destination": "/etc/systemd/system/reachy-robot-tunnel.service",
+      "kind": "systemd",
+      "mode": "0644",
+      "scope": "network",
+      "sha256": "d26866d0dc211510ae10fb19013b5593afa9bb2bcb906f38bf177c8f5bf44004",
+      "owner": "root"
+    },
+    {
+      "host": "hub",
+      "source": "hub/systemd/reachy-voice.service.template",
+      "destination": "/etc/systemd/system/reachy-voice.service",
+      "kind": "systemd",
+      "mode": "0644",
+      "scope": "runtime",
+      "sha256": "0dfeb6db71f29e9e879cd383cd543869b239958b866cd57acf574430dda892e7",
+      "owner": "root"
+    },
+    {
+      "host": "hub",
+      "source": "hub/system/etc/NetworkManager/system-connections/LinkedList-5GHz.nmconnection.template",
+      "destination": "/etc/NetworkManager/system-connections/LinkedList-5GHz.nmconnection",
+      "kind": "network",
+      "mode": "0600",
+      "scope": "network",
+      "sha256": "4bb59d11748bb0873509df82634f6bb5ef72fc43b7207c9d69c7243b29e425c7",
+      "owner": "root"
+    },
+    {
+      "host": "hub",
+      "source": "hub/system/etc/NetworkManager/system-connections/LinkedList.nmconnection.template",
+      "destination": "/etc/NetworkManager/system-connections/LinkedList.nmconnection",
+      "kind": "network",
+      "mode": "0600",
+      "scope": "network",
+      "sha256": "74a6bafda27281091efd7c77ce4cebc350b6ee8994597b243b779967577c389c",
+      "owner": "root"
+    },
+    {
+      "host": "hub",
+      "source": "hub/system/etc/NetworkManager/system-connections/Wired connection 1.nmconnection.template",
+      "destination": "/etc/NetworkManager/system-connections/Wired connection 1.nmconnection",
+      "kind": "network",
+      "mode": "0600",
+      "scope": "network",
+      "sha256": "d22484cbeca9e4235b94caa15768bb733ba08a7a424c30abcf565fa61f17ffd4",
+      "owner": "root"
+    },
+    {
+      "host": "hub",
+      "source": "hub/system/etc/ssh/sshd_config.d/50-cloud-init.conf.template",
+      "destination": "/etc/ssh/sshd_config.d/50-cloud-init.conf",
+      "kind": "network",
+      "mode": "0644",
+      "scope": "network",
+      "sha256": "474ef6932d6b998ec97b122a9d86af024b988d64c243f3caf01dd9e5ed41618e",
+      "owner": "root"
+    },
+    {
+      "host": "hub",
+      "source": "hub/system/etc/ssh/sshd_config.d/00-reachy-key-auth.conf.template",
+      "destination": "/etc/ssh/sshd_config.d/00-reachy-key-auth.conf",
+      "kind": "network",
+      "mode": "0644",
+      "scope": "network",
+      "sha256": "d424dcee8b2169e0f03c027d35d9c0042f071a2720a1eba3ab842dcce4bbc14d",
+      "owner": "root"
+    },
+    {
+      "host": "hub",
+      "source": "hub/system/etc/reachy-network-qos.nft.template",
+      "destination": "/etc/reachy-network-qos.nft",
+      "kind": "network",
+      "mode": "0644",
+      "scope": "network",
+      "sha256": "f5099f5495cd88e919de582f8c0982a83ac5ac483ba25df074845d8d7d85a23d",
+      "owner": "root"
+    },
+    {
+      "host": "hub",
+      "source": "hub/system/etc/hosts.template",
+      "destination": "/etc/hosts",
+      "kind": "network",
+      "mode": "0644",
+      "scope": "network",
+      "sha256": "bd6c279eb4496ca1e05988673e1804f8caeb28453f45c1bf6258378736914be1",
+      "owner": "root"
+    },
+    {
+      "host": "hub",
+      "source": "hub/utilities/pi-wifi-diagnostics",
+      "destination": "/usr/local/sbin/pi-wifi-diagnostics",
+      "kind": "utility",
+      "mode": "0755",
+      "scope": "network",
+      "sha256": "a0ef26785fccddf28fa41e5bf1b43abdad459f4b5d4eb5806fae9a8ccc195ed9",
+      "owner": "root"
+    },
+    {
+      "host": "robot",
+      "source": "robot/config/config.local.json.template",
+      "destination": "@@ROOT@@/config.local.json",
+      "kind": "configuration",
+      "mode": "0600",
+      "scope": "runtime",
+      "sha256": "13fd1bd9930bff7f77574671d95e68da7958f45c570bbc84b2a53d1f903cdaf8",
+      "owner": "pollen"
+    },
+    {
+      "host": "robot",
+      "source": "robot/systemd/reachy-camera-sensor.service.template",
+      "destination": "/etc/systemd/system/reachy-camera-sensor.service",
+      "kind": "systemd",
+      "mode": "0644",
+      "scope": "runtime",
+      "sha256": "73b58c11e3a059105323bfaac142411ac53621027141968c73e75814e5ff1c84",
+      "owner": "root"
+    },
+    {
+      "host": "robot",
+      "source": "robot/systemd/reachy-companion-firewall.service.template",
+      "destination": "/etc/systemd/system/reachy-companion-firewall.service",
+      "kind": "systemd",
+      "mode": "0644",
+      "scope": "network",
+      "sha256": "9d74eb72816af7d9f0f04da9082b125af81e96c8e9b66d141e1a69be62647e27",
+      "owner": "root"
+    },
+    {
+      "host": "robot",
+      "source": "robot/systemd/reachy-mini-bluetooth.service.template",
+      "destination": "/etc/systemd/system/reachy-mini-bluetooth.service",
+      "kind": "systemd",
+      "mode": "0644",
+      "scope": "factory",
+      "sha256": "ab202e322c2774e669104c9b566c12dbeac51a7812eabc279bc527ea53538f2d",
+      "owner": "root"
+    },
+    {
+      "host": "robot",
+      "source": "robot/systemd/reachy-mini-daemon.service.template",
+      "destination": "/etc/systemd/system/reachy-mini-daemon.service",
+      "kind": "systemd",
+      "mode": "0644",
+      "scope": "factory",
+      "sha256": "8984c935e205106c30b2f4c380ec77f0960601e0155103853d92cc11e7c390ee",
+      "owner": "root"
+    },
+    {
+      "host": "robot",
+      "source": "robot/systemd/reachy-network-qos.service.template",
+      "destination": "/etc/systemd/system/reachy-network-qos.service",
+      "kind": "systemd",
+      "mode": "0644",
+      "scope": "network",
+      "sha256": "d39dd576459be7175b6c521d428061b136b7e7f3fd144c6f5ba7ec582bd5a713",
+      "owner": "root"
+    },
+    {
+      "host": "robot",
+      "source": "robot/systemd/reachy-production-audio.service.template",
+      "destination": "/etc/systemd/system/reachy-production-audio.service",
+      "kind": "systemd",
+      "mode": "0644",
+      "scope": "runtime",
+      "sha256": "4ce9ddb47a556408a714119e7242c2b13cf1b5bb64e369bb67a815cd7a738e3a",
+      "owner": "root"
+    },
+    {
+      "host": "robot",
+      "source": "robot/systemd/reachy-report-retention.service.template",
+      "destination": "/etc/systemd/system/reachy-report-retention.service",
+      "kind": "systemd",
+      "mode": "0644",
+      "scope": "runtime",
+      "sha256": "8cae8eb4f70a73401665c3b9e39e1e92cc70dcc2bcdd8f0d8551e1970997d361",
+      "owner": "root"
+    },
+    {
+      "host": "robot",
+      "source": "robot/systemd/reachy-report-retention.timer.template",
+      "destination": "/etc/systemd/system/reachy-report-retention.timer",
+      "kind": "systemd",
+      "mode": "0644",
+      "scope": "runtime",
+      "sha256": "9635a5f9ab0bdb0ed96e613d32999ec52cc03873c811f6b19f55e7152981a048",
+      "owner": "root"
+    },
+    {
+      "host": "robot",
+      "source": "robot/systemd/reachy-voice-agent.service.template",
+      "destination": "/etc/systemd/system/reachy-voice-agent.service",
+      "kind": "systemd",
+      "mode": "0644",
+      "scope": "runtime",
+      "sha256": "8b29ba9026ecc568cfc6515aee4b508bc6133bf530cee9b6fba6a3213dce59ec",
+      "owner": "root"
+    },
+    {
+      "host": "robot",
+      "source": "robot/system/etc/NetworkManager/system-connections/LinkedList-5GHz.nmconnection.template",
+      "destination": "/etc/NetworkManager/system-connections/LinkedList-5GHz.nmconnection",
+      "kind": "network",
+      "mode": "0600",
+      "scope": "network",
+      "sha256": "7452d2385c9f4a42d85eb64f0b8fcc2d3cedbc36e87bbb33e51f2f8541ec1546",
+      "owner": "root"
+    },
+    {
+      "host": "robot",
+      "source": "robot/system/etc/NetworkManager/system-connections/reachy-Katv-recovered.nmconnection.template",
+      "destination": "/etc/NetworkManager/system-connections/reachy-Katv-recovered.nmconnection",
+      "kind": "network",
+      "mode": "0600",
+      "scope": "network",
+      "sha256": "5344256601c506405153a45dc69d7ab179f4bbbf7dd353074b420098fba0bf74",
+      "owner": "root"
+    },
+    {
+      "host": "robot",
+      "source": "robot/system/etc/NetworkManager/system-connections/Hotspot.nmconnection.template",
+      "destination": "/etc/NetworkManager/system-connections/Hotspot.nmconnection",
+      "kind": "network",
+      "mode": "0600",
+      "scope": "network",
+      "sha256": "becbe9293475da0193c6546dd23094ea0fec30bc1c7aff57cd81821cb878e0cb",
+      "owner": "root"
+    },
+    {
+      "host": "robot",
+      "source": "robot/system/etc/NetworkManager/system-connections/LinkedList.nmconnection.template",
+      "destination": "/etc/NetworkManager/system-connections/LinkedList.nmconnection",
+      "kind": "network",
+      "mode": "0600",
+      "scope": "network",
+      "sha256": "8ff81bf7128cc88fb7e67e53ba33673afda1f97f0c65904b709b70dfad58596b",
+      "owner": "root"
+    },
+    {
+      "host": "robot",
+      "source": "robot/system/etc/NetworkManager/dispatcher.d/70-reachy-firewall.template",
+      "destination": "/etc/NetworkManager/dispatcher.d/70-reachy-firewall",
+      "kind": "network",
+      "mode": "0700",
+      "scope": "network",
+      "sha256": "0f0cbc5972a09ec86017985b3aca2c938e9329b2ad362235841c4aa957334253",
+      "owner": "root"
+    },
+    {
+      "host": "robot",
+      "source": "robot/system/etc/ssh/sshd_config.d/00-reachy-key-auth.conf.template",
+      "destination": "/etc/ssh/sshd_config.d/00-reachy-key-auth.conf",
+      "kind": "network",
+      "mode": "0644",
+      "scope": "network",
+      "sha256": "d424dcee8b2169e0f03c027d35d9c0042f071a2720a1eba3ab842dcce4bbc14d",
+      "owner": "root"
+    },
+    {
+      "host": "robot",
+      "source": "robot/system/etc/reachy-network-qos.nft.template",
+      "destination": "/etc/reachy-network-qos.nft",
+      "kind": "network",
+      "mode": "0644",
+      "scope": "network",
+      "sha256": "047aed062f22e23c0a0d8f76cc5d7fce030f06277ba45c54d942bd35ab83dd89",
+      "owner": "root"
+    },
+    {
+      "host": "robot",
+      "source": "robot/system/etc/hosts.template",
+      "destination": "/etc/hosts",
+      "kind": "network",
+      "mode": "0644",
+      "scope": "network",
+      "sha256": "d9d343e341f5dbdb53c773946a1bf2b21d8259f3fa8937e3f8770ed906ccc564",
+      "owner": "root"
+    },
+    {
+      "host": "robot",
+      "source": "robot/utilities/u96-safe-launcher.sh",
+      "destination": "@@ROOT@@/u96-safe-launcher.sh",
+      "kind": "factory",
+      "mode": "0755",
+      "scope": "factory",
+      "sha256": "634cde965501b4d84d423b5737f1a891ec6a2eebfd3bdf7eaa4657167852a810",
+      "owner": "pollen"
+    },
+    {
+      "host": "robot",
+      "source": "robot/factory/bluetooth/bluetooth_service.py",
+      "destination": "/bluetooth/bluetooth_service.py",
+      "kind": "factory",
+      "mode": "0755",
+      "scope": "factory",
+      "sha256": "c3df2c3c81ff7c4464b9ee94c6cd93003d6a3eb7e96203a9780bb4403797dbd7",
+      "owner": "root"
+    },
+    {
+      "host": "robot",
+      "source": "robot/factory/bluetooth/commands/WIFI_RESET.sh",
+      "destination": "/bluetooth/commands/WIFI_RESET.sh",
+      "kind": "factory",
+      "mode": "0755",
+      "scope": "factory",
+      "sha256": "a22343a4698fd219570774ed8fbcf53d33f4b37539f6be5aa97b7bccb705e94a",
+      "owner": "root"
+    },
+    {
+      "host": "robot",
+      "source": "robot/factory/bluetooth/commands/HOTSPOT.sh",
+      "destination": "/bluetooth/commands/HOTSPOT.sh",
+      "kind": "factory",
+      "mode": "0755",
+      "scope": "factory",
+      "sha256": "04f45af84b57fa380e12ff309ae654dabd1b7b79e4382674115e0f7b99994814",
+      "owner": "root"
+    },
+    {
+      "host": "robot",
+      "source": "robot/factory/bluetooth/commands/SOFTWARE_RESET.sh",
+      "destination": "/bluetooth/commands/SOFTWARE_RESET.sh",
+      "kind": "factory",
+      "mode": "0755",
+      "scope": "factory",
+      "sha256": "a5ab3f15bb92320fccdb8349f293a8295caf280ef9f23793c51b3c20b1b02d4c",
+      "owner": "root"
+    },
+    {
+      "host": "robot",
+      "source": "robot/factory/bluetooth/commands/RESTART_DAEMON.sh",
+      "destination": "/bluetooth/commands/RESTART_DAEMON.sh",
+      "kind": "factory",
+      "mode": "0755",
+      "scope": "factory",
+      "sha256": "8826c7146b094bff10493a5857ef6186523b39b357a6f36262d2558342fa3046",
+      "owner": "root"
+    },
+    {
+      "host": "robot",
+      "source": "robot/utilities/config_passwd",
+      "destination": "/usr/local/bin/config_passwd",
+      "kind": "factory",
+      "mode": "0755",
+      "scope": "factory",
+      "sha256": "190a951f4a8dbc7352b217002b0cf971bc24af9ca28dbc164379ba02951bba70",
+      "owner": "root"
+    },
+    {
+      "host": "robot",
+      "source": "robot/utilities/reachyminios_check",
+      "destination": "/usr/local/bin/reachyminios_check",
+      "kind": "factory",
+      "mode": "0755",
+      "scope": "factory",
+      "sha256": "ab8f6439568e1d8106f0ab5eb7799468d0880d6a894c081abf658a735f666758",
+      "owner": "root"
+    },
+    {
+      "host": "mac",
+      "source": "mac/config/config.mac.local.json.template",
+      "destination": "@@ROOT@@/config.mac.local.json",
+      "kind": "configuration",
+      "mode": "0600",
+      "scope": "runtime",
+      "sha256": "48cfbc9e8c8e5ff0ba1e87adea52f50aa409f73f2afa8036cfbf2be1504afc3f",
+      "owner": "notanonenough"
+    },
+    {
+      "host": "mac",
+      "source": "mac/config/config.autonomous.mac.local.json.template",
+      "destination": "@@ROOT@@/config.autonomous.mac.local.json",
+      "kind": "configuration",
+      "mode": "0600",
+      "scope": "runtime",
+      "sha256": "86decbdf42ed0fe8cc326b94fb139a0c10347e6130e3d4cf8d1e8cbf432a5fee",
+      "owner": "notanonenough"
+    },
+    {
+      "host": "mac",
+      "source": "mac/launchd/local.reachy.worker.plist.template",
+      "destination": "@@HOME@@/Library/Application Support/Reachy Companion/LaunchAgents/local.reachy.worker.plist",
+      "kind": "configuration",
+      "mode": "0600",
+      "scope": "runtime",
+      "sha256": "700dc20f2aec094749b3ae46def9955bd12d0a24ab4adbc9079dc6126c1e95a8",
+      "owner": "notanonenough"
+    },
+    {
+      "host": "mac",
+      "source": "mac/launchd/local.reachy.llm.plist.template",
+      "destination": "@@HOME@@/Library/Application Support/Reachy Companion/LaunchAgents/local.reachy.llm.plist",
+      "kind": "configuration",
+      "mode": "0600",
+      "scope": "runtime",
+      "sha256": "bf18fd728c051138e5df8c465f5e404450f7bd5939b8e5f0c352f60e0e03ec7b",
+      "owner": "notanonenough"
+    },
+    {
+      "host": "mac",
+      "source": "mac/launchd/local.reachy.gateway.plist.template",
+      "destination": "@@HOME@@/Library/Application Support/Reachy Companion/LaunchAgents/local.reachy.gateway.plist",
+      "kind": "configuration",
+      "mode": "0600",
+      "scope": "runtime",
+      "sha256": "5c102b02a447eb0b1d5857b6a8fb3afe861a5eab628f593c05e3af0c26690735",
+      "owner": "notanonenough"
+    },
+    {
+      "host": "mac",
+      "source": "mac/launchd/local.reachy.tunnels.plist.template",
+      "destination": "@@HOME@@/Library/Application Support/Reachy Companion/LaunchAgents/local.reachy.tunnels.plist",
+      "kind": "configuration",
+      "mode": "0600",
+      "scope": "runtime",
+      "sha256": "26d46663eeedab7420d84d5d08bbf39f097bba2256fa949f4b199c1167d83187",
+      "owner": "notanonenough"
+    },
+    {
+      "host": "mac",
+      "source": "mac/launchd/local.reachy.vlm.plist.template",
+      "destination": "@@HOME@@/Library/Application Support/Reachy Companion/LaunchAgents/local.reachy.vlm.plist",
+      "kind": "configuration",
+      "mode": "0600",
+      "scope": "runtime",
+      "sha256": "807008ba8bc1f23b614ec056557c11155ff4e8ce0207ed72e1022ccb3d966737",
+      "owner": "notanonenough"
+    },
+    {
+      "host": "mac",
+      "source": "mac/launchd/local.reachy.fast.plist.template",
+      "destination": "@@HOME@@/Library/Application Support/Reachy Companion/LaunchAgents/local.reachy.fast.plist",
+      "kind": "configuration",
+      "mode": "0600",
+      "scope": "runtime",
+      "sha256": "3c45c96ba4b7646ba442f2ed16f93c736d4af9a1d2c337f563c730bfec005a3d",
+      "owner": "notanonenough"
+    },
+    {
+      "host": "mac",
+      "source": "mac/ssh/config.template",
+      "destination": "@@HOME@@/.ssh/config",
+      "kind": "ssh",
+      "mode": "0600",
+      "scope": "network",
+      "sha256": "716e402f9ed1bcb06b5e0d70300cf10c2fab592e16436f4a1f6d0a0f3e1e81e7",
+      "owner": "notanonenough"
+    },
+    {
+      "host": "router",
+      "source": "router/uci/uhttpd.template",
+      "destination": "/etc/config/uhttpd",
+      "kind": "uci",
+      "mode": "0600",
+      "scope": "network",
+      "sha256": "8f108300d01f4ada7f5b0e1a98b3041bba15ae31cec990184cdf0efd8844542e",
+      "owner": "root"
+    },
+    {
+      "host": "router",
+      "source": "router/uci/network.template",
+      "destination": "/etc/config/network",
+      "kind": "uci",
+      "mode": "0600",
+      "scope": "network",
+      "sha256": "278ce24089290fe40a2801f6c6e02c04516e4ebe57d42c2531cd2e0ff430aa36",
+      "owner": "root"
+    },
+    {
+      "host": "router",
+      "source": "router/uci/luci.template",
+      "destination": "/etc/config/luci",
+      "kind": "uci",
+      "mode": "0600",
+      "scope": "network",
+      "sha256": "c4639b4762d1d8f7a9f6541ab3bd8302b172c1825a52b6c11a4b8a415b302e3a",
+      "owner": "root"
+    },
+    {
+      "host": "router",
+      "source": "router/uci/firewall.template",
+      "destination": "/etc/config/firewall",
+      "kind": "uci",
+      "mode": "0600",
+      "scope": "network",
+      "sha256": "59faee36e6fe5e04c39f8244f17c7aeef2759b62f6c180c0369022e692a23749",
+      "owner": "root"
+    },
+    {
+      "host": "router",
+      "source": "router/uci/dropbear.template",
+      "destination": "/etc/config/dropbear",
+      "kind": "uci",
+      "mode": "0600",
+      "scope": "network",
+      "sha256": "67fcf087d20bf47411bd6ef98f86f024b00310fa8b03889817a77de18313fad3",
+      "owner": "root"
+    },
+    {
+      "host": "router",
+      "source": "router/uci/system.template",
+      "destination": "/etc/config/system",
+      "kind": "uci",
+      "mode": "0600",
+      "scope": "network",
+      "sha256": "94095b87e032a0dc1b41e3ef326bdb77a0c082c1d877afb028c982e833f3edcf",
+      "owner": "root"
+    },
+    {
+      "host": "router",
+      "source": "router/uci/ubihealthd.template",
+      "destination": "/etc/config/ubihealthd",
+      "kind": "uci",
+      "mode": "0600",
+      "scope": "network",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "owner": "root"
+    },
+    {
+      "host": "router",
+      "source": "router/uci/wireless.template",
+      "destination": "/etc/config/wireless",
+      "kind": "uci",
+      "mode": "0600",
+      "scope": "network",
+      "sha256": "20b3ce75388dc41af110b50cbebb02a8857569d9d6eb92f2753183df0b6f2f1e",
+      "owner": "root"
+    },
+    {
+      "host": "router",
+      "source": "router/uci/dhcp.template",
+      "destination": "/etc/config/dhcp",
+      "kind": "uci",
+      "mode": "0600",
+      "scope": "network",
+      "sha256": "a96eba5003f47d0d4fb2eb1f2ec9b19d34521e4a68c987693de81a86b05e88de",
+      "owner": "root"
+    },
+    {
+      "host": "router",
+      "source": "router/uci/rpcd.template",
+      "destination": "/etc/config/rpcd",
+      "kind": "uci",
+      "mode": "0600",
+      "scope": "network",
+      "sha256": "1a40da0ebe45b1afd131dfc4650592913e38445e7fe42f96d3b95ad5151ac0e6",
+      "owner": "root"
+    },
+    {
+      "host": "router",
+      "source": "router/uci/attendedsysupgrade.template",
+      "destination": "/etc/config/attendedsysupgrade",
+      "kind": "uci",
+      "mode": "0600",
+      "scope": "network",
+      "sha256": "862e1821b22c5c94fb9b2f97adfd505b46b76ea145d50a93ffda12e13168243a",
+      "owner": "root"
+    },
+    {
+      "host": "router",
+      "source": "router/system/etc/rc.local.template",
+      "destination": "/etc/rc.local",
+      "kind": "configuration",
+      "mode": "0755",
+      "scope": "network",
+      "sha256": "515018aa94eb4937dade12dc0d69890b352af35a5ab5fb8203f9ed10990ac06f",
+      "owner": "root"
+    },
+    {
+      "host": "router",
+      "source": "router/system/etc/sysctl.conf.template",
+      "destination": "/etc/sysctl.conf",
+      "kind": "configuration",
+      "mode": "0644",
+      "scope": "network",
+      "sha256": "fa1403135ff66ed23c1c88163ba06d1d13d6ea9e73201728ae0180b3a6902eca",
+      "owner": "root"
+    },
+    {
+      "host": "router",
+      "source": "router/system/etc/board.json.template",
+      "destination": "/etc/board.json",
+      "kind": "configuration",
+      "mode": "0644",
+      "scope": "network",
+      "sha256": "71f75b0ba5a52e7211fc5c5a15106b4f886589a7393d2365d47056fcd63d5069",
+      "owner": "root"
+    },
+    {
+      "host": "router",
+      "source": "router/ssh/authorized_keys.template",
+      "destination": "/etc/dropbear/authorized_keys",
+      "kind": "ssh",
+      "mode": "0600",
+      "scope": "network",
+      "sha256": "21640f37ac25a5a4adeb4baa2c76c3595de5273e43ae93061a8f17c75de4e209",
+      "owner": "root"
+    },
+    {
+      "host": "hub",
+      "source": "hub/ssh/authorized_keys.template",
+      "destination": "@@HOME@@/.ssh/authorized_keys",
+      "kind": "ssh",
+      "mode": "0600",
+      "scope": "network",
+      "sha256": "0610605e03bb44be53d5c46a75b7ac56d4fb12384da88c6772419d01c94a118d",
+      "owner": "deploy"
+    },
+    {
+      "host": "hub",
+      "source": "hub/ssh/reachy_robot_known_hosts.template",
+      "destination": "@@HOME@@/.ssh/reachy_robot_known_hosts",
+      "kind": "ssh",
+      "mode": "0600",
+      "scope": "network",
+      "sha256": "2541a955cad79fcde79afde177ef0f51a1a1444daa6aee0424a0ca4b1215aa25",
+      "owner": "deploy"
+    },
+    {
+      "host": "hub",
+      "source": "hub/ssh/known_hosts.template",
+      "destination": "@@HOME@@/.ssh/known_hosts",
+      "kind": "ssh",
+      "mode": "0600",
+      "scope": "network",
+      "sha256": "4826d4f9ef935040671e502f79888ef5720417b2e3f95d29501f95620745227e",
+      "owner": "deploy"
+    },
+    {
+      "host": "hub",
+      "source": "hub/system/etc/ssh/sshd_config.template",
+      "destination": "/etc/ssh/sshd_config",
+      "kind": "ssh",
+      "mode": "0644",
+      "scope": "network",
+      "sha256": "f1805313ad346bdb80dff4a560a080edfca9a998f620b64da2a1aba6bcf6782e",
+      "owner": "root"
+    },
+    {
+      "host": "hub",
+      "source": "hub/system/etc/sudoers.template",
+      "destination": "/etc/sudoers",
+      "kind": "ssh",
+      "mode": "0440",
+      "scope": "network",
+      "sha256": "76d0f5775326cea72600a8d590342ca1173403e5bee040fbfc9bded896492c98",
+      "owner": "root"
+    },
+    {
+      "host": "hub",
+      "source": "hub/system/etc/sudoers.d/010_proxy.template",
+      "destination": "/etc/sudoers.d/010_proxy",
+      "kind": "ssh",
+      "mode": "0440",
+      "scope": "network",
+      "sha256": "ecf6bdd57be6c542306c12975380866c3a36bf4056479e44cd57f8a823e90bf1",
+      "owner": "root"
+    },
+    {
+      "host": "hub",
+      "source": "hub/system/etc/sudoers.d/README.template",
+      "destination": "/etc/sudoers.d/README",
+      "kind": "ssh",
+      "mode": "0440",
+      "scope": "network",
+      "sha256": "b428c9b673c3c806370f2aa28a98293a9cb578c70c3a8a2d1a39031861b3dbd8",
+      "owner": "root"
+    },
+    {
+      "host": "hub",
+      "source": "hub/system/etc/sudoers.d/010_global-tty.template",
+      "destination": "/etc/sudoers.d/010_global-tty",
+      "kind": "ssh",
+      "mode": "0440",
+      "scope": "network",
+      "sha256": "afaa47c0d55aaa53413dc0d85e83f71f861976f7d2302c0fbe25a23e868913af",
+      "owner": "root"
+    },
+    {
+      "host": "hub",
+      "source": "hub/system/etc/sudoers.d/010_dpkg-threads.template",
+      "destination": "/etc/sudoers.d/010_dpkg-threads",
+      "kind": "ssh",
+      "mode": "0440",
+      "scope": "network",
+      "sha256": "431a716f6f80d8e703b65232621f9d6db95b5a670296f051c66be4b05d2b8285",
+      "owner": "root"
+    },
+    {
+      "host": "hub",
+      "source": "hub/system/etc/sudoers.d/010_at-export.template",
+      "destination": "/etc/sudoers.d/010_at-export",
+      "kind": "ssh",
+      "mode": "0440",
+      "scope": "network",
+      "sha256": "03d3b196a6b753f9958210ed0726e6bd6d58ef3060d093ef8f5157d6ca7f3f34",
+      "owner": "root"
+    },
+    {
+      "host": "hub",
+      "source": "hub/system/etc/sudoers.d/90-cloud-init-users.template",
+      "destination": "/etc/sudoers.d/90-cloud-init-users",
+      "kind": "ssh",
+      "mode": "0440",
+      "scope": "network",
+      "sha256": "73f95862cad2ce5af1f387c1f993f6a278ed54255fcfcbd9881c1b3c26aaec75",
+      "owner": "root"
+    },
+    {
+      "host": "robot",
+      "source": "robot/ssh/authorized_keys.template",
+      "destination": "@@HOME@@/.ssh/authorized_keys",
+      "kind": "ssh",
+      "mode": "0600",
+      "scope": "network",
+      "sha256": "f9c9679bd535fcd0f3312bb14a57ab40099156ce99fd7dff1165f4ee1867655a",
+      "owner": "pollen"
+    },
+    {
+      "host": "robot",
+      "source": "robot/ssh/tunnel-authorized_keys.template",
+      "destination": "/var/lib/reachy-tunnel/.ssh/authorized_keys",
+      "kind": "ssh",
+      "mode": "0600",
+      "scope": "network",
+      "sha256": "25d351fd041900cd249835fd0827ba1d912fc395dc7f596b1e68e49889b9134e",
+      "owner": "reachy-tunnel"
+    },
+    {
+      "host": "robot",
+      "source": "robot/system/etc/ssh/sshd_config.template",
+      "destination": "/etc/ssh/sshd_config",
+      "kind": "ssh",
+      "mode": "0644",
+      "scope": "network",
+      "sha256": "f1805313ad346bdb80dff4a560a080edfca9a998f620b64da2a1aba6bcf6782e",
+      "owner": "root"
+    },
+    {
+      "host": "robot",
+      "source": "robot/system/etc/sudoers.template",
+      "destination": "/etc/sudoers",
+      "kind": "ssh",
+      "mode": "0440",
+      "scope": "network",
+      "sha256": "76d0f5775326cea72600a8d590342ca1173403e5bee040fbfc9bded896492c98",
+      "owner": "root"
+    },
+    {
+      "host": "robot",
+      "source": "robot/system/etc/sudoers.d/010_dpkg-threads.template",
+      "destination": "/etc/sudoers.d/010_dpkg-threads",
+      "kind": "ssh",
+      "mode": "0440",
+      "scope": "network",
+      "sha256": "431a716f6f80d8e703b65232621f9d6db95b5a670296f051c66be4b05d2b8285",
+      "owner": "root"
+    },
+    {
+      "host": "robot",
+      "source": "robot/system/etc/sudoers.d/010_proxy.template",
+      "destination": "/etc/sudoers.d/010_proxy",
+      "kind": "ssh",
+      "mode": "0440",
+      "scope": "network",
+      "sha256": "ecf6bdd57be6c542306c12975380866c3a36bf4056479e44cd57f8a823e90bf1",
+      "owner": "root"
+    },
+    {
+      "host": "robot",
+      "source": "robot/system/etc/sudoers.d/010_global-tty.template",
+      "destination": "/etc/sudoers.d/010_global-tty",
+      "kind": "ssh",
+      "mode": "0440",
+      "scope": "network",
+      "sha256": "afaa47c0d55aaa53413dc0d85e83f71f861976f7d2302c0fbe25a23e868913af",
+      "owner": "root"
+    },
+    {
+      "host": "robot",
+      "source": "robot/system/etc/sudoers.d/README.template",
+      "destination": "/etc/sudoers.d/README",
+      "kind": "ssh",
+      "mode": "0440",
+      "scope": "network",
+      "sha256": "b428c9b673c3c806370f2aa28a98293a9cb578c70c3a8a2d1a39031861b3dbd8",
+      "owner": "root"
+    },
+    {
+      "host": "robot",
+      "source": "robot/system/etc/sudoers.d/010_pi-nopasswd.template",
+      "destination": "/etc/sudoers.d/010_pi-nopasswd",
+      "kind": "ssh",
+      "mode": "0440",
+      "scope": "network",
+      "sha256": "64d17a3c02839a7dd5c294410bae8beadbf386bbe8cae9e6831e9bbbe50a2ca8",
+      "owner": "root"
+    },
+    {
+      "host": "robot",
+      "source": "robot/system/etc/sudoers.d/010_at-export.template",
+      "destination": "/etc/sudoers.d/010_at-export",
+      "kind": "ssh",
+      "mode": "0440",
+      "scope": "network",
+      "sha256": "03d3b196a6b753f9958210ed0726e6bd6d58ef3060d093ef8f5157d6ca7f3f34",
+      "owner": "root"
+    },
+    {
+      "host": "hub",
+      "source": "hub/system/boot/firmware/config.txt.template",
+      "destination": "/boot/firmware/config.txt",
+      "kind": "factory",
+      "mode": "0644",
+      "scope": "factory",
+      "owner": "root",
+      "sha256": "90a446821551a9df109ec1a77a79f6518fe974517d982d371c5e9efd6bbc98c3"
+    },
+    {
+      "host": "robot",
+      "source": "robot/system/home/pollen/.asoundrc.template",
+      "destination": "@@HOME@@/.asoundrc",
+      "kind": "factory",
+      "mode": "0644",
+      "scope": "factory",
+      "owner": "pollen",
+      "sha256": "08edbe77eb9592ef1cd5d47945973f504f66534a435014db2fb5462f7b25e8c9"
+    },
+    {
+      "host": "robot",
+      "source": "robot/system/boot/firmware/config.txt.template",
+      "destination": "/boot/firmware/config.txt",
+      "kind": "factory",
+      "mode": "0644",
+      "scope": "factory",
+      "owner": "root",
+      "sha256": "388529d9d42b7dba061ac4b9d4003fb9a6158976687c748cd1cb5c56c1f86109"
+    },
+    {
+      "host": "mac",
+      "source": "mac/ssh/hub-known-hosts.template",
+      "destination": "@@HOME@@/reachy-network-recovery/hub-known-hosts",
+      "kind": "ssh-known-hosts",
+      "mode": "0600",
+      "scope": "network",
+      "sha256": "ec56527a0f9f3cb5999f99e43e18d490dd625b01db88d7f818327d324ebfd561",
+      "owner": "notanonenough"
+    },
+    {
+      "host": "mac",
+      "source": "mac/ssh/robot-known-hosts.template",
+      "destination": "@@HOME@@/reachy-network-recovery/robot-known-hosts",
+      "kind": "ssh-known-hosts",
+      "mode": "0600",
+      "scope": "network",
+      "sha256": "2541a955cad79fcde79afde177ef0f51a1a1444daa6aee0424a0ca4b1215aa25",
+      "owner": "notanonenough"
+    },
+    {
+      "host": "mac",
+      "source": "mac/ssh/router-openwrt-known-hosts.template",
+      "destination": "@@HOME@@/reachy-network-recovery/openwrt-2026-11-13/router-openwrt-known-hosts",
+      "kind": "ssh-known-hosts",
+      "mode": "0600",
+      "scope": "network",
+      "sha256": "850f6e7cd90a2a7bae68c9d856082dcd60dfca5264e445b88878dc568f2cf4c1",
+      "owner": "notanonenough"
+    }
+  ],
+  "secrets": {
+    "SECRET_WIFI_LINKEDLIST_PSK": {
+      "required_by": [
+        "hub/system/etc/NetworkManager/system-connections/LinkedList-5GHz.nmconnection.template",
+        "hub/system/etc/NetworkManager/system-connections/LinkedList.nmconnection.template",
+        "robot/system/etc/NetworkManager/system-connections/LinkedList-5GHz.nmconnection.template",
+        "robot/system/etc/NetworkManager/system-connections/LinkedList.nmconnection.template",
+        "router/uci/wireless.template",
+        "router/uci/wireless.template"
+      ]
+    },
+    "SECRET_WIFI_KATV_8_5G_PSK": {
+      "required_by": [
+        "robot/system/etc/NetworkManager/system-connections/reachy-Katv-recovered.nmconnection.template"
+      ]
+    },
+    "SECRET_WIFI_REACHY_MINI_AP_PSK": {
+      "required_by": [
+        "robot/system/etc/NetworkManager/system-connections/Hotspot.nmconnection.template"
+      ]
+    },
+    "SECRET_WIFI_VUQAR_5G_PSK": {
+      "required_by": [
+        "router/uci/wireless.template"
+      ]
+    },
+    "SECRET_OPERATOR_PUBLIC_KEYS": {
+      "required_by": [
+        "router/ssh/authorized_keys.template"
+      ]
+    },
+    "SECRET_HUB_OPERATOR_PUBLIC_KEYS": {
+      "required_by": [
+        "hub/ssh/authorized_keys.template"
+      ]
+    },
+    "SECRET_ROBOT_OPERATOR_PUBLIC_KEYS": {
+      "required_by": [
+        "robot/ssh/authorized_keys.template"
+      ]
+    },
+    "SECRET_ROBOT_TUNNEL_PUBLIC_KEYS": {
+      "required_by": [
+        "robot/ssh/tunnel-authorized_keys.template"
+      ]
+    },
+    "COMPANION_TOKEN": {
+      "external_file": true
+    },
+    "AUTONOMOUS_MAC_TOKEN": {
+      "external_file": true
+    },
+    "S3_ACCESS_KEY": {
+      "external_file": true
+    },
+    "S3_SECRET_KEY": {
+      "external_file": true
+    },
+    "OPERATOR_SSH_PRIVATE_KEY": {
+      "external_file": true
+    },
+    "HUB_TUNNEL_SSH_PRIVATE_KEY": {
+      "external_file": true
+    }
+  }
+}

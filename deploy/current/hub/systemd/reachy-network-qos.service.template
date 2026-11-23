@@ -1,0 +1,13 @@
+[Unit]
+Description=Prioritize local Reachy lease traffic
+After=NetworkManager.service nftables.service
+Before=reachy-production.service reachy-production-audio.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/nft -f /etc/reachy-network-qos.nft
+ExecStop=-/usr/sbin/nft delete table inet reachy_network_qos
+
+[Install]
+WantedBy=multi-user.target

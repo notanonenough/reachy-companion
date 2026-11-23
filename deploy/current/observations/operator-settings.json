@@ -1,0 +1,30 @@
+{
+  "captured_at": "2026-11-14",
+  "restore_automatically": false,
+  "settings": {
+    "conversation-mode.json": {
+      "version": 1,
+      "mode": "normal"
+    },
+    "camera-state.json": {
+      "version": 1,
+      "enabled": true
+    },
+    "microphone-state.json": {
+      "enabled": true
+    },
+    "durable-intent.json": {
+      "automatic_questions_requested": true,
+      "listening_requested": true,
+      "version": 1
+    },
+    "volume-state.json": {
+      "volume_percent": 81
+    },
+    "motion-policy.json": {
+      "motor_enabled": true,
+      "quiet": false,
+      "privacy_all": false
+    }
+  }
+}

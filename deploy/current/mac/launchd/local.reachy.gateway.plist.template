@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>PYTHONPATH</key>
+		<string>@@ROOT@@/src</string>
+	</dict>
+	<key>KeepAlive</key>
+	<true/>
+	<key>Label</key>
+	<string>local.reachy.gateway</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>@@ROOT@@/.venv/bin/python</string>
+		<string>-m</string>
+		<string>reachy_companion.production_logs</string>
+		<string>run</string>
+		<string>--log</string>
+		<string>@@ROOT@@/data/mac-runtime/gateway.log</string>
+		<string>--keep-awake</string>
+		<string>--</string>
+		<string>@@ROOT@@/.venv/bin/python</string>
+		<string>@@ROOT@@/deploy/autonomous/observer_service.py</string>
+		<string>gateway</string>
+		<string>--config</string>
+		<string>@@ROOT@@/config.autonomous.mac.local.json</string>
+		<string>--token-file</string>
+		<string>@@ROOT@@/secrets/autonomous-mac.token</string>
+	</array>
+	<key>RunAtLoad</key>
+	<false/>
+	<key>StandardErrorPath</key>
+	<string>/dev/null</string>
+	<key>StandardOutPath</key>
+	<string>/dev/null</string>
+	<key>WorkingDirectory</key>
+	<string>@@ROOT@@</string>
+</dict>
+</plist>

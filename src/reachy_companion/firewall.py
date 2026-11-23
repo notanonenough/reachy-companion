@@ -20,6 +20,11 @@ def settings(config):
     ipv6 = [str(ipaddress.IPv6Address(address)) for address in item.get('hub_source_ipv6', [])] if policy == 'legacy_hub' else []
     if not 60 <= item['rollback_seconds'] <= 600:
         raise ValueError('Rollback timeout must be 60–600 seconds')
+    peer = item.get('production_peer_ipv4')
+    if peer is not None:
+        address = ipaddress.IPv4Address(peer)
+        if address.is_unspecified or address.is_multicast or address.is_loopback:
+            raise ValueError('Production peer must be a unicast LAN address')
     return item, source, ipv6
 
 
@@ -90,6 +95,9 @@ def render(config, recovery_interfaces=None):
             '  meta l4proto ipv6-icmp accept',
             '  ip daddr 224.0.0.251 udp dport 5353 accept',
             '  ip6 daddr ff02::fb udp dport 5353 accept',
+            *([f'  ip saddr {ipaddress.IPv4Address(item["production_peer_ipv4"])} tcp dport {{ 8090, 8780, 8781 }} accept',
+               f'  ip saddr {ipaddress.IPv4Address(item["production_peer_ipv4"])} udp dport 8782 accept']
+              if item.get('production_peer_ipv4') else []),
             '  iifname @recovery_interfaces udp sport 68 udp dport 67 accept',
             '  iifname @recovery_interfaces udp dport 53 accept',
             '  iifname @recovery_interfaces tcp dport { 53, 8000, 8443 } accept',

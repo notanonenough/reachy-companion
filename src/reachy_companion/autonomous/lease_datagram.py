@@ -137,8 +137,9 @@ class LeaseDatagramServer:
 class DatagramRenewal:
     """One actual two-packet exchange slot; no retry of expired challenges."""
     def __init__(self,client,source_boot,port,*,authority=None,retries=0):
-        if type(retries) is not int or not 0<=retries<=1:raise ValueError('At most one fresh challenge retry')
+        if type(retries) is not int or not 0<=retries<=2:raise ValueError('At most two fresh challenge retries')
         self.retries=retries
+        self.send_allowed=None;self.renew_deadline=None
         self.authority=lease_authority(authority) if authority is not None else None;self.withdrawn=False
         endpoint=urlsplit(client.url)
         self.last_send=None;self.last_ack=None;self.ack_sequence=None
@@ -169,6 +170,7 @@ class DatagramRenewal:
         return verified(self.secret,raw)
     def receive_for(self,kind,field,expected):
         deadline=time.monotonic()+.08
+        if self.renew_deadline is not None:deadline=min(deadline,self.renew_deadline)
         for _ in range(8):
             remaining=deadline-time.monotonic()
             if remaining<=0:raise socket.timeout('Current lease response timed out')
@@ -192,7 +194,11 @@ class DatagramRenewal:
             self.exchange_tail.append(dict(at=time.monotonic(),phase=phase,sequence=self.sequence,attempt=self.attempts,error_kind=error_kind))
     def renew(self):
         if self.authority is not None and self.withdrawn:raise RuntimeError('Datagram lease permanently withdrawn')
+        if self.retries==2 and self.send_allowed is None:raise RuntimeError('Fresh reducer guard required for retries')
         with self.diagnostics_lock:self.attempts+=1;self.attempt_started=time.monotonic()
+        # One bounded exchange slot. Spend the existing device lease window on
+        # fresh challenges; never extend its 300ms deadline or replay a nonce.
+        self.renew_deadline=self.attempt_started+.24
         try:
             for attempt in range(self.retries+1):
                 try:
@@ -218,6 +224,12 @@ class DatagramRenewal:
                         last_receive_age_ms=None if self.last_receive is None else max(0,(now-self.last_receive)*1000),
                         last_ack_age_ms=None if self.last_ack is None else max(0,(now-self.last_ack)*1000))
             raise
+        finally:self.renew_deadline=None
+    def check_send(self):
+        if self.withdrawn or self.send_allowed is not None and self.send_allowed() is not True:
+            raise RuntimeError('Renewal authority or reducer progress withdrawn')
+        if self.renew_deadline is not None and time.monotonic()>=self.renew_deadline:
+            raise socket.timeout('Bounded renewal window exhausted')
     def exchange(self):
         self.record('drain')
         self.socket.setblocking(False)
@@ -227,6 +239,7 @@ class DatagramRenewal:
         self.socket.settimeout(.08)
         self.record('socket_binding');self.capture_socket_receipt()
         began=time.monotonic();echo=secrets.token_hex(16)
+        self.check_send()
         self.record('hello_send');self.last_send=time.monotonic()
         extra={'authority':self.authority} if self.authority is not None else {}
         self.socket.send(signed(self.secret,dict(kind='hello',source_boot=self.source,controller=self.controller,echo=echo,**extra)))
@@ -234,6 +247,7 @@ class DatagramRenewal:
         if (challenge.get('kind')!='challenge' or challenge.get('source_boot')!=self.source
                 or challenge.get('echo')!=echo):raise ValueError('Fresh challenge required')
         if time.monotonic()-began>=.08:raise socket.timeout('Fresh challenge arrived too late')
+        self.check_send()
         self.sequence+=1
         self.record('renew_send');self.last_send=time.monotonic()
         self.socket.send(signed(self.secret,dict(kind='renew',source_boot=self.source,controller=self.controller,
@@ -244,6 +258,7 @@ class DatagramRenewal:
                 or type(ack['sequence']) is not int or not 1<=ack['sequence']<2**63
                 or ack!=dict(kind='accepted',source_boot=self.source,sequence=self.sequence)):
             raise ValueError('Typed renewal acknowledgement')
+        self.check_send()
         self.last_ack=time.monotonic();self.ack_sequence=self.sequence;self.record('accepted')
     def status(self):
         now=time.monotonic()

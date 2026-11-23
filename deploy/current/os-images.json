@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "images": [
+    {
+      "host": "robot",
+      "name": "Reachy Mini OS v0.2.3",
+      "url": "https://github.com/pollen-robotics/reachy-mini-os/releases/download/v0.2.3/image_2026-01-14-reachyminios-v0.2.3.zip",
+      "sha256": "28c5eecc4d4c2b416465b70529e8a3dbfd6dfe9388a1f31cb4b22284b80d961b",
+      "bytes": 1774891149,
+      "source_repository": "https://github.com/pollen-robotics/reachy-mini-os",
+      "source_revision": "c316dfb74b665be7d0dfd374575e592a17b26347",
+      "kernel": "6.12.62+rpt-rpi-v8",
+      "python": "3.12.12 factory / 3.13.5 companion"
+    },
+    {
+      "host": "router",
+      "name": "OpenWrt 25.12.6",
+      "url": "https://downloads.openwrt.org/releases/25.12.6/targets/ramips/mt7621/openwrt-25.12.6-ramips-mt7621-xiaomi_mi-router-4a-gigabit-v2-squashfs-sysupgrade.bin",
+      "sha256": "54e8c64cd0be3171bc58241c054e16061ecffac5675c5740ee484a34bd66fcd9",
+      "source_revision": "r33311-981c978eff",
+      "board": "xiaomi,mi-router-4a-gigabit-v2",
+      "kernel": "6.12.112"
+    },
+    {
+      "host": "hub",
+      "name": "Raspberry Pi OS Lite arm64 2026-10-06",
+      "url": "https://downloads.raspberrypi.com/raspios_lite_arm64/images/raspios_lite_arm64-2026-10-06/2026-10-06-raspios-trixie-arm64-lite.img.xz",
+      "sha256": "483db18a48da399b5b7022ffae9a07bc6d99daab30e593aedac09b69ff422843",
+      "source_revision": "b2cd98a9ee08a31ef7d0110ed09f2492bbd972ec",
+      "kernel": "6.18.50+rpt-rpi-v8"
+    }
+  ]
+}

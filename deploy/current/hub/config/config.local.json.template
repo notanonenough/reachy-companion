@@ -1,0 +1,268 @@
+{
+  "audio": {
+    "calibration_chunks": 10,
+    "capture_device": "plug:reachymini_audio_src",
+    "chunk_ms": 100,
+    "echo_tail_seconds": 0.4,
+    "max_input_seconds": 30,
+    "max_recording_seconds": 25,
+    "min_speech_frames": 3,
+    "min_voiced_chunks": 4,
+    "noise_multiplier": 1.8,
+    "playback_device": "plug:reachymini_audio_sink",
+    "playback_mixer": {
+      "card": "Audio",
+      "control": "PCM,0",
+      "enabled": true,
+      "volume_percent": 95
+    },
+    "pre_roll_chunks": 5,
+    "rms_floor": 500,
+    "sample_rate": 16000,
+    "silence_chunks": 10,
+    "vad_frame_ms": 20,
+    "vad_mode": 2
+  },
+  "brains": {
+    "hermes": {
+      "api_key_env": "HERMES_API_KEY",
+      "api_path": "/chat/completions",
+      "base_url": "http://hermes.lan:8642/v1",
+      "model": "hermes-agent"
+    },
+    "openclaw": {
+      "api_key_env": "OPENCLAW_API_KEY",
+      "api_path": "/chat/completions",
+      "base_url": "http://openclaw.lan:18789/v1",
+      "model": "openclaw/default"
+    },
+    "provider": "lm_studio"
+  },
+  "container": {
+    "cpu_threads": 4,
+    "desktop_llm_base_url": "http://host.docker.internal:1234/v1",
+    "image": "reachy-compute:local",
+    "name": "reachy-compute",
+    "publish_address": "0.0.0.0",
+    "windows_firewall_rule": "Reachy Companion compute from hub"
+  },
+  "conversation": {
+    "greet_on_start": true,
+    "greeting": "Ну привет. Я Ричи. Давай, рассказывай, что у тебя.",
+    "listen_on_start": true,
+    "pause_phrases": [
+      "перестань слушать",
+      "не слушай",
+      "выключи микрофон"
+    ],
+    "pause_reply": "Окей, замолкаю и не слушаю.",
+    "reset_phrases": [
+      "забудь разговор",
+      "начни новый разговор",
+      "сбрось разговор"
+    ],
+    "reset_reply": "Ладно, начинаем с чистого листа.",
+    "retry_seconds": 5,
+    "session": "robot",
+    "wake_on_start": false
+  },
+  "deployment": {
+    "hub": {
+      "apt_packages": [
+        "python3-venv"
+      ],
+      "host": "reachy-hub.local",
+      "identity_file": "",
+      "python": "python3",
+      "root": "@@ROOT@@",
+      "services": [
+        "reachy-hub",
+        "reachy-voice"
+      ],
+      "user": "deploy",
+      "venv_dir": ".venv-router"
+    },
+    "robot": {
+      "apt_packages": [
+        "python3-venv",
+        "alsa-utils",
+        "nftables"
+      ],
+      "host": "reachy-mini.local",
+      "identity_file": "",
+      "python": "python3",
+      "root": "/home/pollen/reachy-companion",
+      "services": [
+        "reachy-voice-agent"
+      ],
+      "user": "pollen",
+      "venv_dir": ".venv"
+    },
+    "worker": {
+      "apt_packages": [
+        "python3-venv",
+        "sox",
+        "libgomp1",
+        "libatomic1"
+      ],
+      "host": "192.168.2.134",
+      "identity_file": "",
+      "python": "python3",
+      "root": "/home/worker/reachy-companion",
+      "services": [
+        "reachy-compute"
+      ],
+      "user": "User",
+      "venv_dir": ".venv"
+    }
+  },
+  "guarded_motion": {
+    "enabled": true,
+    "transport": "stock"
+  },
+  "limits": {
+    "max_agent_request_bytes": 20000,
+    "max_request_bytes": 1400000,
+    "max_session_chars": 80,
+    "max_speech_chars": 5000,
+    "max_text_chars": 4000
+  },
+  "llm": {
+    "api_path": "/completions",
+    "assistant_prefix": "<|im_start|>assistant\n<think>\n\n</think>\n\n",
+    "history_messages": 12,
+    "history_ttl_seconds": 1800,
+    "max_sessions": 16,
+    "max_tokens": 8192,
+    "message_template": "<|im_start|>{role}\n{content}<|im_end|>\n",
+    "mode": "completion",
+    "model": "reachy-main",
+    "stop": [
+      "<|im_end|>",
+      "<|im_start|>"
+    ],
+    "system_prompt": "Ты Ричи, робот-компаньон Reachy Mini. Твой характер — молодой парень с острым языком, любопытством и собственным мнением. Общайся как близкий приятель: на «ты», естественно, непринуждённо, с сухим юмором, иронией и меткими подколами. Не играй ребёнка, не сюсюкай и не изображай услужливого консультанта. Не лебези и не соглашайся автоматически: если человек несёт чушь, принимает плохое решение или противоречит себе, скажи прямо и объясни почему. Можешь ответить резко, огрызнуться и употребить разговорную грубость или мат, если это уместно для ситуации; не вставляй ругань в каждую фразу. Подкалывай конкретные слова и поступки, а не превращай общение в постоянное унижение. С близким человеком держись по-свойски; если ему действительно тяжело, убери показную язвительность и поддержи без сладких штампов. Не избегай сложных, спорных или чувствительных тем только потому, что они неудобные. Обсуждай их открыто, содержательно и без морализаторства; различай факты, мнения и догадки. Честность важнее эффектной колкости: не придумывай факты, не притворяйся уверенным, когда не знаешь, и спокойно исправляй ошибки. Обычно отвечай по-русски одним-двумя короткими предложениями, как в живом разговоре; если вопрос сложный, дай столько пояснений, сколько нужно. Твой ответ произносится вслух: без Markdown, списков и озвучивания внутренних рассуждений. Не повторяй постоянно «бро», «кореш» и другие словечки; дружеский тон передавай манерой разговора. У тебя есть микрофон и динамик. Камера и управление движениями в этот разговор пока не подключены: не утверждай, что видишь человека, и не обещай физические действия. Если речь распознана непонятно, коротко попроси повторить.",
+    "temperature": 0.6
+  },
+  "logging": {
+    "backup_count": 3,
+    "level": "INFO",
+    "log_transcripts": false,
+    "max_bytes": 2000000
+  },
+  "models": {
+    "stt": {
+      "archive_root": "vosk-model-small-ru-0.22",
+      "download_url": "https://huggingface.co/localstack/vosk-models/resolve/main/vosk-model-small-ru-0.22.zip",
+      "path": "models/vosk-model-small-ru-0.22",
+      "sha256": ""
+    },
+    "tts": {
+      "config_url": "https://huggingface.co/rhasspy/piper-voices/resolve/main/ru/ru_RU/ruslan/medium/ru_RU-ruslan-medium.onnx.json",
+      "download_url": "https://huggingface.co/rhasspy/piper-voices/resolve/main/ru/ru_RU/ruslan/medium/ru_RU-ruslan-medium.onnx",
+      "path": "models/ru_RU-ruslan-medium.onnx",
+      "sha256": ""
+    }
+  },
+  "motion": {
+    "antenna_tolerance": 0.15,
+    "max_antenna_offset": 0.35,
+    "max_step_seconds": 3,
+    "min_step_seconds": 0.5,
+    "move_poll_seconds": 0.15,
+    "poll_seconds": 15
+  },
+  "network": {
+    "agent_url": "http://192.168.0.184:8090",
+    "compute_url": "http://127.0.0.1:18082",
+    "hub_url": "http://192.168.0.186:8080",
+    "llm_base_url": "http://127.0.0.1:18097/v1",
+    "robot_url": "http://127.0.0.1:18000",
+    "voice_url": "http://192.168.0.186:8081"
+  },
+  "paths": {
+    "data_dir": "data",
+    "scenarios_dir": "scenarios",
+    "token_file": "secrets/token"
+  },
+  "runtime": {
+    "git": {
+      "branch": "main",
+      "remote": "origin"
+    },
+    "profile": "profiles/friend.json",
+    "windows": {
+      "context_length": 8192,
+      "docker_desktop_path": "C:\\Program Files\\Docker\\Docker\\Docker Desktop.exe",
+      "gpu": "max",
+      "llm_bind": "0.0.0.0",
+      "lms_command": "lms",
+      "model_key": "qwen3.5-9b-uncensored-hauhaucs-aggressive",
+      "startup_task": "Reachy Companion",
+      "startup_timeout": 180
+    }
+  },
+  "security": {
+    "robot": {
+      "allow_dhcp": true,
+      "nft_table": "reachy_companion",
+      "restrict_to_hub": true,
+      "rollback_seconds": 180,
+      "service": "reachy-companion-firewall",
+      "policy": "local_ssh"
+    }
+  },
+  "servers": {
+    "agent": {
+      "listen": "0.0.0.0",
+      "port": 8090
+    },
+    "hub": {
+      "listen": "0.0.0.0",
+      "port": 8080
+    },
+    "voice": {
+      "listen": "0.0.0.0",
+      "port": 8081
+    },
+    "worker": {
+      "listen": "0.0.0.0",
+      "port": 8082
+    }
+  },
+  "streaming": {
+    "enabled": true,
+    "max_event_bytes": 1048576,
+    "max_output_seconds": 180,
+    "pcm_chunk_bytes": 3200,
+    "relay_chunk_bytes": 4096,
+    "sample_rate": 16000
+  },
+  "timeouts": {
+    "client": 300,
+    "http": 10,
+    "llm": 240,
+    "manual_audio_lock": 2,
+    "move": 25,
+    "pitch": 60,
+    "playback_margin": 15,
+    "process_stop": 3,
+    "robot": 5,
+    "ssh_connect": 10,
+    "wake": 40
+  },
+  "tts": {
+    "pitch_cents": 0,
+    "synthesis": {
+      "length_scale": 1.0,
+      "noise_scale": 0.667,
+      "noise_w_scale": 0.8,
+      "normalize_audio": true,
+      "volume": 0.9
+    }
+  },
+  "version": 1,
+  "voice": {
+    "mode": "remote"
+  }
+}

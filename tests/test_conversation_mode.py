@@ -28,6 +28,8 @@ class ConversationModeTests(unittest.TestCase):
 
     def agent(self):
         a = Agent.__new__(Agent)
+        from reachy_companion.camera_permission import CameraPermission
+        a.camera_permission = CameraPermission(self.root / 'camera.json')
         a.conversation_mode = ConversationMode(self.root / 'mode.json', 'alice_test')
         a.durable_intent = DurableIntent(self.root / 'intent.json')
         a.durable_intent.update(listening=True, automatic=True)

@@ -1,0 +1,41 @@
+# BEGIN reachy local security
+Host reachy-mini reachy-mini.local
+    HostName 192.168.0.184
+    ProxyJump reachy-router-vuqar
+    ControlMaster auto
+    ControlPersist 600
+    ControlPath @@HOME@@/.ssh/cm/%C
+    User pollen
+    HostKeyAlias reachy-mini-device
+    UserKnownHostsFile @@HOME@@/reachy-network-recovery/robot-known-hosts
+    StrictHostKeyChecking yes
+    IdentityFile @@HOME@@/.ssh/id_ed25519
+    IdentitiesOnly yes
+    ForwardAgent no
+Host reachy-hub reachy-hub.local
+    HostName 192.168.0.186
+    ProxyJump reachy-router-vuqar
+    ControlMaster auto
+    ControlPersist 600
+    ControlPath @@HOME@@/.ssh/cm/%C
+    User deploy
+    HostKeyAlias reachy-hub-device
+    UserKnownHostsFile @@HOME@@/reachy-network-recovery/hub-known-hosts
+    StrictHostKeyChecking yes
+    IdentityFile @@HOME@@/.ssh/id_ed25519
+    IdentitiesOnly yes
+    ForwardAgent no
+# END reachy local security
+
+# BEGIN reachy router via Vuqar
+Host reachy-router-vuqar
+    HostName 192.168.100.45
+    User root
+    HostKeyAlias reachy-router-device
+    UserKnownHostsFile @@HOME@@/reachy-network-recovery/openwrt-2026-11-13/router-openwrt-known-hosts
+    StrictHostKeyChecking yes
+    IdentityFile @@HOME@@/.ssh/id_ed25519
+    IdentitiesOnly yes
+    ForwardAgent no
+    ConnectTimeout 5
+# END reachy router via Vuqar
