@@ -57,17 +57,22 @@ STT-end→first-TTS-PCM11.209s по Hub clock; main client interval7.650s не �
 
 | Карточка | Статус, владелец и ревьюер | Следующий шаг и контакт |
 |---|---|---|
-| [PERF-01, Issue #30](https://github.com/notanonenough/reachy-companion/issues/30) | Диагностика PR #38 принята; выбран общий candidate `3aea1cd42d0e13b396766bea3bfd4659d698eef5` для #30/#35. Автор `/root/implementer`, reviewer `/root/reviewer` | Установка3aea завершена и независимо принята, окно освобождено **01:23**. Автор исправляет offline reader mapping по замечанию reviewer; затем отдельное quiet90s окно. Production/motion start пока не назначен. Контроль **01:30**, раньше result/failure. |
-| [MODEL-TIMING-01, Issue #35](https://github.com/notanonenough/reachy-companion/issues/35) | Software PR #36 принят, автор `/root/ci_implementer`, reviewer `/root/reviewer`; карточка открыта для normal-chain evidence | Диагностика #30 принята, включена вместе с #35 в candidate3aea. Установка принята; ожидает отдельный общий quiet hardware window одного владельца. После него автор проверяет same-call model stage/usage/provenance receipts offline. Новых starts/tests/builds в аппаратном окне не выполняет. Контроль вместе с #30 **24.11 01:30**. |
-| [BASELINE-02, Issue #26](https://github.com/notanonenough/reachy-companion/issues/26) | Протокол прерванной реплики принят через PR #31; владелец `/root/ci_implementer`, reviewer `/root/reviewer`; baseline неполон, карточка открыта и ожидает зависимость | Штатный cleanup независимо подтверждён, окно освобождено **24.11 00:22:24**. Полный resource baseline ждёт отложенной OBSERVE-02; по новому указанию владельца приоритет #30. Автор #26 завершил текущий шаг, новых starts/probes/observer edits нет. Следующая сверка зависимости с ведущим при контроле #30 **01:30**. |
+| [PERF-01, Issue #30](https://github.com/notanonenough/reachy-companion/issues/30) | Установка и exact runner/readers3aea независимо приняты. Автор `/root/implementer`, reviewer `/root/reviewer` | **Единственное quiet90s окно24.11 01:30–01:40 Asia/Baku**, owner `/root/implementer`, candidate `3aea1cd42d0e13b396766bea3bfd4659d698eef5`: fresh stopped/free → один normal90s trial → knownexit/STOP/device/Mac cleanup → firstfailure/model receipts. Никаких project tests/builds/benchmarks/параллельных model calls на Mac у команды. Контроль **01:35**, раньше failure/result; никаких автоматических повторов. |
+| [MODEL-TIMING-01, Issue #35](https://github.com/notanonenough/reachy-companion/issues/35) | Software PR #36 принят, автор `/root/ci_implementer`, reviewer `/root/reviewer`; карточка открыта для normal-chain evidence | Диагностика #30 принята, включена вместе с #35 в candidate3aea. Установка принята; ожидает отдельный общий quiet hardware window одного владельца. После него автор проверяет same-call model stage/usage/provenance receipts offline. Новых starts/tests/builds в аппаратном окне не выполняет. Контроль вместе с #30 **24.11 01:35**. |
+| [BASELINE-02, Issue #26](https://github.com/notanonenough/reachy-companion/issues/26) | Протокол прерванной реплики принят через PR #31; владелец `/root/ci_implementer`, reviewer `/root/reviewer`; baseline неполон, карточка открыта и ожидает зависимость | Штатный cleanup независимо подтверждён, окно освобождено **24.11 00:22:24**. Полный resource baseline ждёт отложенной OBSERVE-02; по новому указанию владельца приоритет #30. Автор #26 завершил текущий шаг, новых starts/probes/observer edits нет. Следующая сверка зависимости с ведущим при контроле #30 **01:35**. |
 
 Установка exact `3aea1cd42d0e13b396766bea3bfd4659d698eef5` завершена 24.11 около 01:23,
 окно освобождено. Все три узла: source696/package126/top61, один Linux wheel,
 21 configs/profile/full state body без изменений, backup252 files×2 и SQLite OK.
 Factory/Bluetooth/tunnel не менялись; production/mic/camera/motion не запускались.
-Final stopped/free и установка независимо приняты. Runner/readers проходят review; найдено и исправляется неверное поле source_boot в одном terminal reader.
+Final stopped/free, установка и exact runner/readers независимо приняты.
 Private installation manifest: `c708ad513e76420878ff9caeaa231d59008d58071ae6fa47f3032cd315c4c835`,
-46 files; ведущий сверил hashes/sizes. Контроль **01:30 Asia/Baku**.
+46 files; ведущий сверил hashes/sizes. Контроль **01:35 Asia/Baku**.
+
+Независимая готовность quiet trial принята: launch `72c5b18b8d2cb31485c22f05791eb987953d1cf61c57ab1b445a76ab2fdf31d7`,
+abort30d05f07, readers manifest `2b7575b58e518f443b2d5f40abed3fe9832354463ac8725455037bdd2cd25a8c`.
+Ошибки source_boot/отсутствующих PID/startticks в offline readers исправлены;
+17 saved-fixture checks PASS без runtime calls. Это readiness, не физическая приёмка.
 
 | Принятое изменение | Точная проверенная версия и результат |
 |---|---|
