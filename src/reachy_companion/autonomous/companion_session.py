@@ -129,7 +129,7 @@ def run_session(scheduler,poller,lease,client,stop_client,source,stop,duration,p
     private_trace=getattr(scheduler,'private_trace',None)
     if private_trace is not None:
         private_trace.start(stop,hub_boot_id=scheduler.state.authority.hub_boot_id)
-        for resource in (scheduler.audio_adapter,scheduler.speech_adapter,scheduler.speech_adapter.playback):
+        for resource in (scheduler.state,scheduler.audio_adapter,scheduler.speech_adapter,scheduler.speech_adapter.playback):
             resource.private_trace=private_trace
     startup=PeerStartup(source);peer_job=health_job=stop_job=None
     retire_job=None;media_close_job=None;retiring_terminal=None;next_retire=0;peer_receipt=None

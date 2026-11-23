@@ -12,10 +12,10 @@ from .autonomous.voice_chain import digest
 
 
 KINDS=('session_begin','stt_result','stt_disposition','input_admission','main_request',
-       'main_result','main_checked','speech_commit','speech_terminal','playback_stop')
+       'main_result','main_checked','speech_commit','speech_terminal','playback_stop','input_retry')
 FIELDS=('source_boot','sequence','lineage_id','audio_s','pcm_sha256','captured_end',
         'capture_basis','started_at','ended_at','disposition','input_ref','task_id','attempt_id',
-        'request_id','authority','operator_binding','final','stream_id','generation',
+        'request_id','parent_input_ref','authority','operator_binding','final','stream_id','generation',
         'tts_frames','tts_complete','cancelled','output_sha256','tts_pcm_sha256','deadline',
         'producer_started_at','producer_elapsed_s','tts_first_pcm_s','error_kind',
         'submitted_frames','written_frames','consumed_frames','stop_known','input_finished','complete','verified',
@@ -121,13 +121,22 @@ class PrivateAudioTrace:
                 if len(self.queue)>=self.queue_cap:self.drop('queue_full');return
                 if self.enqueued>=self.record_cap-1 or self.bytes_enqueued+len(raw)>self.byte_cap-1024:
                     self.drop('total_cap');self.content=False;return
-                if kind=='input_admission' and fields.get('disposition')=='admitted':
+                if (kind=='input_admission' and fields.get('disposition')=='admitted'
+                        or kind=='input_retry' and fields.get('disposition')=='linked'):
                     ref=fields.get('input_ref')
                     if type(ref) is str and len(ref)<=256:
                         if len(self.audio_refs)>=128:self.drop('lineage_cap');self.content=False;return
-                        self.audio_refs[ref]=scalar(fields.get('lineage_id'))
+                        self.audio_refs[ref]=dict(lineage_id=scalar(fields.get('lineage_id')),authority=value.get('authority'))
                 self.queue.append(raw);self.enqueued+=1;self.bytes_enqueued+=len(raw)
             finally:self.lock.release()
+        except Exception:self.drop('projection_failure')
+    def retry(self,parent_ref,new_ref,authority):
+        try:
+            parent=self.audio_refs.get(parent_ref)
+            linked=parent is not None and parent['authority']==authority
+            if not linked:self.drop('retry_lineage_unavailable')
+            self.emit('input_retry',parent_input_ref=parent_ref,input_ref=new_ref,authority=authority,
+                lineage_id=parent['lineage_id'] if linked else None,disposition='linked' if linked else 'metadata_only')
         except Exception:self.drop('projection_failure')
     def audio_link(self,ref):
         return type(ref) is str and ref in self.audio_refs
@@ -190,7 +199,7 @@ def project_summary(value):
     """Standalone public metadata; safe to embed in the installed-host probe."""
     if type(value) is not dict or value.get('enabled') is not True:return None
     known=('stop','privacy','duration','queue_busy','queue_full','record_cap','total_cap',
-           'content_fenced','projection_failure','lineage_cap','writer_failure','drain_timeout','occupied_at_close','startup_aborted')
+           'content_fenced','projection_failure','lineage_cap','writer_failure','drain_timeout','occupied_at_close','startup_aborted','retry_lineage_unavailable')
     def count(item):return min(1000000000,max(0,item)) if type(item) is int else None
     return dict(enabled=True,incomplete=value.get('incomplete') is True,
         reason=value.get('reason') if type(value.get('reason')) is str and value.get('reason') in known else None,

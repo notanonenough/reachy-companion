@@ -224,6 +224,7 @@ class Scheduler:
     def ingest(self, event, now=None):
         if self.closed:return
         trace=getattr(self,'private_trace',None)
+        if trace is not None:self.state.private_trace=trace
         if trace is not None and (event.get('type')=='stop' or event.get('type')=='operator' and event.get('privacy_all') is True):
             trace.disable('privacy' if event.get('privacy_all') is True else 'stop')
         if self.audio_adapter and event.get('type')=='operator':self.audio_adapter.interrupt()

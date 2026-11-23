@@ -17,6 +17,42 @@ class PrivateTraceTests(unittest.TestCase):
     def trace(self,**kw):
         trace=PrivateAudioTrace(self.path,seconds=kw.pop('seconds',30),**kw)
         self.addCleanup(trace.close);trace.start(threading.Event());return trace
+    def test_actual_context_retries_inherit_only_registered_parent_and_same_authority(self):
+        from reachy_companion.autonomous.runtime import Scheduler
+        from reachy_companion.autonomous.config import load
+        from test_memory_context import item
+        cfg=load(Path(__file__).resolve().parents[1]/'config.autonomous.normal.example.json')
+        def context(v):return dict(memory=dict(store_id='store',revision=v,items=[item(v)]),sensors=[])
+        for audio in (True,False):
+            with self.subTest(audio=audio):
+                if self.path.exists():self.path.unlink()
+                trace=self.trace();scheduler=Scheduler(cfg,NS(boot_id='compute'));scheduler.private_trace=trace
+                scheduler.state.update_context(context(0),0)
+                event=dict(type='utterance',text='known voice' if audio else 'PRIVATE-BACKGROUND')
+                if audio:event['audio']=dict(lineage_id='source:1',source_boot='source',sequence=1,origin='unknown',capture_age_ms=0)
+                scheduler.ingest(event,0);tasks=[]
+                for revision in range(3):
+                    now=revision+.01;ref=next(iter(scheduler.state.candidates))
+                    task=scheduler.state.apply(dict(a='think',why='fixture',start=dict(type='main',input_ref=ref)),scheduler.state.bind(now,5),now)
+                    tasks.append(task)
+                    main_call(trace,lambda _:dict(output='actual retry answer' if audio else 'PRIVATE-BACKGROUND-ANSWER'),task)
+                    if revision<2:scheduler.state.update_context(context(revision+1),revision+.1)
+                if audio:
+                    self.assertTrue(all(trace.audio_link(task.input_ref) for task in tasks))
+                    self.assertEqual(len({task.input_ref for task in tasks}),3)
+                    changed={**tasks[-1].authority.wire(),'operator_epoch':999}
+                    trace.retry(tasks[-1].input_ref,'foreign-ref',changed)
+                    self.assertFalse(trace.audio_link('foreign-ref'))
+                else:self.assertFalse(any(trace.audio_link(task.input_ref) for task in tasks))
+                trace.close();rows=list(map(json.loads,self.path.read_text().splitlines()))
+                results=[row for row in rows if row['kind']=='main_result']
+                if audio:
+                    self.assertEqual([row['text'] for row in results],['actual retry answer']*3)
+                    linked=[row for row in rows if row['kind']=='input_retry' and row['disposition']=='linked']
+                    self.assertEqual([row['parent_input_ref'] for row in linked],[task.input_ref for task in tasks[:2]])
+                else:self.assertNotIn('PRIVATE',self.path.read_text())
+                self.assertTrue(trace.summary()['incomplete']) # rejected authority / unknown background parent
+
     def test_typed_large_source_sequence_and_authority_are_preserved_exactly(self):
         maximum=2**63-1
         value=project(dict(sequence=maximum,authority={'microphone_epoch':maximum},audio_s=float('nan')))

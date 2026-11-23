@@ -21,6 +21,7 @@ JSONL содержит `version=1`, отдельный `trace_id`, `hub_boot_id`
 | `stt_result` | Фактический bounded STT text, source/sequence/lineage, PCM SHA256, audio duration, локальные start/end и stale/error disposition |
 | `stt_disposition` | Передача результата к admission либо withdrawal/drop |
 | `input_admission` | Реально созданный State input ref и новые authority/interaction/speech epochs; blocked не объявляется принятым |
+| `input_retry` | Существующий context/memory retry переносит lineage только от зарегистрированного parent ref при полном совпадении authority; без сравнения текстов |
 | `main_request` | Только utterance и task/attempt/input ref/authority, без prompt/context |
 | `main_result` | Фактический ответ с disposition `unchecked`, локальным завершением и ограниченной проекцией proof |
 | `main_checked` | Результат существующего State.complete/checked_final: ready/failed/discarded и проверенный proof, если он появился |
@@ -30,7 +31,10 @@ JSONL содержит `version=1`, отдельный `trace_id`, `hub_boot_id`
 | `trace_end` | Bounded итог записи; отсутствие footer означает неполный trace |
 
 Main/speech text сохраняется только для input refs, реально принятых из audio
-в этой trace-сессии. Bounded registry содержит максимум 128 refs. Background,
+в этой trace-сессии. Bounded registry содержит максимум 128 refs. Штатный context retry может создать новый ref; trace сохраняет доказанную
+связь со старым task ref в точке его создания. Неизвестный parent, изменённая
+authority или потеря записи связи оставляют новый ref metadata-only и incomplete.
+Background,
 reflection/research и memory maintenance не становятся источником сохранённого
 текста. Законный audio-linked ответ сохраняется как есть, включая использование
 контекста самой моделью: trace не интерпретирует и не редактирует его смысл.
