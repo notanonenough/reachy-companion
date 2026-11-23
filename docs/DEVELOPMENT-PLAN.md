@@ -40,8 +40,8 @@ verified cleanup не приняты; текущие процессы и outputs
 
 | Карточка | Статус, владелец и ревьюер | Следующий шаг и контакт |
 |---|---|---|
-| [RELEASE-01, Issue #9](https://github.com/notanonenough/reachy-companion/issues/9) | Опыт остановлен, ожидает диагностику #15; автор стенда — `/root/implementer`, reviewer — `/root/reviewer` | Кандидат `362002991` установлен, но E2E не прошёл. Автор оформляет failing protocol/акустическую атрибуцию без нового start; следующий контроль21:55 Asia/Baku. Окно до22:10 остаётся только за ним. |
-| [LEASE-01, Issue #15](https://github.com/notanonenough/reachy-companion/issues/15) | В работе офлайн; автор — `/root/ci_implementer`, независимый reviewer — `/root/reviewer` | Ограниченная диагностика первой invalid-authority причины до lease.close по тем же входам/часам; сроки и поведение не менять. PR/контроль23.11.2026 21:55 Asia/Baku. |
+| [RELEASE-01, Issue #9](https://github.com/notanonenough/reachy-companion/issues/9) | Опыт остановлен, ожидает диагностику #15; автор стенда — `/root/implementer`, reviewer — `/root/reviewer` | Кандидат `362002991` установлен, E2E не прошёл. [Протокол](releases/2026-11-23-362002991d9c.md) принят через PR #16. Подготовлен один bounded повтор после нового SHA; контроль22:00 Asia/Baku. Окно до22:10 остаётся только за автором, новых запусков пока нет. |
+| [LEASE-01, Issue #15](https://github.com/notanonenough/reachy-companion/issues/15) | PR #17 на ревью/CI; автор — `/root/ci_implementer`, независимый reviewer — `/root/reviewer` | Exact `d3af506b`: первая invalid-authority диагностика, 7 новых scenarios и штатный joined HTTP путь; guard/TTL/close неизменны. Review/CI и контроль23.11.2026 22:00 Asia/Baku. |
 
 Ведущий работает в `reachy-development-map`, исполнитель — в `reachy-audit-map`,
 ревьюер — в `/tmp/reachy-review-map`; рабочие ветки короткоживущие `codex/*`.
