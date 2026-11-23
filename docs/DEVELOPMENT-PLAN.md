@@ -50,8 +50,7 @@ verified cleanup пока не приняты. Следующий запуск �
 
 | Карточка | Статус, владелец и ревьюер | Следующий шаг и контакт |
 |---|---|---|
-| [RELEASE-01, Issue #9](https://github.com/notanonenough/reachy-companion/issues/9) | Опыт 15b завершён, стенд остановлен; автор — `/root/implementer`, reviewer — `/root/reviewer` | [Протокол 15b](releases/2026-11-23-15b784eeafd4.md) и еженедельный порядок приняты через PR #19. Ожидает #18; cleanup triage выполнен без продуктовых правок. Резервирование до 22:35, новых запусков нет. Контроль 22:35 Asia/Baku. |
-| [REDUCER-01, Issue #18](https://github.com/notanonenough/reachy-companion/issues/18) | PR #20: core одобрен, test-only delta на review/CI; автор — `/root/ci_implementer`, reviewer — `/root/reviewer` | Exact `3ff1ecc3`: исправлен воспроизведённый на базе/новом коде UDP ACK test race; один управляемый in-flight ACK и отдельное success equality. Runtime/200 ms guard неизменны. Контроль 22:35 Asia/Baku. |
+| [RELEASE-01, Issue #9](https://github.com/notanonenough/reachy-companion/issues/9) | Новый diagnostic rollout; единственный автор — `/root/implementer`, reviewer — `/root/reviewer` | PR #20 принят, выбран `3a0f076bac3575ccc6504e8bd320ad5a50554b7f`. Установить exact version, дополнить sampler полем first_reducer_expiry, один bounded опыт и stop. Окно 22:34–22:50, контроль 22:40 Asia/Baku. |
 
 Ведущий работает в `reachy-development-map`, исполнитель — в `reachy-audit-map`,
 ревьюер — в `/tmp/reachy-review-map`; рабочие ветки короткоживущие `codex/*`.
@@ -61,8 +60,8 @@ Read-only инвентаризация закончена; reviewer освобо
 Сверены origin/main, открытая Issue #9 и отсутствие открытых PR; Mac production checkout пока `362002991`.
 Оба автора были прерваны лимитом; прежний владелец стенда возобновлён, reviewer подтвердил доступность.
 Reviewer получает стенд только после освобождения и явной передачи ведущим.
-LEASE-01 принята через PR #17; её автору `/root/ci_implementer` назначена #18
-после подтверждения нехватки stage/stack данных. Reviewer согласовал границу.
+LEASE-01 #17 и REDUCER-01 #20 приняты; `/root/ci_implementer` ожидает
+новый аппаратный результат для конкретной offline-зависимости, контроль 22:40.
 CATALOG входит в новый кандидат, но реальные readers остаются в прежнем legacy mode.
 CI-01 принята в 21:03 Asia/Baku: [PR #6](https://github.com/notanonenough/reachy-companion/pull/6),
 проверенный head `bc63ac863b64194e70a04510f0fdae0f0f2395d0`, merge в origin/main
