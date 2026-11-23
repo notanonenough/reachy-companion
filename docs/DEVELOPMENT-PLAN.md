@@ -62,7 +62,14 @@ verified cleanup пока не приняты. Следующий запуск �
 
 | Карточка | Статус, владелец и ревьюер | Следующий шаг и контакт |
 |---|---|---|
-| [RELEASE-01, Issue #9](https://github.com/notanonenough/reachy-companion/issues/9) | Автор `/root/implementer` пишет protocol PR offline; независимый reviewer `/root/reviewer` получил стенд после явного освобождения автором в 22:42 | Один независимый опыт того же exact `3a0f076bac3575ccc6504e8bd320ad5a50554b7f`: штатные sleep→disabled→wake и measured pose, затем normal start, свежий /frame, адресная акустика, движение с feedback и stop. При unknown/busy/pose failure остановиться. Окно reviewer 22:43–23:00, контроль 22:50 Asia/Baku. |
+| [RELEASE-01, Issue #9](https://github.com/notanonenough/reachy-companion/issues/9) | Автор `/root/implementer` передал protocol PR #21; независимый reviewer `/root/reviewer` получил стенд после явного освобождения автором в 22:42 | Один независимый опыт того же exact `3a0f076bac3575ccc6504e8bd320ad5a50554b7f`: штатный sleep уже вернул body≈0, затем обычный Hub neutral expression и measured pose; при PASS — normal start, свежий /frame, адресная акустика, движение с feedback и stop. При unknown/busy/pose failure остановиться. Окно reviewer 22:43–23:00, контроль 22:50 Asia/Baku. |
+
+В независимом recovery выяснено: Hub sleep выполняет stock pose и не обещает
+disabled. После него mode остался enabled, body≈−0.5°, head pitch≈25.75°.
+Прежняя предпосылка плана sleep→disabled была неверна; wake не выполнялся.
+Ведущий согласовал существующий Hub neutral expression после sleep (body=None,
+как в штатном маршруте) и последующую проверку измеренной позы. Продукт, motor
+mode и guards не меняются; прямой factory вызов не используется.
 
 Ведущий работает в `reachy-development-map`, исполнитель — в `reachy-audit-map`,
 ревьюер — в `/tmp/reachy-review-map`; рабочие ветки короткоживущие `codex/*`.
