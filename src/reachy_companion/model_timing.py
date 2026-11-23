@@ -69,11 +69,13 @@ def project(value, *, request_id=None, gateway_boot_id=None):
                 result['stages'][name]=dict(state=state,duration_s=None)
                 result['incomplete']=True
         usage=value.get('usage',{})
+        if type(usage) is not dict:result['incomplete']=True
         for name in USAGE:
             item=usage.get(name) if type(usage) is dict else None
             if count(item):result['usage'][name]=item
             elif item is not None:result['incomplete']=True
         native=value.get('reported_native',{})
+        if type(native) is not dict:result['incomplete']=True
         for name in (*COUNTS,*MILLISECONDS,*TOP_COUNTS):
             key='reported_'+name;item=native.get(key) if type(native) is dict else None
             if (number(item,3600000) if name in MILLISECONDS else count(item)):
@@ -121,6 +123,7 @@ class Timing:
         try:
             if type(response) is not dict:return
             timings=response.get('timings',{})
+            if type(timings) is not dict:self.value['incomplete']=True
             self.value['reported_native']={
                 **{'reported_'+k:timings.get(k) for k in (*COUNTS,*MILLISECONDS) if type(timings) is dict and k in timings},
                 **{'reported_'+k:response[k] for k in TOP_COUNTS if k in response}}

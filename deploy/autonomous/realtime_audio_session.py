@@ -105,9 +105,9 @@ class AuditedGateway(RemoteGateway):
         self.fast_calls.append(dict(elapsed_s=time.monotonic()-started,activity=result['output']['a'],usage=result.get('usage'),
             microphone_enabled=view['op']['microphone_enabled'],candidates=len(view['candidates']),ready=len(view['ready'])))
         del self.fast_calls[:-256];return result
-    def main(self,task):
+    def main(self,task,*,on_transport=None):
         if self.memory_scope is not None:check_context_task(task,self.memory_scope)
-        started=time.monotonic();result=super().main(task)
+        started=time.monotonic();result=super().main(task,on_transport=on_transport)
         overflow=retain_main_audit(self.main_calls,dict(elapsed_s=time.monotonic()-started,task_id=task.task_id,attempt_id=task.attempt_id,
             input_ref=task.input_ref,final=result.get('completion_provenance'),usage=result.get('usage')))
         if overflow:self.receipt_overflow['main']=True

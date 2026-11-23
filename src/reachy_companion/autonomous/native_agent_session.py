@@ -24,7 +24,7 @@ class NativeGateway(RemoteGateway):
             raise ValueError('Gateway must use the same native_agent profile')
         return result
 
-    def main(self, task):
+    def main(self, task, *, on_transport=None):
         raise ValueError('Normal Agent exclusively owns main/reply')
 
 

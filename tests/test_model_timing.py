@@ -21,7 +21,7 @@ from reachy_companion.private_audio_trace import PrivateAudioTrace,main_call
 
 
 class ModelTimingTests(unittest.TestCase):
-    def fixture(self):
+    def fixture(self,*,context=False):
         cfg=load(Path(__file__).resolve().parents[1]/'config.autonomous.example.json')
         calls=[];clock=NS(value=100.0);mode=NS(value='normal')
         class Native(BaseHTTPRequestHandler):
@@ -41,6 +41,7 @@ class ModelTimingTests(unittest.TestCase):
                     if mode.value=='bad_output':value['stop_type']='limit'
                     if mode.value=='bad_diagnostics':value['timings']=dict(prompt_ms='unsupported',predicted_ms=1e100,cache_n=True)
                     if mode.value=='missing':value.pop('timings');value.pop('tokens_cached')
+                    if mode.value=='bad_container':value['timings']=[]
                 raw=json.dumps(value).encode();self.send_response(503 if mode.value=='unknown' and self.path=='/completion' else 200);self.send_header('Content-Length',str(len(raw)));self.end_headers();self.wfile.write(raw)
         native=ThreadingHTTPServer(('127.0.0.1',0),Native)
         nt=threading.Thread(target=native.serve_forever,daemon=True);nt.start()
@@ -52,7 +53,8 @@ class ModelTimingTests(unittest.TestCase):
         env=patch.dict(os.environ,MODEL_TIMING_TEST_TOKEN='x'*32);env.start()
         server=create_server(cfg);thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
         cfg['gateway']['client_url']='http://127.0.0.1:'+str(server.server_port)
-        gateway=RemoteGateway(cfg)
+        from reachy_companion.autonomous.companion_session import ContextGateway
+        gateway=ContextGateway(cfg,None) if context else RemoteGateway(cfg)
         def cleanup():
             server.shutdown();server.server_close();thread.join(1)
             native.shutdown();native.server_close();nt.join(1);env.stop()
@@ -62,16 +64,16 @@ class ModelTimingTests(unittest.TestCase):
         return NS(cfg=cfg,calls=calls,clock=clock,mode=mode,server=server,gateway=gateway,task=task)
 
     def test_actual_http_trace_stages_and_unchanged_calls_results(self):
-        fixture=self.fixture()
+        fixture=self.fixture(context=True)
         from reachy_companion.autonomous.gateway import model_final
         def final(*args):fixture.clock.value+=.4;return model_final(*args)
         fake_time=NS(monotonic=lambda:fixture.clock.value)
-        with patch('reachy_companion.model_timing.time',fake_time),patch('reachy_companion.autonomous.gateway.time',fake_time),patch('reachy_companion.autonomous.gateway.model_final',final):
+        with patch('reachy_companion.model_timing.time',fake_time),patch('reachy_companion.autonomous.gateway.model_final',final):
             with tempfile.TemporaryDirectory() as directory:
                 root=Path(directory).resolve();root.chmod(0o700)
                 trace=PrivateAudioTrace(root/'trace.jsonl',seconds=10);trace.start(threading.Event(),hub_boot_id='hub')
                 trace.emit('input_admission',input_ref='input',lineage_id='source',disposition='admitted')
-                result=main_call(trace,fixture.gateway.main,fixture.task);trace.close()
+                result=main_call(trace,fixture.gateway.main,fixture.task,fixture.gateway.main_with_transport);trace.close()
                 rows=list(map(json.loads,(root/'trace.jsonl').read_text().splitlines()))
         receipt=result['model_timing'];self.assertFalse(receipt['incomplete'])
         self.assertEqual(receipt['request_id'],'attempt');self.assertEqual(receipt['gateway_boot_id'],fixture.gateway.boot_id)
@@ -90,10 +92,10 @@ class ModelTimingTests(unittest.TestCase):
 
     def test_bad_or_missing_native_diagnostics_do_not_change_result(self):
         fixture=self.fixture()
-        for mode in ('bad_diagnostics','missing'):
+        for mode in ('bad_diagnostics','bad_container','missing'):
             fixture.mode.value=mode;fixture.calls.clear();result=fixture.gateway.main(fixture.task)
             self.assertEqual(result['output'],'Synthetic answer');self.assertEqual(len(fixture.calls),3)
-            self.assertEqual(result['model_timing']['incomplete'],mode=='bad_diagnostics')
+            self.assertEqual(result['model_timing']['incomplete'],mode!='missing')
             self.assertIsNone(result['model_timing']['reported_native']['reported_prompt_ms'])
             json.dumps(result,allow_nan=False)
 
@@ -123,6 +125,9 @@ class ModelTimingTests(unittest.TestCase):
             out=project(value);self.assertTrue(out['incomplete']);self.assertIsNone(out['usage']['input_tokens'])
         self.assertIsNone(project(good,request_id='foreign')['request_id'])
         self.assertIsNone(project(good,gateway_boot_id='foreign')['gateway_boot_id'])
+        for key in ('usage','reported_native'):
+            bad=copy.deepcopy(good);bad[key]=[];self.assertTrue(project(bad)['incomplete'])
+        bad=copy.deepcopy(good);bad['version']=True;self.assertEqual(project(bad)['reason'],'invalid_receipt')
         good['prompt']='PRIVATE-PROMPT';good['reported_native']['raw']='PRIVATE-RAW'
         self.assertNotIn('PRIVATE',json.dumps(project(good)))
         self.assertLess(len(json.dumps(project(good))),4096)
@@ -171,6 +176,47 @@ class ModelTimingTests(unittest.TestCase):
                     self.assertNotIn('text',r)
                 if sink=='broken':self.assertEqual(len(callback),1)
                 self.assertEqual(len(fixture.calls),3)
+
+    def test_late_dependency_revoke_keeps_measured_receipt_and_422(self):
+        from unittest.mock import Mock
+        fixture=self.fixture(context=True)
+        handler=fixture.server.RequestHandlerClass
+        cells=dict(zip(handler.do_POST.__code__.co_freevars,handler.do_POST.__closure__))
+        cells['context'].cell_contents=NS(memory=NS(supports=Mock(side_effect=[True,False])),close=lambda:None)
+        observed=[]
+        with self.assertRaises(HTTPError) as failure:
+            fixture.gateway.main(fixture.task,on_transport=lambda *args:observed.append(args))
+        self.assertEqual(failure.exception.code,422);self.assertEqual(len(fixture.calls),3)
+        receipt=observed[0][0]
+        for name in ('tokenize_text','tokenize_prompt','completion','validation','backend_total','gateway_total'):
+            self.assertEqual(receipt['stages'][name]['state'],'complete')
+        self.assertEqual(receipt['stages']['handler_to_pre_serialize']['state'],'failed')
+        self.assertEqual(receipt['usage']['input_tokens'],3);self.assertEqual(receipt['usage']['output_tokens'],7)
+        self.assertEqual(receipt['request_id'],'attempt');self.assertFalse(fixture.server.gateway.health()['busy']['main'])
+
+    def test_context_guard_and_native_rejection_precede_any_model_call(self):
+        fixture=self.fixture(context=True)
+        fixture.gateway.memory_binding=dict(store_id='store',revision=1,memory_projection_sha256='a'*64)
+        fixture.task.memory_store_id='different';fixture.task.memory_revision=1
+        with self.assertRaisesRegex(ValueError,'whitelist/store/revision changed'):
+            fixture.gateway.main_with_transport(fixture.task,lambda *args:None)
+        self.assertFalse(fixture.calls)
+        from reachy_companion.autonomous.native_agent_session import NativeGateway
+        native=NativeGateway.__new__(NativeGateway)
+        with self.assertRaisesRegex(ValueError,'exclusively owns'):
+            native.main_with_transport(fixture.task,lambda *args:None)
+
+    def test_audited_gateway_forwards_callback_and_retains_existing_audit(self):
+        import importlib.util
+        path=Path(__file__).resolve().parents[1]/'deploy/autonomous/realtime_audio_session.py'
+        spec=importlib.util.spec_from_file_location('timing_realtime',path)
+        module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+        fixture=self.fixture();gateway=module.AuditedGateway(fixture.cfg)
+        result=gateway.main_with_transport(fixture.task,lambda *args:None)
+        self.assertEqual(result['output'],'Synthetic answer')
+        self.assertEqual(len(gateway.main_calls),1);self.assertEqual(len(fixture.calls),3)
+        self.assertEqual(gateway.main_calls[0]['usage'],result['usage'])
+        self.assertEqual(result['model_timing']['request_id'],fixture.task.attempt_id)
 
     def test_transport_missing_malformed_and_foreign_receipt_preserve_polling(self):
         fixture=self.fixture();good=fixture.gateway.main(fixture.task)['model_timing']

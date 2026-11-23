@@ -3,7 +3,6 @@ import json
 import os
 import re
 import threading
-import time
 from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from http.client import HTTPException
@@ -619,7 +618,7 @@ def create_server(config):
             except Exception:self.reply(503,{'error':'log_not_delivered'})
             finally:log_slot.release()
         def do_POST(self):
-            began=stamp();request=None
+            began=stamp();request=None;known_timing=None
             if not self.authorized(): return
             if self.path not in ('/decision', '/main', '/context', '/context/revoke'):
                 self.reply(404, {}); return
@@ -649,20 +648,21 @@ def create_server(config):
                         descriptors=[dict(alias=x['id']+':'+str(x['version']),type=x['epistemic_type'],summary=x['content']) for x in request['data']['memory']]
                     if self.path=='/main' and not context.memory.supports(descriptors):raise ValueError('Main memory dependency changed')
                 result = gateway.generate('fast' if self.path=='/decision' else 'main', request['data'],request['request_id'])
+                known_timing=result.get('model_timing') if self.path=='/main' else None
                 relevant=(self.path=='/main' or result['output'].get('commit') or result['output'].get('start'))
                 if context and relevant and not context.memory.supports(descriptors):raise ValueError('Memory dependency changed during inference')
                 if self.path=='/main':result['model_timing']=project(bind(result.get('model_timing'),request['request_id'],gateway.boot_id,'handler_to_pre_serialize',began))
                 self.reply(200, {**result, 'request_id': request['request_id']})
             except BlockingIOError as exc:
-                self.failed(409,'busy',exc,request,began)
+                self.failed(409,'busy',exc,request,began,known_timing)
             except ExecutionUnknown as exc:
-                self.failed(503,'execution_unknown_quarantined',exc,request,began)
+                self.failed(503,'execution_unknown_quarantined',exc,request,began,known_timing)
             except Exception as exc:
-                self.failed(422,'invalid_request_or_model_output',exc,request,began)
-        def failed(self,status,reason,error,request,began):
+                self.failed(422,'invalid_request_or_model_output',exc,request,began,known_timing)
+        def failed(self,status,reason,error,request,began,known_timing):
             body={'error':reason}
             if self.path=='/main':
-                receipt=bind(getattr(error,'model_timing',None),request.get('request_id') if type(request) is dict else None,
+                receipt=bind(getattr(error,'model_timing',None) or known_timing,request.get('request_id') if type(request) is dict else None,
                     gateway.boot_id,'handler_to_pre_serialize',began,failed=True)
                 body['model_timing']=project(receipt)
             self.reply(status,body)

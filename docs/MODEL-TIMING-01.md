@@ -117,6 +117,10 @@ receipt совпадают с вариантом recorder off. Проверяю�
 quarantine с retained receipt до окончания poll, отсутствие repost, callback
 failure/disabled, malformed/missing/foreign diagnostics, one-shot, privacy,
 consumer missing-terminal/foreign-authority, existing default-off/STOP и caps.
+Проверены production ContextGateway, AuditedGateway и FrozenModelBackend:
+optional diagnostics проходят через прежние whitelist/instance guards; NativeGateway
+по-прежнему запрещает main. Поздний отзыв memory dependency сохраняет уже
+измеренные stages/counts только этого handler request и прежний422.
 
 ```sh
 PYTHONPATH=src:tests python -m unittest test_model_timing test_production_baseline test_gateway_tokenizer_unknown test_autonomous test_private_audio_trace test_worker_code_identity -q

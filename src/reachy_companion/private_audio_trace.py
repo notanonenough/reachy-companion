@@ -9,8 +9,6 @@ import threading
 import time
 import uuid
 from .autonomous.voice_chain import digest
-
-
 from .model_timing import project as project_model_timing
 
 KINDS=('session_begin','stt_result','stt_disposition','input_admission','main_request',
