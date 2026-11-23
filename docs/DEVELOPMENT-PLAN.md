@@ -25,14 +25,14 @@
 | Карточка | Статус, владелец и ревьюер | Следующий шаг и контакт |
 |---|---|---|
 | [RELEASE-01, Issue #9](https://github.com/notanonenough/reachy-companion/issues/9) | В работе, подготовка; автор — `/root/implementer`, независимый ревьюер — `/root/reviewer` | Prep PR исправления Mac доступа, затем новый кандидат, rollout и физическая приёмка. Контроль 23.11.2026 в 21:30 Asia/Baku; изменения стенда после принятого prep PR и передачи окна. |
-| [CONTRACT-01, Issue #2](https://github.com/notanonenough/reachy-companion/issues/2) | На приёмке; единственный автор — `/root/ci_implementer`, независимый ревьюер — `/root/reviewer` | PR #10: контракт одобрен на `59f18d2a`; новый test-only head `cb044599` устраняет выявленную CI-гонку storage fault и требует повторного review/CI. Следующий контакт 23.11.2026 в 21:25 Asia/Baku. |
+| [CATALOG-01, Issue #12](https://github.com/notanonenough/reachy-companion/issues/12) | Готова и назначена; единственный автор — `/root/ci_implementer`, независимый ревьюер — `/root/reviewer` | Runtime registry и scalar HTTP adapter через существующий production цикл; первый loopback и план интеграции. Следующий контакт 23.11.2026 в 21:40 Asia/Baku. Стенд не занимает. |
 
 Ведущий работает в `reachy-development-map`, исполнитель — в `reachy-audit-map`,
 ревьюер — в `/tmp/reachy-review-map`; рабочие ветки короткоживущие `codex/*`.
 Основную рабочую копию `reachy-companion` не используют для продуктовых правок.
 Read-only инвентаризация закончена; reviewer освободил стенд в 21:18:20 Asia/Baku.
 Сейчас аппаратных работ нет. Следующее окно автора #9 — после принятого prep PR;
-CONTRACT-01 остаётся офлайн.
+CATALOG-01 остаётся офлайн и не подменяет отдельно выбранный release candidate.
 CI-01 принята в 21:03 Asia/Baku: [PR #6](https://github.com/notanonenough/reachy-companion/pull/6),
 проверенный head `bc63ac863b64194e70a04510f0fdae0f0f2395d0`, merge в origin/main
 `ee3b7abc6c908e8160862ebe768630545379ef40` проверен после слияния. Issue #5 закрыта,
@@ -56,10 +56,11 @@ CONTRACT-01 (передача записана в Issue #2 до начала). �
    владельцем и явного применения; прямое фоновое применение запрещено. Основание §35; контракт согласован
    ведущим и техлидом до реализации. Владелец — `/root/implementer`,
    ревьюер — `/root/reviewer`.
-2. **[CONTRACT-01, Issue #2](https://github.com/notanonenough/reachy-companion/issues/2), назначена второму исполнителю.** Описать общий конверт наблюдений,
-   каталог возможностей и результаты шести модулей (§7–10,15–16,19–22).
-   До реализации обеих сторон техлид проверяет совместимость, недоступность
-   источника, отзыв допуска и обратную связь. Транспорт пока не выбирать.
+2. **[CONTRACT-01, Issue #2](https://github.com/notanonenough/reachy-companion/issues/2), принята через PR #10.** Контракт шести модулей (§7–10,15–16,19–22)
+   описывает каталог, актуальность, допуски и результаты. Следующая узкая задача
+   [CATALOG-01, Issue #12](https://github.com/notanonenough/reachy-companion/issues/12)
+   назначена второму исполнителю: scalar registry/adapter в существующий runtime.
+   Медиатранспорт и движение в неё не входят.
 3. **[BASELINE-01, Issue #8](https://github.com/notanonenough/reachy-companion/issues/8), принята через PR #11.** Инвентаризация версий и штатных
    интерфейсов, единые часы/погрешность, исходная совместная нагрузка и бюджеты
    (§4,10,17–19,25,27–29). Нужен последовательный доступ к стенду.
@@ -273,3 +274,20 @@ CONTRACT CI выявил существующий race теста storage failur
 SQLite. Ведущий разрешил test-only фиксацию часов и fault injection в достигнутой
 транзакции; production/TTL/guards не меняются, verified revoke сохраняется.
 Автор и reviewer воспроизвели причину; новая версия проходит review/CI.
+
+Приёмка CONTRACT-01 21:27 Asia/Baku: [PR #10](https://github.com/notanonenough/reachy-companion/pull/10)
+слит после [независимого APPROVED](https://github.com/notanonenough/reachy-companion/pull/10#pullrequestreview-6026242151)
+точного `cb044599d7011d9b6bfd666f4b6d424ec9003d2e`. Reviewer повторил 67 tests
+и delayed-heartbeat сценарий; оба Linux CI45226609182/45226625903 успешны
+(1780 tests, 26 skipped, Node и package build). Свежая main добавляла только
+BASELINE/map docs; merge-tree без конфликтов. Merge
+`b1c87370cedf8d180f2b48964d9f647460e16887` и ancestry проверены в origin/main,
+Issue2 закрыта, remote branch удалена; локальную автор удаляет при переходе.
+
+[CATALOG-01 #12](https://github.com/notanonenough/reachy-companion/issues/12)
+назначена освободившемуся `/root/ci_implementer`, reviewer `/root/reviewer`.
+Техлид подтвердил границу: существующий production цикл, bounded scalar catalog,
+explicit compatibility и freshness; без media/motion/deploy. Первый loopback
+и план — 21:40 Asia/Baku. Аппаратные accuracy/load остаются непроверенными;
+BASELINE дала inventory, а не приёмку этих свойств. Access boundary #9 отдельно
+согласована техлидом, стенд пока свободен.
