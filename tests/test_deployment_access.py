@@ -168,6 +168,33 @@ class AccessTests(unittest.TestCase):
         access.rollback(self.backup)
         self.assertEqual(self.config.read_bytes(), old)
 
+    @unittest.skipUnless(shutil.which('ssh'), 'OpenSSH required')
+    def test_scope_bleed_refused_without_changing_effective_foreign_alias(self):
+        include = self.base / 'trailing-include'
+        include.write_text('ServerAliveInterval 42\n')
+        for block_name in access.BLOCKS:
+            for last_scope in (b'Host reachy-mini', b'Match host reachy-mini'):
+                for tail in (b' ServerAliveInterval 42\n', (' Include ' + str(include) + '\n').encode()):
+                    old = self.original(b'Host unrelated\n HostName example.invalid\n' +
+                        ('# BEGIN ' + block_name + '\n').encode() + last_scope + b'\n' +
+                        ('# END ' + block_name + '\n').encode() + tail)
+                    before = subprocess.check_output(['ssh', '-G', '-F', str(self.config), 'unrelated'], stderr=subprocess.DEVNULL)
+                    self.assertIn(b'serveraliveinterval 0\n', before)
+                    with self.assertRaisesRegex(ValueError, 'foreign SSH scope'):
+                        access.install(self.stage, self.backup, self.root)
+                    self.assertFalse(self.backup.exists())
+                    self.assertFalse((self.root / 'Users/fixture user/reachy-network-recovery').exists())
+                    self.assertEqual(self.config.read_bytes(), old)
+                    after = subprocess.check_output(['ssh', '-G', '-F', str(self.config), 'unrelated'], stderr=subprocess.DEVNULL)
+                    self.assertEqual(after, before)
+
+    def test_repeated_install_with_foreign_include_keeps_scope_and_bytes(self):
+        self.original(b'Include /nonexistent/optional-config\nHost unrelated\n HostName example.invalid\n')
+        access.install(self.stage, self.backup, self.root)
+        before = self.config.read_bytes()
+        access.install(self.stage, self.base / 'second-backup', self.root)
+        self.assertEqual(self.config.read_bytes(), before)
+
     def test_invalid_route_or_home_is_rejected(self):
         for home, route in [('/tmp/../etc', 'direct'), ('relative', 'jump'), ('/tmp/x"', 'direct'), ('/tmp/home', 'evil')]:
             with self.assertRaises(ValueError):access.render(home, route)

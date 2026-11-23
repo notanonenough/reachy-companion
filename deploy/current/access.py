@@ -8,6 +8,7 @@ import argparse
 import json
 import os
 from pathlib import Path
+import re
 import stat
 import tempfile
 
@@ -48,6 +49,17 @@ def read_stage(path):
     return rows
 
 
+def ssh_scope(lines):
+    # Include can change scope; only a subsequent explicit Host/Match restores
+    # knowledge. Keep arguments exact rather than guessing pattern equivalence.
+    scope = b'host *'
+    for line in lines:
+        match = re.match(br'(?i)^(host|match|include)(?:\s+|=)(.*)', line.strip())
+        if match:
+            scope = None if match[1].lower() == b'include' else match[1].lower() + b' ' + match[2].strip()
+    return scope
+
+
 def merge_config(previous, managed):
     """Keep foreign bytes; reject ambiguous markers rather than guess ownership."""
     remainder = previous
@@ -64,6 +76,15 @@ def merge_config(previous, managed):
         block = b''.join(lines[starts[0]+1:ends[0]])
         if any(('# BEGIN ' + other).encode() in block or ('# END ' + other).encode() in block for other in BLOCKS):
             raise ValueError('Nested managed SSH markers')
+        # Removing a Host/Match header must not move trailing foreign options
+        # into an earlier host. Include is an option, not a scope boundary.
+        following = next((line.strip() for line in lines[ends[0]+1:]
+                          if line.strip() and not line.lstrip().startswith(b'#')), b'')
+        boundary = re.match(br'(?i)^(host|match)(?:\s+|=)', following)
+        before_scope = ssh_scope(lines[:starts[0]])
+        after_scope = ssh_scope(lines[:ends[0]])
+        if following and not boundary and (before_scope is None or before_scope != after_scope):
+            raise ValueError('Ambiguous foreign SSH scope after managed block')
         remainder = b''.join(lines[:starts[0]] + lines[ends[0]+1:])
     return managed.rstrip(b'\n') + b'\n' + remainder
 
