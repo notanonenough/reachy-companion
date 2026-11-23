@@ -43,6 +43,15 @@ schema versions и лимиты. Hub сохраняет `catalog_generation` и 
 а команды не отправляются. Аутентификация узлов и разрешения независимы от
 этих полей; текст descriptor от модели не регистрирует адаптер.
 
+Каталог передаётся атомарным полным `Catalog` snapshot: protocol, connection_id,
+catalog_generation, source_boot_id и capabilities (до 64 descriptors и общего
+byte bound). Все entries имеют одинаковые generation/boot и уникальные id.
+Новый snapshot заменяет предыдущий только после полной проверки; отсутствующий
+id означает removal. Повреждённый snapshot не применяется частично. Generation
+строго возрастает в пределах boot, duplicate того же содержимого идемпотентен,
+тот же generation с иным содержимым — conflict. На reconnect заново подтверждается
+текущий snapshot, readiness прежнего connection не переносится автоматически.
+
 Для данного проекта envelope ограничен 16 KiB до decode; binary media передаётся
 отдельно. Схема ограничивает имена/массивы/скалярные arguments; semantic handler
 проверяет точный набор, единицы и диапазоны аргументов. Эти ограничения пока
@@ -131,7 +140,10 @@ socket). Это не известное время экспозиции. `unknow
 `captured_at` за аппаратное время экспозиции. Для совместимого projection
 оставляем в summary `time_basis`, unit и confidence; unknown не получает summary.
 Production-integration должна дополнительно хранить registry/provenance и
-sequence, которых нынешний Sensor сам по себе не проверяет.
+sequence, которых нынешний Sensor сам по себе не проверяет. Есть также граничное
+различие: нынешний `Sensor.view` допускает равенство age и TTL; новый validated
+snapshot должен применять договорённое `age < TTL` и при чтении, не только
+при ingress. Этот переход включён в CATALOG-01, текущий код здесь не меняется.
 
 ## Команды, допуски и результат
 
@@ -224,7 +236,7 @@ stale/replay/reconnect/reboot; unknown age против нуля; accepted/unkno
 
 Приёмка CATALOG-01: обычный production entrypoint с loopback source добавляет
 новую метрику без изменения State, отзывает кэш при removal/privacy/disconnect,
-не принимает old boot/sequence, unknown остаётся unknown, slow reader не
+не принимает old boot/sequence, при чтении age >= TTL уже stale, unknown остаётся unknown, slow reader не
 накапливает задачи; все старые sensor paths и STOP проходят регрессии. Техлид
 проверяет реальный registry и адаптер, не только эти design helpers. Новые
 пределы descriptor/очереди фиксируются конфигурацией и негативными тестами.

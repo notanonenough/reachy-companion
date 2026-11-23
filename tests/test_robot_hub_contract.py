@@ -25,6 +25,17 @@ def checked(kind, value):
     return value
 
 
+def catalog_checked(value):
+    checked('Catalog', value)
+    ids = set()
+    for cap in value['capabilities']:
+        if (cap['id'] in ids or cap['catalog_generation'] != value['catalog_generation']
+                or cap['source_boot_id'] != value['source_boot_id']):
+            raise ValueError('Mixed or ambiguous catalog snapshot')
+        ids.add(cap['id'])
+    return value
+
+
 def negotiate(capability, supported):
     """Type support is distinct from the identity or permission of an adapter."""
     checked('Capability', capability)
@@ -127,6 +138,16 @@ class RobotHubContractTests(unittest.TestCase):
         with self.assertRaises(ValueError): decode(json.dumps(bad))
         for patch in ({'protocol': 2}, {'confidence': 2}, {'sequence': -1}, {'surprise': True}):
             with self.assertRaises(ValidationError): checked('Observation', {**self.values['observation'], **patch})
+
+    def test_catalog_is_one_bounded_snapshot_without_duplicate_or_mixed_boot_entries(self):
+        catalog = dict(kind='catalog', protocol=1, connection_id='link-2', catalog_generation=3,
+                       source_boot_id='robot-boot-1', capabilities=self.values['capabilities'])
+        catalog_checked(catalog)
+        for capabilities in (catalog['capabilities'] + [catalog['capabilities'][0]],
+                             [{**catalog['capabilities'][0], 'source_boot_id': 'old-boot'}]):
+            with self.assertRaises(ValueError): catalog_checked({**catalog, 'capabilities': capabilities})
+        with self.assertRaises(ValueError):
+            catalog_checked({**catalog, 'capabilities': [catalog['capabilities'][0]] * 65})
 
     def test_new_scalar_sensor_reaches_existing_state_without_a_new_sensor_branch(self):
         cap = self.caps['metrics']
