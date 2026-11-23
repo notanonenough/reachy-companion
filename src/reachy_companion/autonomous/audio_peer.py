@@ -158,15 +158,19 @@ class AudioPeer:
             self.audio_level=dict(rms=rms,delta=None if previous is None else rms-previous['rms'],captured_end=captured_end)
             return True
 
-    def publish(self, pcm, captured_end, echo_reference):
+    def publish(self, pcm, captured_end, echo_reference, *, turn=None):
         if not isinstance(pcm, bytes) or not pcm or len(pcm)%2 or len(pcm)>256000:
             raise ValueError('Bounded mono16k observation')
+        if turn is not None:
+            from .audio_turn import segment
+            turn=segment(turn,len(pcm)//2)
         with self.lock:
             if not self.permitted():return False
             if self.lifetime=='lease' and self.sequence>=2**63-1:self.close('observation_sequence_exhausted');return False
             self.sequence += 1
             self.observation = dict(pcm=pcm, captured_end=captured_end,
-                source_boot=self.boot_id, sequence=self.sequence, echo_reference=echo_reference)
+                source_boot=self.boot_id, sequence=self.sequence, echo_reference=echo_reference,
+                **({"turn":turn} if turn is not None else {}))
             return True
 
     def operator_status(self):
@@ -692,7 +696,8 @@ class AudioPolling:
                             self.adapter.submit(pcm,source_boot=self.source_boot,
                                 sequence=observation['sequence'],captured_end=started-age,
                                 authority=authority,operator_binding=binding,
-                                echo_reference=observation.get('echo_reference'))
+                                echo_reference=observation.get('echo_reference'),
+                                **({'turn':observation.get('turn')} if getattr(self.adapter,'endpoint_v1',False) or 'turn' in observation else {}))
             if (not self.job and now>=self.next_poll and operator and operator['microphone_enabled']
                     and not operator['privacy_all'] and now<operator['valid_until']):
                 binding=tuple(operator['binding']);self.calls+=1;self.next_poll=now+.05

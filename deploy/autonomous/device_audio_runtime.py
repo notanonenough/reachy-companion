@@ -13,7 +13,7 @@ from reachy_companion.autonomous.alsa_capture import AlsaCapture
 from reachy_companion.autonomous.alsa_pcm import AlsaPCM
 from reachy_companion.autonomous.audio_peer import diagnostic_operator,AudioPeer,create_server,owner_binding,lease_authority
 from reachy_companion.autonomous.playback import Playback
-from reachy_companion.autonomous.response_endpoint import ResponseEndpoint
+from reachy_companion.autonomous.response_endpoint import ResponseEndpoint, TurnEndpoint
 from reachy_companion.autonomous.contracts import uid,decode
 from reachy_companion.autonomous.lease_datagram import LeaseDatagramServer
 from reachy_companion.autonomous.pcm_controls import StereoChannels,CaptureExclusion
@@ -155,7 +155,7 @@ def main():
         import webrtcvad
         capture_device=a.capture_device or cfg['audio']['capture_device']
         report['capture_device']=capture_device
-        endpoint=ResponseEndpoint(webrtcvad.Vad(2),**endpoint_settings)
+        endpoint=TurnEndpoint(webrtcvad.Vad(2),**endpoint_settings)
         start=time.monotonic()
         while not stop.is_set() and not peer.closed and (a.lifetime=='lease' or time.monotonic()-start<a.duration):
             if not peer.permitted():
@@ -171,19 +171,14 @@ def main():
             mono=channels.select(value['pcm'],scope)
             if scope!='endpoint':
                 report['owned_output_frames_excluded']+=value['frames'];endpoint.clear()
-                endpoint=ResponseEndpoint(webrtcvad.Vad(2),**endpoint_settings);continue
+                continue
             peer.publish_level(mono,value['captured_end'])
-            available_bytes=len(endpoint.pcm)+len(endpoint.pending)+len(mono)
-            endpoint.feed(mono);del mono
-            if endpoint.reason:
-                if endpoint.reason=='speech_then_silence' or endpoint.reason=='response_deadline' and endpoint.started:
-                    # VAD can end inside this read. Do not date the retained
-                    # utterance at the later samples that were discarded.
-                    unused_frames=(available_bytes-len(endpoint.pcm))//2
-                    captured_end=value['captured_end']-unused_frames/16000
-                    if peer.publish(bytes(endpoint.pcm),captured_end,exclusion.last_stream):report['utterances']+=1
-                else:report['no_response_windows']+=1
-                endpoint.clear();endpoint=ResponseEndpoint(webrtcvad.Vad(2),**endpoint_settings)
+            for part in endpoint.feed(mono,sample_start=report['capture_frames']-value['frames'],
+                    captured_end=value['captured_end']):
+                if peer.publish(part['pcm'],part['captured_end'],exclusion.last_stream,turn=part['turn']):
+                    report['utterances']+=1
+            del mono
+            report.update(no_response_windows=endpoint.no_response,endpoint_dropped=endpoint.dropped,endpoint_last_drop=endpoint.last_drop)
         report.update(elapsed_s=time.monotonic()-start,source_boot=peer.boot_id,controller_lease_started=peer.started_lease,
             capture_timestamp_provenance='alsa_monotonic_available_position',peer_close_reason=peer.close_reason,
             max_operator_ms=peer.max_operator_ms,operator_requests=peer.operator_requests)

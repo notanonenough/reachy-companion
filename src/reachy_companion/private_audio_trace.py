@@ -13,7 +13,7 @@ from .model_timing import project as project_model_timing
 
 KINDS=('session_begin','stt_result','stt_disposition','input_admission','main_request',
        'main_result','main_checked','speech_commit','speech_terminal','playback_stop','input_retry','main_transport')
-FIELDS=('source_boot','sequence','lineage_id','audio_s','pcm_sha256','captured_end',
+FIELDS=('endpoint_segment','aggregation','turn_id','segments','earliest_deadline','source_boot','sequence','lineage_id','audio_s','pcm_sha256','captured_end',
         'capture_basis','started_at','ended_at','disposition','input_ref','task_id','attempt_id',
         'request_id','parent_input_ref','authority','operator_binding','final','stream_id','generation',
         'tts_frames','tts_complete','cancelled','output_sha256','tts_pcm_sha256','deadline',
@@ -37,7 +37,16 @@ def project(fields):
     for key in FIELDS:
         if key not in fields:continue
         value=fields[key]
-        if key=='model_timing':result[key]=project_model_timing(value)
+        if key in ('endpoint_segment','segments'):
+            from .autonomous.audio_turn import segment
+            try:
+                if key=='endpoint_segment':result[key]=segment(value)
+                else:
+                    if type(value) is not list or not 1<=len(value)<=3:raise ValueError('Segment cap')
+                    result[key]=[dict(segment({k:v for k,v in item.items() if k not in ('source_boot','sequence','lineage_id')}),
+                        **{k:scalar(item[k]) for k in ('source_boot','sequence','lineage_id')}) for item in value]
+            except (ValueError,KeyError,TypeError):result[key]=None
+        elif key=='model_timing':result[key]=project_model_timing(value)
         elif key in ('authority','final'):
             keys=AUTHORITY if key=='authority' else FINAL
             result[key]={k:scalar(value[k]) for k in keys if k in value} if type(value) is dict else None

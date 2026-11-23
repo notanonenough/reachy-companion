@@ -42,6 +42,18 @@ def finish(rows):
 
 
 class BaselineTests(unittest.TestCase):
+    def test_aggregate_admission_never_reports_final_segment_as_whole_turn(self):
+        rows=trace();before=b.analyze_trace(rows)
+        admission=next(row for row in rows if row['kind']=='input_admission')
+        admission.update(aggregation='endpoint_v1',turn_id='a'*32,segments=[])
+        result=b.analyze_trace(rows)
+        self.assertEqual(result['state'],'incomplete')
+        self.assertEqual(result['issues']['aggregate_timing_unsupported'],1)
+        self.assertEqual(result['audio_playback_chains'],0)
+        self.assertEqual(result['metrics']['stt_end_to_playback_stop_s']['n'],0)
+        self.assertEqual(result['event_counts'],before['event_counts'])
+        self.assertEqual(result['metrics']['stt_client_s'],before['metrics']['stt_client_s'])
+
     def test_nonterminal_transport_receipt_never_completes_chain(self):
         from reachy_companion.model_timing import Timing,bind,project
         model={'id':'fixture','completion_backend':'llama_native','audit':dict(runtime_build='fixture',
