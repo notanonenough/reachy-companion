@@ -46,6 +46,26 @@ class Hub:
         self.stock_scope=threading.local();self.stock_unknown=False;self.stock_owned=None;self.stock_stop_observed=None
         self.stock_stop_request=None
         self._stock_fresh_reject_logged=False
+        try:
+            from .autonomous.stock_diagnostics import StockDiagnostics
+            self.stock_diagnostics=StockDiagnostics(self.boot_id)
+        except ImportError:
+            # Standalone Hub deployments without autonomous remain usable.
+            self.stock_diagnostics=None
+
+    def stock_diagnostic(self, action, *args):
+        # Evidence failures must never affect the existing control outcome.
+        try:
+            return getattr(self.stock_diagnostics,action)(getattr(self.stock_scope,'diagnostic_token',None),*args)
+        except BaseException:
+            return None
+
+    def stock_diagnostic_token(self):
+        return getattr(self.stock_scope,'diagnostic_token',None)
+
+    def stock_diagnostic_snapshot(self, token=None, scoped=False):
+        try:return self.stock_diagnostics.snapshot(token,scoped)
+        except BaseException:return None
 
     def stock_selected(self):
         return self.config['guarded_motion'].get('transport','native')=='stock'
@@ -106,6 +126,7 @@ class Hub:
             self.stock_scope.expression_version=None
             self.stock_scope.binding=self.stock_operator()
             self.stock_scope.observed=0
+            self.stock_scope.diagnostic_token=object()
 
     def stock_end(self):
         connection=getattr(self.stock_scope,'factory_connection',None)
@@ -147,6 +168,11 @@ class Hub:
     def stock_stop_owned(self,task_id):
         self.move_uuid(task_id)
         if task_id!=self.stock_owned:raise RuntimeError('Only this lane owned UUID may be stopped')
+        self.stock_diagnostic('begin_stop',task_id)
+        try:return self._stock_stop_owned(task_id)
+        finally:self.stock_diagnostic('finish_stop',self.stock_unknown)
+
+    def _stock_stop_owned(self,task_id):
         request_failed=False
         self.stock_stop_observed=False
         self.stock_stop_request=None
@@ -156,40 +182,55 @@ class Hub:
         try:
             active=self.stock_dependencies()
             elapsed=time.monotonic()-began
-        except Exception:absent=False
+        except Exception as exc:
+            self.stock_diagnostic('preflight',None,None,exc)
+            absent=False
         else:
+            self.stock_diagnostic('preflight',elapsed,active,None,not active and elapsed>.3)
             if not active and elapsed>.3:
                 # Do not turn an expired EMPTY observation into a stop of an
                 # already completed, non-idempotent factory UUID. One fresh
                 # read-only attempt may establish absence; no stop POST retry.
-                began=time.monotonic()
+                began=time.monotonic();expired=False
                 try:
                     active=self.stock_dependencies()
-                    if time.monotonic()-began>.3:raise TimeoutError('Stock stop preflight expired')
+                    elapsed=time.monotonic()-began
+                    expired=elapsed>.3
+                    self.stock_diagnostic('preflight',elapsed,active,None,expired)
+                    if expired:raise TimeoutError('Stock stop preflight expired')
                 except Exception as exc:
                     self.stock_unknown=True
+                    if not expired:self.stock_diagnostic('preflight',None,None,exc)
+                    self.stock_diagnostic('fail','stop_preflight','freshness_expired' if expired else None,task_id,exc)
                     raise RuntimeError('Fresh stock stop preflight unavailable') from exc
                 absent=not active
             else:absent=not active and elapsed<=.3
         if absent:
+            self.stock_diagnostic('observe',True)
             self.stock_stop_observed=True
             if self.stock_unknown:raise RuntimeError('UUID absence observed; explicit reconciliation required')
             self.stock_owned=None;return
         self.stock_stop_request=dict(endpoint='/api/move/stop',error_class=None,http_status=None)
+        self.stock_diagnostic('post',True)
         try:
             self.factory('/api/move/stop',{'uuid':task_id}) # independent of withdrawn operator permission
+            self.stock_diagnostic('post',True,True)
         except BaseException as exc:
             request_failed=True;self.stock_unknown=True
+            self.stock_diagnostic('fail','stop_post',None,task_id,exc)
+            self.stock_diagnostic('post',True,False,exc)
             error_class=('HTTPError' if isinstance(exc,HTTPError) else 'TimeoutError' if isinstance(exc,TimeoutError)
                          else 'TransportError' if isinstance(exc,OSError) else 'ResponseError')
             status=exc.code if isinstance(exc,HTTPError) and type(exc.code) is int and 100<=exc.code<=599 else None
             self.stock_stop_request.update(error_class=error_class,http_status=status)
+        observation_expired=False
         try:
             deadline=time.monotonic()+min(2,self.config['timeouts']['move'])
             while time.monotonic()<deadline:
                 active=self.factory('/api/move/running')
                 if type(active) is not list:raise RuntimeError('Stock running observation unknown')
                 ids=[self.move_uuid(item['uuid']) for item in active]
+                self.stock_diagnostic('observe',task_id not in ids)
                 if task_id not in ids:
                     self.stock_stop_observed=True
                     if request_failed:
@@ -198,9 +239,11 @@ class Hub:
                         raise RuntimeError('Stock stop request failed; UUID absence observed; explicit reconciliation required')
                     self.stock_owned=None;return
                 time.sleep(self.config['motion']['move_poll_seconds'])
+            observation_expired=True
             raise TimeoutError('Owned stock stop not observed')
-        except BaseException:
+        except BaseException as exc:
             self.stock_unknown=True
+            self.stock_diagnostic('fail','stop_observation','absence_timeout' if observation_expired else None,task_id,exc)
             if not request_failed or self.stock_stop_observed is not True:self.stock_stop_observed=False
             raise
 
@@ -311,7 +354,10 @@ class Hub:
                 else:payload=dict(payload,body_yaw=None)
                 payload.setdefault('head_pose',None)
             try:return self.factory(path,payload)
-            except BaseException:self.stock_unknown=True;raise
+            except BaseException as exc:
+                self.stock_unknown=True
+                self.stock_diagnostic('fail','dispatch_post',None,None,exc)
+                raise
         if payload is not None and self.config['guarded_motion']['enabled']:
             # Includes legacy expressions, wake/sleep and timeout stop calls.
             # No REST fallback: an absent/unready robot-local actor withdraws.
@@ -344,7 +390,7 @@ class Hub:
                 'action_running': self.lock.locked() or self.stock_unknown,
                 'stock_motion':dict(selected=self.stock_selected(),unknown=self.stock_unknown,
                     hub_boot_id=self.boot_id,owned_uuid=self.stock_owned,stop_observed=self.stock_stop_observed,
-                    stop_request=self.stock_stop_request,hard_stop_certified=False)}
+                    stop_request=self.stock_stop_request,diagnostics=self.stock_diagnostic_snapshot(),hard_stop_certified=False)}
 
     def move(self, path, payload):
         if self.stock_selected():
@@ -356,7 +402,10 @@ class Hub:
             try:
                 task=self.robot(path,payload)
                 try:task_id=self.move_uuid(task['uuid'])
-                except Exception:self.stock_unknown=True;raise
+                except Exception as exc:
+                    self.stock_unknown=True
+                    self.stock_diagnostic('fail','dispatch_response','invalid_observation',None,exc)
+                    raise
                 self.stock_owned=task_id;self.stock_stop_observed=None
                 deadline=time.monotonic()+self.config['timeouts']['move']
                 while time.monotonic()<deadline:
