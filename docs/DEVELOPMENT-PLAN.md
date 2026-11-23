@@ -48,8 +48,10 @@ first_reducer_expiry и first_lease_invalid остались null; прежни�
 остановлен, mic/camera выключены; его cleanup false (`busy:audio`, `peer_stop_unknown`).
 В новом опыте device подтвердил terminal stop, закрытие capture и восстановление
 mic; Hub cleanup false из-за busy:fast/main/background, audio false.
-Автор завершает независимые проверки outputs и атрибуцию акустической записи;
-reviewer разбирает локальные доказательства. Выпуск не принят.
+Независимые проверки подтвердили выключенные mic/camera, отсутствие moves,
+production PIDs и Mac jobs/ports. Acoustic attribution не подтвердила отдельный
+ответ робота; frame identity не сохранялась, движение отклонено до исполнения
+из-за прежней позы вне envelope. Выпуск не принят.
 Предыдущий `362002991` завершил опыт
 после102.58s: Hub прекратил renewal по ещё не установленной
 причине, device закрыл controller lease. Сквозная акустика, кадр, движение и
@@ -60,16 +62,17 @@ verified cleanup пока не приняты. Следующий запуск �
 
 | Карточка | Статус, владелец и ревьюер | Следующий шаг и контакт |
 |---|---|---|
-| [RELEASE-01, Issue #9](https://github.com/notanonenough/reachy-companion/issues/9) | Опыт exact `3a0f076bac3575ccc6504e8bd320ad5a50554b7f` завершён; единственный автор — `/root/implementer`, reviewer — `/root/reviewer` | Автор завершает terminal checks, акустическую атрибуцию и protocol PR. Reviewer проверяет локальные evidence и предлагает следующий опыт для оставшихся gates. Стенд закреплён за автором до 22:50; контроль 22:45 Asia/Baku. Нового start пока нет. |
+| [RELEASE-01, Issue #9](https://github.com/notanonenough/reachy-companion/issues/9) | Автор `/root/implementer` пишет protocol PR offline; независимый reviewer `/root/reviewer` получил стенд после явного освобождения автором в 22:42 | Один независимый опыт того же exact `3a0f076bac3575ccc6504e8bd320ad5a50554b7f`: штатные sleep→disabled→wake и measured pose, затем normal start, свежий /frame, адресная акустика, движение с feedback и stop. При unknown/busy/pose failure остановиться. Окно reviewer 22:43–23:00, контроль 22:50 Asia/Baku. |
 
 Ведущий работает в `reachy-development-map`, исполнитель — в `reachy-audit-map`,
 ревьюер — в `/tmp/reachy-review-map`; рабочие ветки короткоживущие `codex/*`.
 Основную рабочую копию `reachy-companion` не используют для продуктовых правок.
-Read-only инвентаризация закончена; reviewer освободил стенд в 21:18:20 Asia/Baku.
+Read-only инвентаризация закончена; прежнее окно reviewer завершилось в 21:18:20.
 После явного «продолжай» прежние исполнитель и reviewer продолжили работу.
 Сверены origin/main, единственная открытая Issue #9 и отсутствие открытых PR
 после принятия #20. Mac production checkout и оба Linux узла — exact `3a0f076`.
-Reviewer получает стенд только после освобождения и явной передачи ведущим.
+Стенд явно передан reviewer после завершения авторского опыта и освобождения
+в 22:42. Автор больше не выполняет hardware calls; второй автор также offline.
 LEASE-01 #17 и REDUCER-01 #20 приняты; `/root/ci_implementer` ожидает
 конкретную offline-зависимость по результатам опыта; без воспроизведения новая
 продуктовая правка не назначена.
