@@ -187,29 +187,40 @@ def analyze_trace(rows):
 
 def analyze_status(rows):
     if rows is None:return dict(state='missing')
+    rows=[row for row in rows if row.get('kind','status')=='status']
     counters={key:0 for key in COUNTERS};pairs=Counter();previous={};identity=None;segments=0;unknown=0;last_elapsed=None;resets=0
     maxima=[];elapsed=[];rtt=[];progress=[];queue=[];latest={};active=invalid=stale=0
-    first_invalid=first_expiry=None;poll_outcomes=Counter()
+    first_invalid=first_expiry=None;poll_outcomes=Counter();seen_snapshots=set();repeated=0;pressure_max={};timing_max={};pressure_phases=Counter()
     for row in rows:
         begin,end=row.get('hub_request_begin'),row.get('hub_request_end')
         if number(begin) and number(end) and end>=begin:
             rtt.append(end-begin)
-            outcome='unavailable' if row.get('stage')=='unavailable' or row.get('error_class') is not None else 'response'
+            outcome=row.get('poll_outcome') if row.get('poll_outcome') in ('response','timeout','error','identity_changed','oversize') else ('unavailable' if row.get('stage')=='unavailable' or row.get('error_class') is not None else 'response')
             poll_outcomes[outcome]+=1
         else:poll_outcomes['missing_interval']+=1
         if row.get('first_reducer_expiry') or row.get('first_lease_invalid'):invalid+=1
         first_invalid=first_invalid or project_first_lease_invalid(row.get('first_lease_invalid'))
         first_expiry=first_expiry or project_first_reducer_expiry(row.get('first_reducer_expiry'))
         peer=row.get('peer');peer=peer if type(peer) is dict else {}
-        current=peer.get('source_boot')
-        if not identifier(current):unknown+=1;previous={};identity=None;last_elapsed=None;continue
-        if current!=identity:segments+=1;previous={};identity=current;last_elapsed=None
+        source=peer.get('source_boot');binding=row.get('session_binding')
+        current=source
+        if binding is not None:
+            candidate=row.get('candidate')
+            if (type(binding) is dict and set(binding)=={'controller','source_boot','session_boot'} and all(identifier(v) for v in binding.values())
+                    and binding['source_boot']==source and type(candidate) is str and len(candidate)==40 and all(c in '0123456789abcdef' for c in candidate)):
+                current=(candidate,binding['controller'],source,binding['session_boot'])
+            else:current=None
+        if current is None or (type(current) is not tuple and not identifier(current)):unknown+=1;previous={};identity=None;last_elapsed=None;continue
+        if current!=identity:segments+=1;previous={};identity=current;last_elapsed=None;seen_snapshots.clear()
         current_elapsed=row.get('elapsed_s')
         if number(current_elapsed):
             if last_elapsed is not None and current_elapsed<last_elapsed:
-                segments+=1;resets+=1;previous={}
+                segments+=1;resets+=1;previous={};seen_snapshots.clear()
             last_elapsed=current_elapsed
         if row.get('stage')=='ACTIVE':active+=1
+        snapshot=(current,current_elapsed)
+        if number(current_elapsed) and snapshot in seen_snapshots:repeated+=1;continue
+        if number(current_elapsed):seen_snapshots.add(snapshot)
         speech=row.get('speech',{})
         if type(speech) is dict and speech.get('operator_receipt_fresh') is False:stale+=1
         if number(row.get('elapsed_s')):elapsed.append(row['elapsed_s'])
@@ -217,13 +228,21 @@ def analyze_status(rows):
         if type(lease) is dict:
             if number(lease.get('max_tick_gap_ms')):maxima.append(lease['max_tick_gap_ms'])
             if number(lease.get('progress_age_ms')):progress.append(lease['progress_age_ms'])
+            timing=lease.get('timing',{})
+            for key in ('last_send_age_ms','last_accepted_age_ms','reducer_progress_age_ms','worker_scheduling_age_ms'):
+                if type(timing) is dict and number(timing.get(key)):timing_max[key]=max(timing_max.get(key,0),timing[key])
         runtime=row.get('runtime',{})
         if type(runtime) is dict:
             latency=runtime.get('latency_s',{});pressure=runtime.get('pressure',{})
             if type(latency) is dict:
                 for key in ('fast','main'):
                     if number(latency.get(key)):latest[key]=latency[key]
-            if type(pressure) is dict and number(pressure.get('queue_depth')):queue.append(pressure['queue_depth'])
+            if type(pressure) is dict:
+                if number(pressure.get('queue_depth')):queue.append(pressure['queue_depth'])
+                if pressure.get('phase') in ('ACTIVE','DRAINING','DEGRADED','RECOVERING','STOPPED'):pressure_phases[pressure['phase']]+=1
+                ages=pressure.get('active_age_s',{})
+                for key in ('fast','main','motion','context','maintenance','updates','audio'):
+                    if type(ages) is dict and number(ages.get(key)):pressure_max[key]=max(pressure_max.get(key,0),ages[key])
         values=row.get('audio_counts',row.get('audio',{}).get('counts',{}) if type(row.get('audio')) is dict else {})
         if type(values) is not dict:values={}
         if any(key in previous and type(values.get(key)) is int and values[key]<previous[key] for key in COUNTERS):
@@ -236,7 +255,7 @@ def analyze_status(rows):
             previous[key]=value
     return dict(state='observed' if rows else 'empty',rows=len(rows),active_rows=active,
         invalid_snapshot_rows=invalid,stale_operator_rows=stale,identity_unknown_rows=unknown,
-        counter_segments=segments,counter_resets=resets,audio_observed_deltas={k:v if pairs[k] else None for k,v in counters.items()},
+        counter_segments=segments,counter_resets=resets,repeated_snapshot_rows=repeated,pressure_phase_snapshots=dict(pressure_phases),sampled_active_age_max_s=pressure_max,sampled_lease_timing_max_ms=timing_max,audio_observed_deltas={k:v if pairs[k] else None for k,v in counters.items()},
         counter_interval_counts=dict(pairs),first_lease_invalid=first_invalid,first_reducer_expiry=first_expiry,
         last_job_latency_s=latest,job_latency_semantics='last_value_not_call_samples',
         sampled_progress_age_ms=dict(n=len(progress),max=max(progress,default=None)),
@@ -280,22 +299,56 @@ def parse_proc_stat(text,*,pid,start_ticks,host_boot,at,user_hz,page_size):
 
 def analyze_resources(rows):
     output={}
+    allowed_roles=('hub_owner','robot_audio','mac_fast','mac_main','mac_stt','mac_tts','mac_embeddings','mac_provider','legacy')
     for node in ('hub','robot','mac'):
-        selected=[r for r in rows or [] if r.get('node')==node];cpu=[];rss=[];prior=None;unknown=0
+        selected=[r for r in rows or [] if r.get('node')==node and r.get('kind','resource')=='resource']
+        instances={};unknown=0;states=Counter();prior_by_role={}
         for row in selected:
-            scope=(row.get('host_boot'),row.get('pid'),row.get('start_ticks'))
-            valid=(identifier(scope[0]) and type(scope[1]) is int and scope[1]>0 and type(scope[2]) is int
-                and scope[2]>=0 and row.get('clock_basis')=='host_monotonic'
+            role=row.get('role','legacy');state=row.get('sample_state','ok')
+            state=state if state in ('ok','missing','identity_changed','timeout','unsupported','error') else 'error';states[state]+=1
+            basis=row.get('identity_basis','linux_start_ticks')
+            start=row.get('process_start_identity')
+            if start is None and type(row.get('start_ticks')) is int:start=str(row['start_ticks'])
+            scope=(role,row.get('host_boot'),row.get('pid'),basis,start)
+            valid=(role in allowed_roles and identifier(scope[1]) and type(scope[2]) is int and scope[2]>0
+                and basis in ('linux_start_ticks','mach_start_abstime') and type(start) is str and start.isdigit() and len(start)<=32
+                and row.get('clock_basis')=='host_monotonic' and state=='ok'
                 and all(number(row.get(k)) for k in ('at','cpu_s','rss_bytes')))
-            if not valid:unknown+=1;prior=None;continue
-            rss.append(row['rss_bytes'])
+            if not valid:
+                unknown+=1
+                if role in allowed_roles and type(row.get('pid')) is int:prior_by_role.pop((role,row['pid']),None)
+                else:prior_by_role.clear()
+                continue
+            item=instances.setdefault(scope,dict(role=role,identity_basis=basis,rows=0,cpu=[],rss=[]))
+            item['rows']+=1;item['rss'].append(row['rss_bytes'])
+            prior=prior_by_role.get((role,row['pid']))
             if prior is not None:
                 before,old_scope=prior;dt=row['at']-before['at'];dc=row['cpu_s']-before['cpu_s']
-                if scope==old_scope and dt>0 and dc>=0 and math.isfinite(100*dc/dt):cpu.append(100*dc/dt)
+                if scope==old_scope and dt>0 and dc>=0 and math.isfinite(100*dc/dt):item['cpu'].append(100*dc/dt)
                 else:unknown+=1
-            prior=(row,scope)
-        output[node]=dict(state='observed' if selected else 'missing',rows=len(selected),unknown_intervals=unknown,
-            cpu_percent_one_core=distribution(cpu),rss_bytes=distribution(rss))
+            prior_by_role[(role,row['pid'])]=(row,scope)
+        groups=[dict(instance=index,role=item['role'],identity_basis=item['identity_basis'],rows=item['rows'],
+            cpu_percent_one_core=distribution(item['cpu']),rss_bytes=distribution(item['rss'])) for index,item in enumerate(instances.values(),1)]
+        # Keep old single-instance report shape; never pool different workers/instances.
+        single=groups[0] if len(groups)==1 else {}
+        node_rows=[r for r in rows or [] if r.get('node')==node]
+        footers=[r for r in node_rows if r.get('kind')=='observer_end']
+        modern=any(r.get('kind')=='resource' for r in selected)
+        completion=dict(state='unknown',footer_present=False,reason='legacy')
+        if modern or footers:
+            valid_footer=(len(footers)==1 and node_rows[-1] is footers[0] and footers[0].get('incomplete') is False
+                and footers[0].get('reason') in ('complete','stopped')
+                and type(footers[0].get('records')) is int and footers[0]['records']==len(node_rows)-1)
+            reason=footers[0].get('reason') if len(footers)==1 else 'missing_footer' if not footers else 'multiple_footers'
+            reason=reason if reason in ('complete','stopped','samples','io','cap','status_error','acquisition_failed','missing_footer','multiple_footers') else 'invalid_footer'
+            completion=dict(state='complete' if valid_footer else 'incomplete',footer_present=bool(footers),reason=reason)
+        state='observed' if instances else 'incomplete' if selected else 'missing'
+        if completion['state']=='incomplete':state='incomplete'
+        output[node]=dict(state=state,completion=completion,rows=len(selected),
+            unknown_intervals=unknown,sample_states=dict(states),instances=groups,process_scope_only=True,
+            cpu_percent_one_core=single.get('cpu_percent_one_core',distribution([])),rss_bytes=single.get('rss_bytes',distribution([])),
+            coverage=dict(process_instances=len(groups),roles=sorted({g['role'] for g in groups}),
+                usable_cpu_intervals=sum(g['cpu_percent_one_core']['n'] for g in groups),host_total=False,gpu=False,rss_unique_total=False))
     return output
 
 
