@@ -7,127 +7,73 @@
 
 ## Цель этапа и принятая основа
 
-Цель — личный автономный компаньон: непрерывное восприятие и выбор поведения
-в активном сеансе, включая тишину, с памятью и управляемой владельцем личностью.
-Первый этап — связать все решения с реализацией и устранить ближайшие конкретные
-расхождения через существующий путь запуска, сохраняя остановку и разрешения.
+Цель проекта — личный автономный компаньон: непрерывное восприятие и выбор
+поведения в активном сеансе, включая тишину, с памятью и управляемой владельцем
+личностью. Карта всех 38 решений опубликована; первый ограниченный стендовый
+выпуск принят. Следующий этап — измерить устойчивость и задержки общей нагрузки
+перед сравнением технологий и переходом к одной диалоговой модели.
 
-Исходная общая версия: `f75fb382b460f6963ce674efcf4f16b5e1b9de15` (`origin/main`).
-В ней уже есть Python Scheduler, регулярные fast-вызовы и самостоятельные
-кандидаты в тишине, SQLite-состояние, допуски, аудиовладелец и камера через daemon.
-Одна диалоговая модель, шесть согласованных модулей и общий каталог возможностей
-пока не приняты как реализованный результат. Go/gRPC остаются кандидатами
-для сравнительного опыта; число процессов не зафиксировано (§15 имеет приоритет
-над ранними схемами §12–14).
+В main приняты [CHAR-01 #3](https://github.com/notanonenough/reachy-companion/pull/3),
+[CI-01 #6](https://github.com/notanonenough/reachy-companion/pull/6),
+[BASELINE-01 #11](https://github.com/notanonenough/reachy-companion/pull/11),
+[CONTRACT-01 #10](https://github.com/notanonenough/reachy-companion/pull/10),
+[access prep #13](https://github.com/notanonenough/reachy-companion/pull/13),
+[CATALOG-01 #14](https://github.com/notanonenough/reachy-companion/pull/14),
+[LEASE-01 #17](https://github.com/notanonenough/reachy-companion/pull/17),
+[REDUCER-01 #20](https://github.com/notanonenough/reachy-companion/pull/20) и
+[AUDIO-TRACE-01 #24](https://github.com/notanonenough/reachy-companion/pull/24).
+Каталог scalar sources остаётся opt-in; пять установленных sensor readers legacy.
+Одна диалоговая модель пока не реализована; Go/gRPC остаются гипотезами для сравнения.
 
-В `origin/main` приняты: карта всех 38 пунктов; [CHAR-01 #3](https://github.com/notanonenough/reachy-companion/pull/3)
-(предложение личности через PR без автоматического применения);
-[CI-01 #6](https://github.com/notanonenough/reachy-companion/pull/6);
-[BASELINE-01 #11](https://github.com/notanonenough/reachy-companion/pull/11)
-(фактическая инвентаризация узлов);
-[CONTRACT-01 #10](https://github.com/notanonenough/reachy-companion/pull/10)
-(согласованный контракт шести модулей, ещё не runtime);
-[access prep #13](https://github.com/notanonenough/reachy-companion/pull/13)
-(выбираемый SSH-маршрут с закреплёнными ключами и откатом);
-[CATALOG-01 #14](https://github.com/notanonenough/reachy-companion/pull/14)
-(opt-in scalar registry через штатный production цикл, подтверждённый программно);
-[LEASE-01 #17](https://github.com/notanonenough/reachy-companion/pull/17)
-(диагностика первой причины отзыва без изменения допуска);
-[REDUCER-01 #20](https://github.com/notanonenough/reachy-companion/pull/20)
-(однократный снимок этапа и стека при reducer expiry, без изменения срока допуска);
-[AUDIO-TRACE-01 #24](https://github.com/notanonenough/reachy-companion/pull/24)
-(явно включаемая private trace одного production сеанса; default-off).
-С 23:20 на Mac/Hub/Ричи установлен точный кандидат
-`717a6577a9f7c2b3ff6dd22045761866678b37bc`: один архив 673 файлов, одинаковый
-пакет, actual imports/metadata и canonical identity 60 модулей проверены.
-Runtime8+7+6 byte-equal, пять sensor readers остаются legacy. Backup прежнего3a0
-проверен по hashes; project base services перезапущены, factory/tunnel сохранены.
-Один approved 90s trace-опыт завершён: raw STT/admitted/main связаны с единственным
-правильным TTS «4», слышимость подтвердил владелец, trace полная без потерь.
-Hub/device accepted и cleanup true, owners завершены, mic/camera off,
-Mac jobs/ports закрыты. Reviewer принял bounded stand gates; конфигурации
-21 файлов независимо подтверждены, read-only окно освобождено в 23:28:33.
-Протокол PR #25 прошёл exact review, ожидается CI перед слиянием и публикацией.
+Опубликован [стендовый prerelease `stand-2026-11-23.1`](https://github.com/notanonenough/reachy-companion/releases/tag/stand-2026-11-23.1)
+на точном `717a6577a9f7c2b3ff6dd22045761866678b37bc`. Эта версия установлена на
+Mac/Hub/Reachy: один архив673 files, одинаковый wheel, actual imports и canonical
+identity60 проверены. Tag в origin указывает именно на испытанный commit;
+GitHub assets archive/wheel/checksums опубликованы и их digests сверены.
+[RELEASE-01 #9](https://github.com/notanonenough/reachy-companion/issues/9) закрыта.
 
-На прежнем `3a0f076bac3575ccc6504e8bd320ad5a50554b7f` авторский опыт достиг
-175 s без reducer expiry. [Протокол](releases/2026-11-23-3a0f076bac35.md)
-принят через PR #21, reviewed `03f50a5bd73f793197fa759ee9c15f75a778160f`,
-оба CI успешны, merge `ea3cdab4da5561496ed2af5b847abc66456292b1` проверен в main.
-Это невоспроизведение прежнего сбоя, а не доказательство его исправления.
+[Финальный протокол](releases/2026-11-23-717a6577a9f7.md) принят через PR #25:
+exact reviewed `39a2a8b2f140f4eaee29f6f87458ddb89abaf477`, оба CI
+45249505727/45249515884 успешны, merge `dc82d3c61311b189eabbb1831099489cf24059fb`
+проверен в origin/main. В 90s опыте raw STT/admitted/main причинно связаны с
+единственным правильным TTS «4», слышимость подтвердил владелец; trace полная,
+без потерь. Текущее движение подтверждено измерениями. Visible-frame evidence
+перенесено с3a0 по неизменным relevant files и независимой сверке21 runtime files.
+Hub/device accepted, cleanup true, все владельцы завершены; профиль не изменился.
+Стенд остановлен; последнее read-only окно reviewer освобождено в23:28:33.
 
-Независимый reviewer затем выполнил один 90 s опыт того же кандидата. После
-штатных sleep и neutral expression измеренная поза вошла в прежний envelope.
-Свежий видимый кадр и движение с measured feedback подтверждены. Hub/device
-accepted=true, Hub cleanup_verified=true; mic/camera off, production PIDs и
-Mac jobs/ports закрыты, moves пусты, профиль неизменен. В 22:49 reviewer явно
-освободил стенд; новых запусков нет. [Протокол независимого опыта](releases/2026-11-23-3a0f076bac35-independent.md)
-принят через PR #23: exact reviewed `18c00c5ed9f57db71384a0f7395ac2917a600cf5`,
-оба CI 45242772245/45242813299 успешны, merge
-`d739e1598f5142a88584d2632a335c7a6416aa51` подтверждён в origin/main.
-
-Акустическая приёмка остаётся открытой: владелец услышал из Ричи с большой
-задержкой неверный ответ на контрольный вопрос 2+2. Raw STT/model text в
-завершённом production не сохранялись; digests/receipts не различают ошибку
-сегментации, подмену входа следующей репликой и ответ модели. [AUDIO-TRACE-01 #22](https://github.com/notanonenough/reachy-companion/issues/22)
-принята через PR #24: exact reviewed `415be7015ea486d014371eb8211752260dd66131`,
-98 независимых проверок, local full 1849/26 skipped PASS, оба Linux CI
-45246690234/45246700289 успешны. Выбран новый кандидат из main
-`717a6577a9f7c2b3ff6dd22045761866678b37bc`, наличие reviewed head проверено.
-Диагностика не является исправлением голоса. Первый bounded stand release
-принят reviewer; тег и GitHub Release ещё не опубликованы.
-История предыдущих отказов: [362](releases/2026-11-23-362002991d9c.md),
-[15b](releases/2026-11-23-15b784eeafd4.md); первичный reducer expiry 15b пока не
-имеет установленного конкретного блокирующего вызова.
+Ограничения выпуска остаются явными: 90s не доказывают длительную автономность;
+прежние неверный ответ и reducer expiry не объявлены исправленными. Точные ear
+latency, exposure time и hard-stop deadline не измерены. В успешном опыте
+STT-end→first-TTS-PCM11.209s по Hub clock; main client interval7.650s не равен
+чистому compute time. История: [362](releases/2026-11-23-362002991d9c.md),
+[15b](releases/2026-11-23-15b784eeafd4.md), [175s на3a0](releases/2026-11-23-3a0f076bac35.md),
+[независимый3a0](releases/2026-11-23-3a0f076bac35-independent.md). Это исходные данные
+следующего измерительного шага, а не причины повторять завершённую приёмку.
 
 ## Активная работа и следующий контакт
 
 | Карточка | Статус, владелец и ревьюер | Следующий шаг и контакт |
 |---|---|---|
-| [RELEASE-01, Issue #9](https://github.com/notanonenough/reachy-companion/issues/9) | Автор `/root/implementer`, независимый reviewer `/root/reviewer`; hardware освобождён, runtime остановлен | [PR #25](https://github.com/notanonenough/reachy-companion/pull/25), exact `39a2a8b2f140f4eaee29f6f87458ddb89abaf477` независимо APPROVED. Автор отслеживает CI; ведущий после green принимает протокол и публикует `stand-2026-11-23.1` на испытанный717, затем закрывает #9. Контроль 23:35 Asia/Baku. |
+| [BASELINE-02, Issue #26](https://github.com/notanonenough/reachy-companion/issues/26) | Фактически начата23:36; автор `/root/ci_implementer`, независимый reviewer `/root/reviewer`, назначен до старта | Offline аудит существующих probes/телеметрии и bounded717 evidence; согласовать измерительную границу, подготовить проверяемый collector/план и PR. Действующие ограничения отделить от гипотез бюджетов; clocks/sample counts явные. Контроль23:50 Asia/Baku. Hardware/новых starts сейчас нет. |
 
-AUDIO-TRACE-01 #22 закрыта после PR #24; remote branch удалена, автор
-`/root/ci_implementer` ожидает конкретный causal результат для следующей offline
-карточки. Предполагаемое исправление голоса до evidence не назначается.
+Ведущий — `reachy-development-map`; автор #26 — `reachy-baseline`,
+ветка `codex/production-baseline` от fresh origin/main; reviewer —
+`/tmp/reachy-review-map`. Автор завершённой #9 `/root/implementer` свободен,
+повторно не назначен. Рабочие ветки #22/#25 слиты и удалены в origin.
+Production checkout `reachy-companion` остаётся exact717; для правок его не используют.
+До выполнения принятого измерительного плана ведущий назначает одного hardware
+owner и отдельное окно. Само существование карточки #26 не запускает стенд.
 
-Прежняя предпосылка sleep→disabled оказалась неверна: Hub sleep выполняет
-stock pose и не выключает моторы. После sleep body≈−0.5°, neutral expression
-через существующий Hub маршрут дал measured yaw0.413°, pitch4.194°, body−0.352°.
-Guard и motor mode не менялись, прямого factory setter не было.
-
-Одобренный harness и зависимости сохранены вне Git в закрытом
+Одобренный односеансовый harness сохранён вне Git в закрытом
 `~/reachy-release-backups/20261123-private-trace-harness-approved`.
 Manifest SHA-256 `7f81c398a93619f4eaa2329b6870cbdcfd9214fb2bcb6b08456d6d083c66ec36`;
-ведущий повторно проверил hashes и private modes всех 8 файлов. Reviewed helper
-SHA-256: local `44ee0de5f498a4dcdd3f4da25dbf5eb55f8952f8b663e32f0b7be7eb790486bc`,
+ведущий проверил hashes/private modes8 files. Reviewed helper SHA-256:
+local `44ee0de5f498a4dcdd3f4da25dbf5eb55f8952f8b663e32f0b7be7eb790486bc`,
 remote `aa2310807750870c8c2bc3cf205f046e122e3404de40d4cc2999885daac3298d`.
-Любое изменение требует delta review; одобрение helper не разрешает новый start.
-
-Ведущий работает в `reachy-development-map`, автор протокола — в `reachy-trace-protocol`,
-рабочая ветка #22 слита и удалена; ревьюер — в
-`/tmp/reachy-review-map`; рабочие ветки короткоживущие `codex/*`.
-Основную рабочую копию `reachy-companion` не используют для продуктовых правок.
-Read-only инвентаризация закончена; прежнее окно reviewer завершилось в 21:18:20.
-После явного «продолжай» прежние исполнитель и reviewer продолжили работу.
-Сверены origin/main, открытая Issue #9 и отсутствие открытых PR после принятия
-#21; затем создана #22 и автор фактически начал работу от fresh main.
-Mac production checkout и оба Linux узла — exact `717a6577a`.
-После нового опыта автор освободил стенд; reviewer завершил отдельную read-only
-сверку и явно освободил окно в 23:28:33. Все работают offline; новых starts нет.
-CATALOG входит в новый кандидат, но реальные readers остаются в прежнем legacy mode.
-CI-01 принята в 21:03 Asia/Baku: [PR #6](https://github.com/notanonenough/reachy-companion/pull/6),
-проверенный head `bc63ac863b64194e70a04510f0fdae0f0f2395d0`, merge в origin/main
-`ee3b7abc6c908e8160862ebe768630545379ef40` проверен после слияния. Issue #5 закрыта,
-удалённая ветка удалена; автор переключает рабочую копию и удаляет локальную ветку.
-[Независимое ревью](https://github.com/notanonenough/reachy-companion/pull/6#pullrequestreview-6025799267)
-воспроизвело 42 macOS tests. Оба Linux workflow (45222558837, 45222572115) успешны:
-1753 tests, 26 skipped, панель и сборка. Устранены 11 platform-temp ошибок и
-race ожидания server handler; production guards не менялись.
-
-Второму исполнителю `/root/ci_implementer` после закрытия CI-01 передана
-CONTRACT-01 (передача записана в Issue #2 до начала). Независимый ревьюер подтвердил
-ёмкость очереди: сначала заканчивает CHAR-01, затем контракт. Контракт не зависит
-от правки личности; его design docs/fixtures не редактируют runtime, схемы и
-документы CHAR-01. У каждого автора остаётся одна активная карточка.
+Семь independent fault/positive сценариев и zero-IO dry-run прошли.
+Любая последующая правка требует delta review. Private717 evidence находится в
+`~/reachy-release-backups/20261123-717a6577a9f7`, содержимое в Git не переносится.
 
 ## Ближайшая очередь и препятствия
 
@@ -145,7 +91,7 @@ CONTRACT-01 (передача записана в Issue #2 до начала). �
 3. **[BASELINE-01, Issue #8](https://github.com/notanonenough/reachy-companion/issues/8), принята через PR #11.** Инвентаризация версий и штатных
    интерфейсов выполнена. Погрешность часов, совместная нагрузка и численные
    бюджеты (§4,10,17–19,25,27–29) остаются следующими аппаратными измерениями
-   после первого рабочего выпуска; инвентаризация их не доказывает.
+   после первого выпуска: [BASELINE-02 #26](https://github.com/notanonenough/reachy-companion/issues/26) фактически начата; инвентаризация их не доказывает.
 4. **BEHAVIOR-01, после фиксации контракта цикла.** Одна диалоговая модель
    через текущий Scheduler, регулярный вызов в тишине, отмена и актуальность
    результатов (§23–24,30,35); сравнение с текущей парой моделей.
@@ -161,46 +107,27 @@ GitHub-доступ восстановлен и проверен 23.11.2026 в 2
 до прерывания не было. Владелец CHAR-01 не менялся: `/root/implementer`
 фактически начал работу в `codex/owner-character` от `a6826c789` в 20:48.
 
-## Ближайший выпуск и постоянная аппаратная приёмка
+## Постоянная аппаратная приёмка и следующий выпуск
 
-Владелец установил стартовый ритм: **еженедельное релизное окно по пятницам
-с 15:00 Asia/Baku; раньше — при готовности текущего выпуска**. Эта политика
-передаётся следующему ведущему вместе с картой. Регулярное дежурство уже
-обновлено; отдельную дублирующую автоматизацию не создавать.
+Владелец установил ритм: **еженедельное релизное окно по пятницам с15:00
+Asia/Baku; раньше — при готовности текущего выпуска**. Регулярное дежурство
+уже обновлено, дублирующую автоматизацию не создавать. Порядок закреплён
+в DEPLOYMENT через PR #19. Первый выпуск #9 завершён и не перезапускается.
 
-Для каждого окна выбирается точный кандидат из `main` и один владелец стенда.
-После фактической приёмки ведущий ставит тег и публикует GitHub Release.
-Неуспешная проверка ведёт к исправлению и ближайшему повтору, а не к пропуску
-непройденного условия. Если новых изменений для установки нет, оставить одну
-отметку о проверке окна без пустого релиза. Первый выпуск продолжается в #9;
-новый ритм не перезапускает и не отменяет уже идущие проверки.
-Тот же порядок закреплён в DEPLOYMENT через принятый PR #19.
+Для каждого нового окна выбирается точный принятый candidate из main и один
+владелец стенда. Проверяются затронутые entrypoints и физическое поведение,
+версии/configs, наблюдаемый результат и stop; сохраняются private configs,
+секреты/память и восстановимые previous packages/source по [DEPLOYMENT](DEPLOYMENT.md).
+Перенос прежних физических evidence допускается только с явным обоснованием
+неизменности соответствующего пути и независимым review. HTTP health сам по себе
+физический эффект не подтверждает. Непройденный обязательный gate остаётся открытым.
 
-[Issue #9 — релиз на реальном стенде](https://github.com/notanonenough/reachy-companion/issues/9)
-обязательна в дополнение к инвентаризации #8. Исходный кандидат — принятый commit
-`407f4c56e5bca3544fcbbadbb1ac9f14c8e93fad`; новые docs в main его не подменяют.
-Инвентаризация выявила препятствие штатному запуску: hardcoded старый Mac
-ProxyJump и отсутствующие pinned known_hosts paths. Прямой read-only доступ с
-StrictHostKeyChecking и сохранёнными ключами работает. Для #9 нужна проверенная
-правка конфигурации доступа с backup/rollback; после её code review ведущий
-выбрал новый кандидат `362002991d9c7d8f623af7ed28b91aad365e1bb8` после принятия PR #13.
-Роутер пока менять оснований нет. Последующие изменения main кандидата не подменяют.
-Назначенный автор #9 — `/root/implementer`, независимый reviewer — `/root/reviewer`,
-выпуск принимает ведущий. Три последовательных опыта и точные кандидаты описаны
-выше и в карточке. Текущий сеанс остановлен; окно и следующий контакт указаны
-в таблице активной работы. Reviewer получает аппаратное окно отдельно после
-освобождения; следующий запуск выбирается по результату разбора доказательств.
-
-Проверяются версии и рабочие entrypoints всех затронутых служб Ричи/Hub/Mac,
-штатный start, микрофон→STT→слышимый ответ, свежий кадр, движение с обратной связью
-и stop. Конфигурация/секреты/память сохраняются, предыдущая версия и откат записываются
-до установки по [DEPLOYMENT.md](DEPLOYMENT.md). HTTP health не доказывает физический
-эффект. Любое неподтверждённое обязательное поведение оставляет выпуск открытым.
-
-Для этого и каждого следующего выпуска тег ставится только на прошедший кандидат,
-GitHub Release ссылается на протокол с узлами, версиями, фактическими результатами,
-ограничениями и откатом. Предлагаемый первый тег `stand-2026-11-23.1`; пока тег и
-Release не созданы, аппаратная приёмка не пройдена. Подробная постоянная карточка — #9.
+После exact review, CI и фактической приёмки ведущий публикует tag именно
+испытанного candidate и Release со ссылкой на принятый протокол/ограничения/откат.
+Неуспешная проверка ведёт к конкретному исправлению или следующему различающему
+опыту. Если новых изменений для установки нет, пустой релиз не создаётся.
+Сейчас новых принятых продуктовых изменений после717 нет; следующая готовая
+работа — baseline #26, затем обоснованный контракт/сравнение одного dialogue backend.
 
 ## Карточки
 
@@ -298,7 +225,7 @@ Code PR не принимает persona proposal. Установленный п�
 | 32 | П | [brains.py:answer](../src/reachy_companion/brains.py) openclaw/hermes; [autonomous/workflows.py:WorkflowClient](../src/reachy_companion/autonomous/workflows.py); [deploy/workflows/](../deploy/workflows); config `workflows.enabled=false` | Текстовые адаптеры и synthetic workflows есть, живые integrations не включены/не подтверждены. Блокирующий полный ответ. | 24,30,34 | Offline trace одинаковый для агентов/обычной модели, identity/cancel/capability; первый полезный workflow определить отдельно. |
 | 33 | Т | [autonomous/durable.py:DurableStore.append,Delivery](../src/reachy_companion/autonomous/durable.py); [autonomous/services.py:log,advance](../src/reachy_companion/autonomous/services.py); [tests/test_production_cycle.py](../tests/test_production_cycle.py); [tests/test_s3_delivery_connection.py](../tests/test_s3_delivery_connection.py) | Durable SQLite outbox/retry/batching существует, но append намеренно оставляет только metadata; write синхронный в цикле. Нет полного тестового audio/video/model архива с bounded producer queue. | 3,17,24 | Offline/slow S3, restart/idempotence, completeness+redaction, disk cap gap markers, сравнить latency export on/off. |
 | 34 | Исследование завершено; перенос Г | [docs/REACHY-ECOSYSTEM-RESEARCH.md](REACHY-ECOSYSTEM-RESEARCH.md); [emotion_library.py](../src/reachy_companion/emotion_library.py); [assets/pollen-emotions-v1.json](../src/reachy_companion/assets/pollen-emotions-v1.json); [speech_clock.py](../src/reachy_companion/speech_clock.py); [autonomous/stock_motion_adapter.py](../src/reachy_companion/autonomous/stock_motion_adapter.py) | Есть закреплённые emotion assets и часть timing; не единая локальная композиция primary/idle/gaze/speech. Совместимость новых apps не равна совместимости 1.2.11. | 11,12,14,29,33 | Начать с одного executor/generations; три жеста из ненулевой позы без sidecar sound, consumed PCM sync, отмена; версия/license каждого донора. |
-| 35 | Т; частота/хранилище Г; reflection П | [autonomous/runtime.py:Scheduler.advance](../src/reachy_companion/autonomous/runtime.py); [autonomous/state.py:snapshot](../src/reachy_companion/autonomous/state.py); [autonomous/services.py:update,advance](../src/reachy_companion/autonomous/services.py); [autonomous/durable.py](../src/reachy_companion/autonomous/durable.py); [tests/test_production_cycle.py](../tests/test_production_cycle.py) | Тишина, TTL, goal CAS, background IO и overload уже есть. Fast/main ещё две модели. CHAR-01 принята через PR #3: прямое применение профиля моделью закрыто, отдельный proposal→GitHub PR без auto reviewer→owner acceptance→apply реализован программно. Код установлен на candidate362 в #9, digest реального профиля не изменился; полный аппаратный выпуск ещё не принят. | 23,30,31,36; запрет auto-character независим | Программно доказать регулярную итерацию в тишине/stale context/разные goals; запретить прямую model/background character mutation; проверить отдельный proposal→PR→owner acceptance→apply и owner update; device acceptance отдельная. |
+| 35 | Т; частота/хранилище Г; reflection П | [autonomous/runtime.py:Scheduler.advance](../src/reachy_companion/autonomous/runtime.py); [autonomous/state.py:snapshot](../src/reachy_companion/autonomous/state.py); [autonomous/services.py:update,advance](../src/reachy_companion/autonomous/services.py); [autonomous/durable.py](../src/reachy_companion/autonomous/durable.py); [tests/test_production_cycle.py](../tests/test_production_cycle.py) | Тишина, TTL, goal CAS, background IO и overload уже есть. Fast/main ещё две модели. CHAR-01 принята через PR #3: прямое применение профиля моделью закрыто, отдельный proposal→GitHub PR без auto reviewer→owner acceptance→apply реализован программно. Код установлен на принятом stand-2026-11-23.1 (exact717); реальный профиль не изменился, bounded аппаратная приёмка #9 завершена. | 23,30,31,36; запрет auto-character независим | Программно доказать регулярную итерацию в тишине/stale context/разные goals; запретить прямую model/background character mutation; проверить отдельный proposal→PR→owner acceptance→apply и owner update; device acceptance отдельная. |
 | 36 | Т редактируемой памяти; recognition П/Г | [autonomous/memory.py:MemoryStore.commit,recall](../src/reachy_companion/autonomous/memory.py); [autonomous/context.py:ContextProvider](../src/reachy_companion/autonomous/context.py); [autonomous/durable.py](../src/reachy_companion/autonomous/durable.py) memory string; [tests/test_memory_context.py](../tests/test_memory_context.py) | Provenance/CAS/forget для записей есть отдельно от character summary. Готового знакомства/связывания лица/голоса с записью нет. | 9,28,30,35 | Owner confirmation→recall→correction/delete; спорное сходство не перезаписывает личность, слова не приписываются присутствующему автоматически. |
 | 37 | Действующее разрешение | [docs/REVIEW-NOTES.md](REVIEW-NOTES.md) §37; [scripts/factory_ssh.py](../scripts/factory_ssh.py); [scripts/production-control](../scripts/production-control); [deploy/current/release.py](../deploy/current/release.py); [deploy/autonomous/robot_inventory.py](../deploy/autonomous/robot_inventory.py) | Доступ разрешён владельцем; #8 зафиксировала фактические узлы, #9 проверила direct strict SSH и установленный candidate362. Занятость стенда ведётся отдельно. | Координация ведущего | Перед каждым опытом узел/версия/занятость; не повторное согласование разрешённого опыта. |
 | 38 | Действующий процесс | [AGENTS.md](../AGENTS.md); [docs/REVIEW-NOTES.md](REVIEW-NOTES.md) §38; git baseline | MAP-01 принята в origin/main, роли и CHAR-01 назначены; процесс каждого следующего изменения проверяется отдельно. | MAP-01, reviewer | По каждому diff base/head/checks/reviewer verdict, свежий main; только ведущий merge и карта, автор исправляет замечания. |
