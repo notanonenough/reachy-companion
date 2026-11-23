@@ -55,15 +55,23 @@ STT-end→first-TTS-PCM11.209s по Hub clock; main client interval7.650s не �
 
 | Карточка | Статус, владелец и ревьюер | Следующий шаг и контакт |
 |---|---|---|
-| [BASELINE-02, Issue #26](https://github.com/notanonenough/reachy-companion/issues/26) | Фактически начата23:36; автор `/root/ci_implementer`, независимый reviewer `/root/reviewer`, назначен до старта | Offline аудит существующих probes/телеметрии и bounded717 evidence; согласовать измерительную границу, подготовить проверяемый collector/план и PR. Действующие ограничения отделить от гипотез бюджетов; clocks/sample counts явные. Контроль23:50 Asia/Baku. Hardware/новых starts сейчас нет. |
+| [BASELINE-02, Issue #26](https://github.com/notanonenough/reachy-companion/issues/26) | Offline подготовка принята через PR #27; владелец `/root/ci_implementer`, reviewer `/root/reviewer`; карточка остаётся открытой | До аппаратных реплик ждёт #28: в717 отсутствовали CPU/RSS/pressure, без observer joint-load baseline неполон. Collector сейчас редактирует только автор #28. После accepted observer/readiness ведущий назначит одно аппаратное окно; до этого hardware не используется. |
+| [OBSERVE-01, Issue #28](https://github.com/notanonenough/reachy-companion/issues/28) | Фактически начата после PR #27; автор `/root/implementer`, reviewer `/root/reviewer`; интерфейс согласован до старта | Bounded supervisor-side CPU/RSS трёх узлов и existing status gauges, platform-neutral per-process identity/units; только offline code и собственные fixture children. Consumer extension принадлежит этому автору, runtime717 неизменён. Контроль **24.11 00:10 Asia/Baku**, раньше PR/результат/препятствие. |
 
-Ведущий — `reachy-development-map`; автор #26 — `reachy-baseline`,
-ветка `codex/production-baseline` от fresh origin/main; reviewer —
-`/tmp/reachy-review-map`. Автор завершённой #9 `/root/implementer` свободен,
-повторно не назначен. Рабочие ветки #22/#25 слиты и удалены в origin.
+PR #27 принят: exact reviewed `a5a296061a51cf45dd5a8af42493bb45133bea40`,
+30 независимых целевых/negative/parity checks; local full1866/26 skipped PASS,
+CI45252465406/45252477590 SUCCESS. Merge `cab202eb5db52e4e7f9b9678d32f9e3b652d232f`
+подтверждён в origin/main, remote branch удалена. Приняты только offline collector
+и план, не выполненный hardware baseline. Предложенные3×120s — отдельные будущие
+реплики с остановкой серии при первом отказе, не доказательство долгой автономности.
+
+Ведущий — `reachy-development-map`; автор #28 — `reachy-observer`,
+ветка `codex/resource-observer` от принятой fresh origin/main; reviewer —
+`/tmp/reachy-review-map`. Автор #26 ожидает зависимость и не правит общий collector
+параллельно. Рабочие ветки #22/#25/#27 слиты и удалены в origin.
 Production checkout `reachy-companion` остаётся exact717; для правок его не используют.
 До выполнения принятого измерительного плана ведущий назначает одного hardware
-owner и отдельное окно. Само существование карточки #26 не запускает стенд.
+owner и отдельное окно. Наличие карточек #26/#28 не запускает стенд.
 
 Одобренный односеансовый harness сохранён вне Git в закрытом
 `~/reachy-release-backups/20261123-private-trace-harness-approved`.
