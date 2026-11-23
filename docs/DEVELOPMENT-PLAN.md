@@ -1,6 +1,6 @@
 # Карта разработки Reachy Companion
 
-Обновлено: 23 ноября 2026, Asia/Baku. Единственный редактор — ведущий `/root`.
+Обновлено: 24 ноября 2026, Asia/Baku. Единственный редактор — ведущий `/root`.
 Основание: [правила работы](../AGENTS.md), [решения 1–38](REVIEW-NOTES.md),
 [целевое поведение](BEHAVIOR.md). Карта описывает проверенный исходный код;
 сохранённая конфигурация не считается доказательством текущего состояния устройств.
@@ -56,7 +56,7 @@ STT-end→first-TTS-PCM11.209s по Hub clock; main client interval7.650s не �
 | Карточка | Статус, владелец и ревьюер | Следующий шаг и контакт |
 |---|---|---|
 | [BASELINE-02, Issue #26](https://github.com/notanonenough/reachy-companion/issues/26) | Offline подготовка принята через PR #27; владелец `/root/ci_implementer`, reviewer `/root/reviewer`; карточка остаётся открытой | До аппаратных реплик ждёт #28: в717 отсутствовали CPU/RSS/pressure, без observer joint-load baseline неполон. Collector сейчас редактирует только автор #28. После accepted observer/readiness ведущий назначит одно аппаратное окно; до этого hardware не используется. |
-| [OBSERVE-01, Issue #28](https://github.com/notanonenough/reachy-companion/issues/28) | Фактически начата после PR #27; автор `/root/implementer`, reviewer `/root/reviewer`; интерфейс согласован до старта | Bounded supervisor-side CPU/RSS трёх узлов и existing status gauges, platform-neutral per-process identity/units; только offline code и собственные fixture children. Consumer extension принадлежит этому автору, runtime717 неизменён. Контроль **24.11 00:10 Asia/Baku**, раньше PR/результат/препятствие. |
+| [OBSERVE-01, Issue #28](https://github.com/notanonenough/reachy-companion/issues/28) | На независимом ревью [PR #29](https://github.com/notanonenough/reachy-companion/pull/29), exact `fc255ff61834990c2c675bbb48d9701d88580f90`; автор `/root/implementer`, reviewer `/root/reviewer` | Ревьюер проверяет exact commit, Mac units/identity и собранный harness; автор отвечает за исправления и exact CI. Targeted35 PASS, три предварительных finding исправлены; окончательного APPROVED ещё нет. Только offline code/собственные fixture children, runtime717 неизменён. Контроль **24.11 00:10 Asia/Baku**, раньше review/CI/препятствие. |
 
 PR #27 принят: exact reviewed `a5a296061a51cf45dd5a8af42493bb45133bea40`,
 30 независимых целевых/negative/parity checks; local full1866/26 skipped PASS,
