@@ -74,7 +74,9 @@ def main():
     import argparse
     import json
     parser=argparse.ArgumentParser(description=main.__doc__)
-    parser.add_argument('action',choices=('inspect','rollback','set-character'))
+    parser.add_argument('action',choices=('inspect','rollback','set-character','list-character-proposals','publish-character-proposal','apply-character-proposal'))
+    parser.add_argument('proposal_id',nargs='?')
+    parser.add_argument('--repo')
     parser.add_argument('--state',type=Path,required=True)
     parser.add_argument('--target',type=int)
     parser.add_argument('--expected',type=int)
@@ -90,8 +92,21 @@ def main():
         if not character or any(not 1<=len(value)<=512 for value in character.values()):
             parser.error('Set-character requires personality or principles, each 1..512 characters')
     elif character:parser.error('Character fields require set-character')
+    proposal_action=args.action in ('publish-character-proposal','apply-character-proposal')
+    if proposal_action and not args.proposal_id:parser.error('Proposal id required')
+    if args.proposal_id and not proposal_action:parser.error('Proposal id requires publish or apply')
+    if args.repo is not None and args.action!='publish-character-proposal':parser.error('Repository is selected only at publication')
     store=DurableStore(args.state)
     try:
+        if args.action in ('list-character-proposals','publish-character-proposal','apply-character-proposal'):
+            from .character_proposals import CharacterProposals,GitHub
+            proposals=CharacterProposals(store)
+            if args.action=='list-character-proposals':result=proposals.listing()
+            elif args.action=='publish-character-proposal':
+                item=proposals.publish(args.proposal_id,args.repo,GitHub())
+                result=dict(id=args.proposal_id,status=item['status'],url=f"https://github.com/{item['repo']}/pull/{item['pr']}")
+            else:result=dict(id=args.proposal_id,revision=proposals.apply(args.proposal_id,GitHub()))
+            print(json.dumps(result,ensure_ascii=False));return
         if args.action=='set-character':
             store.claim()
             store.update(character,args.expected,args.reason)

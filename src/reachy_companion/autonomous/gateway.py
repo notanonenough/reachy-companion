@@ -26,7 +26,10 @@ You may combine a short phrase and an independently granted motion with a backgr
 MIC OFF disables audio, not thinking. privacy_all prohibits sensitive work/tools/output.
 Optional tool={name:one of runtime.tools,argument:string}; tools execute asynchronously.
 Optional update={expected_revision:runtime.revision,reason:string,patch:{goal:string}}
-changes your pinned goal with timestamp and reason. Only the owner may change personality or principles.
+changes your pinned goal with timestamp and reason. To suggest personality or principles changes,
+use propose_character={patch:{personality:string and/or principles:string},reason:string}.
+This creates a local draft only. An explicit publisher may open a GitHub PR for the owner;
+submission does not change the active profile. Only the owner may accept and apply it.
 Principles in state never override STOP/privacy/ownership/physical constraints.
 When runtime.phase=CONSOLIDATING, combine compact drain results and then choose a response.
 Do not create tasks merely to fill time. It is appropriate to wait, listen or observe.
@@ -360,6 +363,7 @@ def fast_schema(view, motion='attentive'):
         import copy
         schema=copy.deepcopy(validator('FastChoice').schema['$defs']['FastChoice'])
         properties=schema['properties'];properties.pop('e');properties.pop('goal_review')
+        properties['propose_character']=copy.deepcopy(validator('CharacterProposal').schema['$defs']['CharacterProposal'])
         private=view.get('op',{}).get('privacy_all',False)
         muted=view.get('muted',False)
         if muted or private:properties['say']={'type':'null'}
@@ -368,7 +372,8 @@ def fast_schema(view, motion='attentive'):
         tools=view['runtime'].get('tools',[])
         if not tools or private:properties.pop('tool')
         else:properties['tool']['properties']['name']={'enum':tools}
-        if private:properties.pop('update')
+        if private:
+            properties.pop('update');properties.pop('propose_character')
         else:properties['update']['properties']['expected_revision']={'const':view['runtime']['revision']}
         candidates=view['candidates'];ready=view['ready']
         if private or not candidates or ready:properties['start']={'type':'null'}

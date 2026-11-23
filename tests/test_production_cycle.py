@@ -455,7 +455,7 @@ class CycleTests(unittest.TestCase):
         self.assertEqual(result['output']['commit'],'actual-ready')
         schema=backend.payload['json_schema']
         self.assertEqual(schema['required'],['a','why','commit'])
-        self.assertEqual(set(schema['properties']),{'a','why','commit','motion'})
+        self.assertEqual(set(schema['properties']),{'a','why','commit','motion','propose_character'})
         validator=Draft202012Validator(schema)
         validator.validate(dict(a='converse',why='ready',commit='r0',motion='attentive'))
         with self.assertRaises(Exception):validator.validate(dict(a='converse',why='ready',commit='r0',say='shortcut'))

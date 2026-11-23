@@ -343,7 +343,7 @@ class State:
             self.record('motion_capability_rejected');return None
         if (value.get('say') and not self.production) or value.get('goal_review') or value.get('e'):
             self.record('capability_rejected'); return None
-        if (value.get('update') or value.get('tool')) and not (self.production and self.services):
+        if (value.get('update') or value.get('tool') or value.get('propose_character')) and not (self.production and self.services):
             self.record('capability_rejected');return None
         if value.get('say') and (self.muted or self.privacy or self.quiet):
             self.record('muted_action_rejected');return None
@@ -373,6 +373,8 @@ class State:
         refs = [ref for ref in (focus, start['input_ref'] if start else None, commit) if ref is not None]
         if any(dependencies.get(ref) is None or dependencies[ref] != self.dependency_digest(ref, now) for ref in refs):
             self.record('dependency_changed'); return None
+        if value.get('propose_character'):
+            self.services.propose_character(value['propose_character'])
         if value.get('update'):
             update=value['update']
             self.services.update(update['patch'],update['expected_revision'],update['reason'],now)

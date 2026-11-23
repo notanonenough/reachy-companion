@@ -71,6 +71,14 @@ class Services:
         self.store.update(patch,expected,reason);self.reload()
         state.record('state_updated')
 
+    def propose_character(self,proposal):
+        state=self.scheduler.state
+        if state.privacy or state.stopped or state.overload!='ACTIVE':raise ValueError('Proposal admission withdrawn')
+        from .character_proposals import CharacterProposals
+        identity=CharacterProposals(self.store).draft(proposal)
+        state.record('character_draft_created',request_id=identity)
+        return identity
+
     def start_tool(self, name, argument, binding, now):
         state=self.scheduler.state
         if (name not in self.tools or state.privacy or state.stopped or state.overload!='ACTIVE'
