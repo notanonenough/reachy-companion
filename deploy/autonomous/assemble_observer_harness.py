@@ -35,6 +35,8 @@ def assemble(base,output):
     source=replace_once(source,' compile(REMOTE.read_text()',dry+' compile(REMOTE.read_text()')
     source=replace_once(source," try:\n  event('preflight_begin'", " observers=ObserverGroup(a.output,a.candidate,ROOT,event)\n try:\n  event('preflight_begin'")
     source=replace_once(source,"  event('active_observed');camera_done", "  with lock:observer_owner=dict(owner)\n  observers.start(observer_owner)\n  event('active_observed');camera_done")
+    source=replace_once(source,"   if now-origin>=a.duration:event('bounded_duration');break", "   if now-origin>=max(1,a.duration-2):observers.request_finish()\n   if now-origin>=a.duration:event('bounded_duration');break")
+    source=replace_once(source," finally:\n  stop_auxiliary(player,'stimulus',event)"," finally:\n  observers.request_finish()\n  stop_auxiliary(player,'stimulus',event)")
     source=replace_once(source,"  stop_auxiliary(sampler,'sampler',event)","  stop_auxiliary(sampler,'sampler',event)\n  try:observers.close()\n  except Exception:event('observer_cleanup_error');observers.incomplete=True")
     source=replace_once(source,'if not owner_known or not trace_copied or evidence_errors:', 'if not owner_known or not trace_copied or evidence_errors or observers.incomplete:')
     # Exact same listener provenance functions, no second ownership implementation.

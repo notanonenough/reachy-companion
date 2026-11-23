@@ -88,7 +88,8 @@ candidate/controller/source/session binding; новый binding/reset разры
 
 Нужен Python≥3.11 проекта. Assembly читает только локальный approved snapshot и
 модули этой версии. Проверяет все четыре exact base SHA256, затем делает небольшой
-patch: attachment start после ACTIVE; cleanup после owner stop/exit/shutdown;
+patch: attachment start после ACTIVE; observer finish request за2s до bounded end;
+cleanup после owner stop/exit/shutdown;
 incomplete observer запрещает acceptance. Existing owner control не дублируется.
 Remote supervisor, камера/sampler и terminal helper остаются byte-identical.
 Unknown base/hash или изменившийся anchor дают отказ до создания output.
@@ -110,7 +111,9 @@ network/process probes. Assembly отдельно читает helpers и зап
 
 Exact approved-base integration tests локально собирают этот snapshot и
 исполняют actual start/finally AST с fake transports/processes: normal,
-early spawn failure, hanging observer, diskfull, SSH loss. Прежние семь
+early spawn failure, hanging observer, diskfull, SSH loss. В этих сценариях
+используются реальные локальные observer children/control pipes и terminal footer,
+а remote transport заменён fixture; заранее готовый footer не подменяет выход. Прежние семь
 lifecycle regressions также выполняются против собранных local/remote helpers,
 включая logging failure и foreign same-controller listener. На машине без
 private approved base эти конкретные tests skipped с явной причиной;
@@ -125,12 +128,21 @@ platform readers/consumer/manager tests и Linux child остаются испо
    запускает один read-only child на Mac и по одному через SSH на Hub/robot.
    Linux получает ephemeral private helper bundle вне installed source; никакой
    package/config installation. Право renew/STOP остаётся у прежнего supervisor.
-3. При observer error не делать restart/reconnect. Ошибка evidence сохраняется;
+3. За2s до обычного bounded trial end supervisor неблокирующе посылает
+   `finish\n` по stdin каждого observer child; в finally повторяет idempotent
+   request при раннем выходе. Это команда observer, не runtime STOP. Только
+   принятие команды самим observer подтверждает finish. Measurement window
+   заканчивается на его host-local timestamp; пересёкший границу probe
+   отмечается dropped_inflight, прежние ошибки не удаляются.
+   При observer error не делать restart/reconnect. Ошибка evidence сохраняется;
    физическая остановка идёт по прежнему authenticated stop → tracked child exit
-   → device/Mac shutdown. Затем каждый observer child отдельно terminate/wait2s,
-   kill/wait1s при необходимости. Logger failure не выбрасывается в owner cleanup.
-   SSH loss даёт unknown/incomplete; remote observer имеет собственный deadline,
-   но исчезновение SSH не выдаётся за известный remote exit.
+   → device/Mac shutdown. Затем каждый observer child отдельно graceful wait2s;
+   только при неуспехе terminate/wait1s, kill/wait1s и incomplete. Remote terminal
+   должен прийти через ещё открытый SSH, разрыв транспорта не равен finish ACK. Logger failure не выбрасывается в owner cleanup.
+   EOF/SSH loss даёт unknown/incomplete; remote observer имеет собственный deadline,
+   но исчезновение SSH не выдаётся за известный remote exit. Arrival order finish
+   и аварийного runtime STOP не гарантируется: ранний stop может честно оставить
+   measurement incomplete. Safety STOP не ждёт observer.
 4. Проверить три footer, coverage/identities и terminal receipts. Unsupported
    на любом узле блокирует полноту baseline, но не физический STOP. Raw inputs
    остаются private. Первые результаты этой разработки не являются аппаратной

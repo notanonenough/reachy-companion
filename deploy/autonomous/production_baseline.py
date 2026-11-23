@@ -340,7 +340,7 @@ def analyze_resources(rows):
                 and footers[0].get('reason') in ('complete','stopped')
                 and type(footers[0].get('records')) is int and footers[0]['records']==len(node_rows)-1)
             reason=footers[0].get('reason') if len(footers)==1 else 'missing_footer' if not footers else 'multiple_footers'
-            reason=reason if reason in ('complete','stopped','samples','io','cap','status_error','acquisition_failed','missing_footer','multiple_footers') else 'invalid_footer'
+            reason=reason if reason in ('complete','stopped','samples','io','cap','status_error','control','acquisition_failed','missing_footer','multiple_footers') else 'invalid_footer'
             completion=dict(state='complete' if valid_footer else 'incomplete',footer_present=bool(footers),reason=reason)
         state='observed' if instances else 'incomplete' if selected else 'missing'
         if completion['state']=='incomplete':state='incomplete'

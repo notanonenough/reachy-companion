@@ -9,6 +9,8 @@ import math
 import os
 from pathlib import Path
 import signal
+import select
+import threading
 import sys
 import time
 
@@ -174,30 +176,69 @@ class Writer:
             self.incomplete=True;self.reason='io';return False
 
 
-def run(reader,targets,node,writer,*,ticks=180,clock=time.monotonic,sleep=time.sleep,stopped=lambda:False,status_poll=None):
+class FinishControl:
+    """One observer-only command. EOF/loss never means successful finish."""
+    def __init__(self,stream,clock=time.monotonic):
+        self.stream=stream;self.clock=clock;self.event=threading.Event();self.done=threading.Event()
+        self.reason=None;self.at=None;self.finish_accepted=False;self.worker=None
+    def accept(self,reason):
+        if self.event.is_set():return
+        self.reason=reason;self.at=self.clock();self.finish_accepted=reason=='finish';self.event.set()
+    def start(self):
+        def read():
+            data=b''
+            try:
+                while not self.done.is_set() and not self.event.is_set():
+                    ready,_,_=select.select([self.stream],[],[],.1)
+                    if not ready:continue
+                    chunk=os.read(self.stream.fileno(),64-len(data))
+                    if not chunk:self.accept('eof');return
+                    data+=chunk
+                    if b'\n' in data:
+                        self.accept('finish' if data==b'finish\n' else 'invalid');return
+                    if len(data)>=64:self.accept('invalid');return
+            except Exception:self.accept('io')
+        self.worker=threading.Thread(target=read,daemon=True);self.worker.start()
+    def close(self):
+        self.done.set()
+        if self.worker is not None:self.worker.join(.2)
+    def ended_during(self,end):return self.event.is_set() and self.at is not None and end>=self.at
+
+
+def run(reader,targets,node,writer,*,ticks=180,clock=time.monotonic,sleep=time.sleep,stopped=lambda:False,status_poll=None,control=None):
     if node not in ('mac','hub','robot') or type(ticks) is not int or not 1<=ticks<=MAX_TICKS:raise ValueError('scope')
     targets=[target(x) for x in targets]
     if not 1<=len(targets)<=MAX_TARGETS or len({(x['role'],x['pid']) for x in targets})!=len(targets):raise ValueError('targets')
     if any((node=='hub' and x['role']!='hub_owner') or (node=='robot' and x['role']!='robot_audio') or (node=='mac' and not x['role'].startswith('mac_')) for x in targets):raise ValueError('node_role')
-    began=clock();deadline=began+ticks;count=0;failures=0
+    began=clock();deadline=began+ticks;count=0;failures=0;dropped_inflight=0;sample_count=0
     while count<ticks and clock()<deadline and not stopped() and not writer.incomplete:
         tick=clock()
         for item in targets:
             if stopped() or clock()>=deadline:break
-            row=sample(reader,item,node,clock=clock);failures+=row['sample_state']!='ok'
+            row=sample(reader,item,node,clock=clock)
+            if control is not None and control.ended_during(row['probe_end']):dropped_inflight+=1;break
+            failures+=row['sample_state']!='ok';sample_count+=1
             if not writer.write(row):break
         if status_poll is not None and not writer.incomplete and clock()<deadline and not stopped():
             try:
                 projected=status_poll();projected.update(node=node,host_boot=reader.host_boot)
-                failures+=projected['poll_outcome']!='response';writer.write(projected)
+                if control is not None and control.ended_during(projected['hub_request_end']):dropped_inflight+=1
+                else:failures+=projected['poll_outcome']!='response';writer.write(projected)
             except Exception:
                 failures+=1;writer.incomplete=True;writer.reason='status_error'
         count+=1
         # No catch-up: an overrun schedules the next tick after this one completes.
         next_at=max(tick+1,clock()+(.001 if clock()>tick+1 else 0))
-        if next_at<deadline and not stopped():sleep(max(0,next_at-clock()))
+        if next_at<deadline and not stopped():
+            delay=max(0,next_at-clock())
+            if control is not None:control.event.wait(delay)
+            else:sleep(delay)
     summary=dict(version=1,kind='observer_end',node=node,ticks=count,records=writer.records,
-        incomplete=writer.incomplete or bool(failures),reason=writer.reason if writer.incomplete else 'samples' if failures else 'stopped' if stopped() else 'complete',sample_failures=failures)
+        incomplete=writer.incomplete or bool(failures),reason=writer.reason if writer.incomplete else 'samples' if failures else 'stopped' if stopped() else 'complete',sample_failures=failures,sample_count=sample_count,dropped_inflight=dropped_inflight)
+    if control is not None:
+        summary.update(finish_accepted=control.finish_accepted,window_end=control.at,control_reason=control.reason)
+        if not control.finish_accepted or not sample_count:summary.update(incomplete=True,reason='control')
+        elif not summary['incomplete']:summary['reason']='stopped'
     if not writer.write(summary):summary.update(incomplete=True,reason=writer.reason)
     return summary
 

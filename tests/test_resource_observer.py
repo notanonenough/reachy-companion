@@ -10,6 +10,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import threading
 import unittest
 from unittest.mock import patch
 
@@ -86,6 +87,25 @@ class ObserverTests(unittest.TestCase):
             with patch.object(os,'sysconf',side_effect=lambda key:200 if key=='SC_CLK_TCK' else 16384):reader=o.ProcessReader(platform='linux',procroot=root)
             value=reader.read(42);self.assertEqual(value['cpu_s'],2);self.assertEqual(value['rss_bytes'],49152)
             self.assertNotIn('private',json.dumps(value));self.assertEqual(value['units']['cpu_hz'],200)
+
+    def test_finish_control_eof_and_inflight_are_explicit(self):
+        read_fd,write_fd=os.pipe()
+        with os.fdopen(read_fd,'rb',buffering=0) as stream:
+            control=o.FinishControl(stream);control.start();os.close(write_fd)
+            self.assertTrue(control.event.wait(1));self.assertFalse(control.finish_accepted);self.assertEqual(control.reason,'eof');control.close()
+        control=o.FinishControl(None);r=FakeReader();buffer=io.BytesIO()
+        def read(pid):
+            control.accept('finish');return dict(process_start_identity='12',cpu_s=1,rss_bytes=4096,units={})
+        with patch.object(r,'read',side_effect=read):
+            result=o.run(r,[self.item()],'hub',o.Writer(buffer),ticks=1,control=control,stopped=control.event.is_set)
+        self.assertEqual(result['dropped_inflight'],1);self.assertEqual(result['sample_count'],0)
+        self.assertTrue(result['incomplete']) # finish alone does not invent sample coverage
+        control=o.FinishControl(None);r=FakeReader();now=[0.]
+        def sleep(delay):control.accept('finish')
+        with patch.object(r,'read',side_effect=FileNotFoundError('missing before finish')):
+            # No control wait here: retain the actual failed sample, then mark finish before footer.
+            row=o.sample(r,self.item(),'hub');control.accept('finish')
+        self.assertEqual(row['sample_state'],'missing');self.assertLessEqual(row['probe_end'],control.at)
 
     def test_platform_neutral_instances_not_interleaved(self):
         rows=[]

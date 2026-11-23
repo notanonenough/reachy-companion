@@ -10,6 +10,7 @@ import socket
 import subprocess
 import sys
 import tempfile
+import time
 import threading
 import types
 import unittest
@@ -41,7 +42,7 @@ class GroupTests(unittest.TestCase):
             def kill(self):events.append('kill')
             def wait(self,timeout):events.append(('wait',timeout));raise subprocess.TimeoutExpired('fixture',timeout)
         group=ObserverGroup('/fixture','7'*40,'/fixture',fail);group.children=[('hub',Hanging(),Path('/nonexistent'))]
-        group.close();self.assertTrue(group.incomplete);self.assertEqual(events,['terminate',('wait',2),'kill',('wait',1)])
+        group.close();self.assertTrue(group.incomplete);self.assertEqual(events,[('wait',2),'terminate',('wait',1),'kill',('wait',1)])
 
     def test_internal_runner_dry_run_has_no_probes(self):
         with patch.object(observer_runner,'ProcessReader',side_effect=AssertionError('resource')),patch.object(subprocess,'Popen',side_effect=AssertionError('process')),patch.object(socket,'socket',side_effect=AssertionError('network')),contextlib.redirect_stdout(io.StringIO()) as out:
@@ -76,7 +77,7 @@ class AssembledTests(unittest.TestCase):
         checks=(BASE/'reachy-trace-lifecycle-checks.py').read_text()
         checks=checks.replace("pathlib.Path('/tmp/reachy-trace-acceptance.py')",repr(self.local))
         checks=checks.replace("pathlib.Path('/tmp/reachy-trace-remote-owner.py')",repr(self.snapshot/'reachy-trace-remote-owner.py'))
-        checks=checks.replace('ns=dict(',"ns=dict(__file__=str(LOCAL),observers=types.SimpleNamespace(close=lambda:None,incomplete=False),")
+        checks=checks.replace('ns=dict(',"ns=dict(__file__=str(LOCAL),observers=types.SimpleNamespace(close=lambda:None,request_finish=lambda:None,incomplete=False),")
         namespace={'PosixPath':Path}
         with contextlib.redirect_stdout(io.StringIO()) as output:exec(compile(checks,'original_fault_regressions','exec'),namespace)
         self.assertEqual(output.getvalue().count('PASS:'),7)
@@ -87,20 +88,28 @@ class AssembledTests(unittest.TestCase):
         for fault in ('normal','early_start_failure','hanging_observer','disk_full','ssh_loss'):
             with self.subTest(fault=fault):
                 calls=[];directory=self.root/fault;directory.mkdir()
-                class Child:
-                    def __init__(self,node):self.returncode=255 if fault=='ssh_loss' and node=='hub' else None
-                    def poll(self):return self.returncode
-                    def terminate(self):calls.append('observer.terminate');self.returncode=0
-                    def kill(self):calls.append('observer.kill');self.returncode=-9
-                    def wait(self,timeout):
-                        calls.append('observer.wait')
-                        if fault=='hanging_observer':raise subprocess.TimeoutExpired('observer',timeout)
-                        return self.returncode
                 def spawn(args,**kw):
                     calls.append('observer.start')
                     if fault=='early_start_failure':raise OSError('spawn')
                     name=Path(kw['stdout'].name).stem.removeprefix('observer-')
-                    kw['stdout'].write(b'{"kind":"observer_end","incomplete":false}\n');kw['stdout'].flush();return Child(name)
+                    if fault=='ssh_loss' and name=='hub':code='import sys;sys.exit(255)'
+                    elif fault=='hanging_observer' and name=='hub':code='import signal,time;signal.signal(signal.SIGTERM,signal.SIG_IGN);print("started",flush=True);time.sleep(20)'
+                    else:
+                        role={'mac':'mac_provider','hub':'hub_owner','robot':'robot_audio'}[name]
+                        code="""import sys
+from resource_observer import FinishControl,run,Writer
+class Reader:
+ host_boot='fixture';basis='linux_start_ticks'
+ def read(self,pid):return dict(process_start_identity='12',cpu_s=1,rss_bytes=4096,units={})
+c=FinishControl(sys.stdin.buffer);c.start()
+r=run(Reader(),[dict(role=ROLE,pid=42,process_start_identity='12',identity_basis='linux_start_ticks')],NODE,Writer(sys.stdout.buffer),stopped=c.event.is_set,control=c)
+c.close();raise SystemExit(2 if r['incomplete'] else 0)
+""".replace('ROLE',repr(role)).replace('NODE',repr(name))
+                    child=subprocess.Popen([sys.executable,'-u','-c',code],env=dict(os.environ,PYTHONPATH=str(DIRECTORY)+os.pathsep+str(DIRECTORY.parents[1]/'src')),**kw)
+                    # Observe an actual first child record, not a prewritten terminal fixture.
+                    deadline=time.monotonic()+2
+                    while child.poll() is None and not Path(kw['stdout'].name).stat().st_size and time.monotonic()<deadline:time.sleep(.01)
+                    return child
                 class Hub:
                     returncode=0
                     def poll(self):return 0
@@ -125,7 +134,7 @@ class AssembledTests(unittest.TestCase):
                     exec(compiled([ast.Try(body=[ast.Pass()],handlers=[],orelse=[],finalbody=self.outer.finalbody)]),ns)
                 self.assertTrue(all(x in calls for x in ('auth_stop','hub.wait','shutdown','trial_finished')),calls)
                 self.assertLess(calls.index('auth_stop'),calls.index('hub.wait'));self.assertLess(calls.index('hub.wait'),calls.index('shutdown'))
-                if 'observer.terminate' in calls:self.assertLess(calls.index('shutdown'),calls.index('observer.terminate'))
+                self.assertLess(calls.index('observer_finish_requested'),calls.index('auth_stop'))
                 if fault!='normal':self.assertTrue(group.incomplete)
                 else:self.assertFalse(group.incomplete)
 
