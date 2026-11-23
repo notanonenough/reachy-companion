@@ -24,7 +24,7 @@
 
 | Карточка | Статус, владелец и ревьюер | Следующий шаг и контакт |
 |---|---|---|
-| [MAP-01](#map-01-карта-всех-решений) | В работе; автор карты — ведущий `/root`, аудит — `/root/implementer`, независимый ревьюер — `/root/reviewer` | Ведущий собирает карту; ревьюер проверяет точный коммит. Контакт 23.11.2026 в 20:45 Asia/Baku, затем новая контрольная точка по результату. |
+| [CHAR-01](#char-01-личность-меняет-только-владелец) | Назначена; автор — `/root/implementer`, независимый ревьюер — `/root/reviewer` | Исполнитель готовит код и воспроизводимую проверку; следующий контакт 23.11.2026 в 20:55 Asia/Baku или раньше по готовности/препятствию. |
 
 Ведущий работает в `reachy-development-map`, исполнитель — в `reachy-audit-map`,
 ревьюер — в `/tmp/reachy-review-map`; рабочие ветки короткоживущие `codex/*`.
@@ -33,7 +33,7 @@
 
 ## Ближайшая очередь и препятствия
 
-1. **CHAR-01, готова после MAP-01.** Запретить изменение личности и принципов
+1. **CHAR-01, назначена после принятой MAP-01.** Запретить изменение личности и принципов
    результатом модели/фонового обновления; дать владельцу явную офлайн-правку
    через существующий production CLI. Основание §35; контракт согласован
    ведущим и техлидом до реализации. Владелец — `/root/implementer`,
@@ -71,8 +71,11 @@ GitHub CLI установлен, но не авторизован; сохран�
   техлид выборочно воспроизводит утверждения через штатные тесты и проверяет
   приоритет §15, разделение §23/35 и отсутствие ложной аппаратной приёмки.
 - База: `f75fb382b460f6963ce674efcf4f16b5e1b9de15`;
-  рабочая ветка: `codex/development-map`. Проверяемый коммит и решение ревью
-  будут сохранены перед приёмкой.
+  проверенный и опубликованный коммит: [`719f40a61`](https://github.com/notanonenough/reachy-companion/commit/719f40a61f719165f9fc4bfffa72dc64a5388f1c).
+  **Принята 23.11.2026 в 20:44 Asia/Baku:** независимое [APPROVED](reviews/MAP-01.md),
+  свежая база совпала, наличие в `origin/main` проверено после push.
+  Карточка закрыта, слитая ветка `codex/development-map` удаляется.
+  Это локальный эквивалент PR по правилам проекта.
 
 ### CHAR-01 — личность меняет только владелец
 
@@ -98,8 +101,12 @@ GitHub CLI установлен, но не авторизован; сохран�
   CLI сохраняет валидную правку с новой ревизией, отказывает при stale revision,
   слишком длинной строке и работающем runtime. Ключевые тесты ревьюер запускает
   самостоятельно. Это программный результат, физических эффектов не заявляем.
-- Статус: готова к назначению после MAP-01; базу, ветку, контрольную точку
-  и точный коммит ведущий добавит при выдаче.
+- Статус: **назначена** 23.11.2026 в 20:44 Asia/Baku. База — свежая
+  `origin/main` с принятой картой `719f40a61` и учётной записью назначения;
+  исполнитель фиксирует полный SHA перед работой. Ветка `codex/owner-character`;
+  отдельная рабочая копия исполнителя. Следующий контакт — 20:55 Asia/Baku.
+  Результат передать доступным в origin коммитом, base/head/diff и проверками;
+  ревьюер самостоятельно проверяет точный head, ведущий принимает в main.
 
 ## Как читать привязку решений
 
@@ -159,7 +166,7 @@ GitHub CLI установлен, но не авторизован; сохран�
 | 35 | Т; частота/хранилище Г; reflection П | [autonomous/runtime.py:Scheduler.advance](../src/reachy_companion/autonomous/runtime.py); [autonomous/state.py:snapshot](../src/reachy_companion/autonomous/state.py); [autonomous/services.py:update,advance](../src/reachy_companion/autonomous/services.py); [autonomous/durable.py](../src/reachy_companion/autonomous/durable.py); [tests/test_production_cycle.py](../tests/test_production_cycle.py) | Тишина, TTL, goal CAS, background IO и overload уже есть. Fast/main ещё две модели. **Прямой конфликт на исходной базе:** periodic character maintenance и model update могут менять personality/principles без запроса владельца. | 23,30,31,36; запрет auto-character независим | Программно доказать регулярную итерацию в тишине/stale context/разные goals; запретить model/background character mutation, оставить явный owner update; device acceptance отдельная. |
 | 36 | Т редактируемой памяти; recognition П/Г | [autonomous/memory.py:MemoryStore.commit,recall](../src/reachy_companion/autonomous/memory.py); [autonomous/context.py:ContextProvider](../src/reachy_companion/autonomous/context.py); [autonomous/durable.py](../src/reachy_companion/autonomous/durable.py) memory string; [tests/test_memory_context.py](../tests/test_memory_context.py) | Provenance/CAS/forget для записей есть отдельно от character summary. Готового знакомства/связывания лица/голоса с записью нет. | 9,28,30,35 | Owner confirmation→recall→correction/delete; спорное сходство не перезаписывает личность, слова не приписываются присутствующему автоматически. |
 | 37 | Действующее разрешение | [docs/REVIEW-NOTES.md](REVIEW-NOTES.md) §37; [scripts/factory_ssh.py](../scripts/factory_ssh.py); [scripts/production-control](../scripts/production-control); [deploy/current/release.py](../deploy/current/release.py); [deploy/autonomous/robot_inventory.py](../deploy/autonomous/robot_inventory.py) | Доступ разрешён владельцем; аудит не проверял connectivity и запущенный SHA. | Координация ведущего | Перед каждым опытом узел/версия/занятость; не повторное согласование разрешённого опыта. |
-| 38 | Действующий процесс | [AGENTS.md](../AGENTS.md); [docs/REVIEW-NOTES.md](REVIEW-NOTES.md) §38; git baseline | Роли назначены, карта подготовлена. Приёмка этой карты требует независимого ревью точного коммита и публикации в main. | MAP-01, reviewer | По каждому diff base/head/checks/reviewer verdict, свежий main; только ведущий merge и карта, автор исправляет замечания. |
+| 38 | Действующий процесс | [AGENTS.md](../AGENTS.md); [docs/REVIEW-NOTES.md](REVIEW-NOTES.md) §38; git baseline | MAP-01 принята в origin/main, роли и CHAR-01 назначены; процесс каждого следующего изменения проверяется отдельно. | MAP-01, reviewer | По каждому diff base/head/checks/reviewer verdict, свежий main; только ведущий merge и карта, автор исправляет замечания. |
 
 ## Воспроизведённые проверки
 
@@ -189,6 +196,6 @@ GitHub CLI установлен, но не авторизован; сохран�
 из отдельной рабочей копии. Эти наборы частично пересекаются с 127 тестами
 исполнителя; складывать их как число уникальных тестов нельзя.
 
-Точный коммит карты, итог независимого ревью и факт наличия в origin/main
-фиксируются после проверки. Ни один тест в этом этапе не подтверждает
+Карта принята по точному коммиту `719f40a61` после [независимого ревью](reviews/MAP-01.md);
+23.11.2026 в 20:44 Asia/Baku ведущий проверил этот результат в `origin/main`. Ни один тест в этом этапе не подтверждает
 физическое движение, звук или текущую версию стенда.
