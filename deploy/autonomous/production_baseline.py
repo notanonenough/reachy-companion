@@ -6,10 +6,11 @@ import math
 from pathlib import Path
 import statistics
 from reachy_companion.autonomous.contracts import Authority,decode
+from reachy_companion.model_timing import project as project_model_timing
 from reachy_companion.lease_diagnostics import project_first_lease_invalid,project_first_reducer_expiry
 
 TRACE_KINDS=('session_begin','stt_result','stt_disposition','input_admission','input_retry',
-    'main_request','main_result','main_checked','speech_commit','speech_terminal','playback_stop','trace_end')
+    'main_request','main_transport','main_result','main_checked','speech_commit','speech_terminal','playback_stop','trace_end')
 COUNTERS=('submitted','overwritten','stale','echo','started','completed','no_response','empty','errors','timeouts')
 METRICS=('stt_client_s','stt_end_to_admission_s','admission_to_main_start_s','main_client_s',
     'main_end_to_checked_s','checked_to_speech_s','tts_first_pcm_s','tts_producer_s','stt_end_to_playback_stop_s','retry_candidate_to_main_start_s')
@@ -81,10 +82,19 @@ def analyze_trace(rows):
         clean.update({key:row[key] for key in ('cancelled','tts_complete','stop_known','verified_stopped') if type(row.get(key)) is bool})
         clean['kind']=kind
         clean['disposition']=row.get('disposition') if type(row.get('disposition')) is str and len(row['disposition'])<=64 else None
-        needs_authority=kind in ('stt_result','input_admission','input_retry','main_request','main_result','main_checked','speech_commit','speech_terminal')
+        needs_authority=kind in ('stt_result','input_admission','input_retry','main_request','main_transport','main_result','main_checked','speech_commit','speech_terminal')
         if needs_authority and not valid_authority(row.get('authority'),identity[1]):
             issues['invalid_authority']+=1;continue
         clean['authority']=row.get('authority') if needs_authority else None
+        if kind=='main_transport':
+            receipt=project_model_timing(row.get('model_timing'),request_id=row.get('attempt_id'),
+                gateway_boot_id=row['authority']['compute_boot_id'])
+            status=row.get('transport_diagnostic_status')
+            missing=status in ('no_response','missing_diagnostic','malformed_diagnostic','identity_mismatch')
+            if ((missing and row.get('model_timing')!=project_model_timing(None))
+                    or (not missing and (status not in ('verified_receipt','partial_diagnostic') or receipt.get('reason')=='invalid_receipt' or receipt!=row.get('model_timing')))
+                    or clean['disposition'] not in ('execution_unknown','observed_error_receipt','transport_failure')):
+                issues['invalid_transport_receipt']+=1;continue
         if type(row.get('sequence')) is int and 0<=row['sequence']<2**63:clean['sequence']=row['sequence']
         events.append(clean)
     if counts['session_begin']!=1:issues['session_begin_count']+=1
@@ -106,6 +116,11 @@ def analyze_trace(rows):
     source_keys=('source_boot','sequence','lineage_id');task_keys=('task_id','attempt_id','input_ref')
     stt=table('stt_result',source_keys);admissions=table('input_admission',('input_ref',))
     requests=table('main_request',task_keys);results=table('main_result',task_keys)
+    transports=table('main_transport',task_keys)
+    for key,row in transports.items():
+        request=requests.get(key)
+        if request is None or request['authority']!=row['authority'] or row['at']<request['at']:
+            issues['invalid_transport_join']+=1
     checked=table('main_checked',task_keys);commits=table('speech_commit',task_keys)
     terminal=table('speech_terminal',('request_id',));stops=table('playback_stop',('request_id',))
     refs={key[0]:row for key,row in admissions.items() if row.get('disposition')=='admitted'}

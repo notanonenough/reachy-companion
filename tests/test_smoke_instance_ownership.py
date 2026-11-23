@@ -100,7 +100,10 @@ class FrozenInstanceTests(unittest.TestCase):
                 session.swap_after_complete=mode=='after_complete'
                 gateway=Gateway(backend)
                 with patch.dict(sys.modules,{'lmstudio':sdk}):
-                    if mode=='healthy':gateway.generate('main',fixture.contract.MAIN_INPUT)
+                    if mode=='healthy':
+                        result=gateway.generate('main',fixture.contract.MAIN_INPUT)
+                        self.assertEqual(result['model_timing']['stages']['tokenize_text']['state'],'complete')
+                        self.assertEqual(result['model_timing']['stages']['completion']['state'],'complete')
                     else:
                         with self.assertRaises((BudgetRejected,ExecutionUnknown)):
                             gateway.generate('main',fixture.contract.MAIN_INPUT)

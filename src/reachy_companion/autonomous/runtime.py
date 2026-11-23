@@ -10,6 +10,7 @@ from http.client import HTTPException
 from .contracts import decode, uid, validator, validate
 from .state import State
 from ..private_audio_trace import emit,main_call
+from ..model_timing import project as project_model_timing,attach_error
 
 
 class Job:
@@ -48,11 +49,33 @@ class RemoteGateway:
             raise ValueError('Oversized gateway response')
         return decode(raw)
 
-    def inference(self,path,payload,role):
+    def inference(self,path,payload,role,on_transport=None):
         try:return self.call(path,payload)
         except (OSError,HTTPException):
             import sys
             failure=sys.exception()
+            if path=='/main' and on_transport is not None:
+                receipt=project_model_timing(None);diagnostic_status='no_response'
+                if isinstance(failure,HTTPError):
+                    diagnostic_status='malformed_diagnostic'
+                    try:
+                        raw=failure.read(65537)
+                        if len(raw)<=65536:
+                            supplied=decode(raw).get('model_timing')
+                            if supplied is None:diagnostic_status='missing_diagnostic'
+                            else:
+                                receipt=project_model_timing(supplied,request_id=payload['request_id'],gateway_boot_id=self.boot_id)
+                                if receipt['reason']!='invalid_receipt':
+                                    diagnostic_status='partial_diagnostic' if receipt['incomplete'] else 'verified_receipt'
+                                elif type(supplied) is dict and (supplied.get('request_id')!=payload['request_id'] or supplied.get('gateway_boot_id')!=self.boot_id):
+                                    diagnostic_status='identity_mismatch'
+                    except Exception:pass
+                attach_error(failure,receipt)
+                disposition=('execution_unknown' if isinstance(failure,HTTPError) and failure.code==503
+                    and diagnostic_status in ('verified_receipt','partial_diagnostic') else
+                    'observed_error_receipt' if isinstance(failure,HTTPError) else 'transport_failure')
+                try:on_transport(receipt,disposition,diagnostic_status)
+                except Exception:pass
             if isinstance(failure,HTTPError) and failure.code in (401,403,404,409,422):raise
             if not self.config.get('production'):raise
             # A client-side timeout is not backend terminal evidence. Keep this
@@ -65,7 +88,9 @@ class RemoteGateway:
                     execution=health.get('executions',{}).get(role,{})
                     if (health.get('compute_boot_id')==self.boot_id and execution.get('request_id')==payload['request_id']
                             and execution.get('status')=='terminal'):
-                        raise RuntimeError('Inference response lost; exact remote execution is terminal')
+                        error=RuntimeError('Inference response lost; exact remote execution is terminal')
+                        attach_error(error,getattr(failure,'model_timing',None))
+                        raise error
                 except (OSError,HTTPException):pass
                 time.sleep(.1)
 
@@ -75,12 +100,15 @@ class RemoteGateway:
             raise ValueError('request identity mismatch')
         return result
 
-    def main(self, task):
+    def main_with_transport(self,task,callback):
+        return self.main(task,on_transport=callback)
+
+    def main(self, task, *, on_transport=None):
         if task.kind == 'research':
             from .workflows import WorkflowClient
             output = WorkflowClient(self.config['workflows']).run(task)
             return dict(output=output,compute_boot_id=task.authority.compute_boot_id,request_id=task.attempt_id)
-        result = self.inference('/main', dict(request_id=task.attempt_id, data=task.prompt),'main')
+        result = self.inference('/main', dict(request_id=task.attempt_id, data=task.prompt),'main',on_transport)
         if result['request_id'] != task.attempt_id:
             raise ValueError('attempt identity mismatch')
         return result
@@ -401,7 +429,7 @@ class Scheduler:
                 if task:
                     self.main_task = task
                     trace=getattr(self,'private_trace',None)
-                    self.main_job = Job(main_call,trace,self.gateway.main,task) if trace is not None else Job(self.gateway.main,task)
+                    self.main_job = Job(main_call,trace,self.gateway.main,task,getattr(self.gateway,'main_with_transport',None)) if trace is not None else Job(self.gateway.main,task)
             except Exception as exc:
                 self.state.record('fast_failed', error_class=type(exc).__name__)
             self.fast_job = self.binding = None

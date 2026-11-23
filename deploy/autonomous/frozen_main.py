@@ -73,9 +73,9 @@ class FrozenModelBackend(ModelBackend):
             raise BudgetRejected('Fixed main boundary cannot select another model')
         return FrozenHandle(client,model,self.main_binding)
 
-    def generate_loaded(self,role,data,handle=None,context_input=False):
+    def generate_loaded(self,role,data,handle=None,context_input=False,timing=None):
         if role=='main':
             if type(handle) is not FrozenHandle or handle.binding!=self.main_binding:
                 raise BudgetRejected('Unbound main handle cannot tokenize or complete')
             handle.check()
-        return super().generate_loaded(role,data,handle,context_input=context_input)
+        return super().generate_loaded(role,data,handle,context_input=context_input,timing=timing)

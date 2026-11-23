@@ -75,9 +75,9 @@ class ContextGateway(RemoteGateway):
     def fast(self,request_id,view):
         if self.memory_binding is not None:check_context_view(view,self.memory_binding)
         return super().fast(request_id,view)
-    def main(self,task):
+    def main(self,task,*,on_transport=None):
         if self.memory_binding is not None:check_context_task(task,self.memory_binding)
-        return super().main(task)
+        return super().main(task,on_transport=on_transport)
 
 
 def occupied(scheduler,poller,lease,peer_job=None,health_job=None,stop_job=None,retire_job=None,media_close_job=None):
