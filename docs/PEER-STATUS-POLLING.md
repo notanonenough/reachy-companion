@@ -75,3 +75,28 @@ Private numeric evidence and executable reproduction are retained under
 `~/reachy-release-backups/20261127-peer-poll-offline`; the baseline was exact
 `2c17c0ff6b7d499d9d2e8082651d12ea34cee676`. No private transcripts/configs are
 needed for these fixtures.
+
+The exact344c71cd push CI failed the existing three-stream retirement fixture
+with `audio_completion_unknown`; its first predicate was not retained. The
+same exact PR CI and local full suite passed. This historical cause remains
+unknown, rather than being assigned to the polling change or called a flake.
+The fixture now retains a bounded first-unknown projection on failure.
+
+Separate local base/head and fallback/PersistentPeer comparisons reproduced
+`Local terminal references changed`. A controlled ordinary joined-loop
+interleaving establishes its cause: after the remote retirement ACK, a new
+operator joint-stop worker can still be returning locally. Stream/generation,
+full consumed cursor and stop receipt remain valid, but the old commit treated
+this new live reference as an identity error. The loop now checks identity
+under the existing playback lock and retains that same ACK/job until the
+actual local references return. Admission stays closed; there is no repeated
+remote retirement RPC, blocking wait or new deadline. Missing/foreign identity,
+unexpected local ownership and invalid final stop/cursor receipts still fail.
+STOP continues through the existing immediate withdrawal and bounded drain;
+a permanently held reference remains busy and prevents successful cleanup.
+
+`PYTHONPATH=src:tests python -m unittest test_terminal_retirement` checks the
+actual ACK→joint-stop→commit sequence, one remote ACK, closed admission, STOP
+with a held worker, wrong identity while busy and final receipt validation.
+This fixes the independently reproduced retirement race; it does not establish
+the cause of the older CI `audio_completion_unknown` or hardware latency.

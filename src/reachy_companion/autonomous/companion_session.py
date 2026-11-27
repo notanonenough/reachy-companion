@@ -36,6 +36,24 @@ class SessionFailure(RuntimeError):
         super().__init__(code)
 
 
+def commit_retired_terminal(playback, terminal):
+    """Keep the remote ACK while new local stop references finish returning."""
+    with playback.lock:
+        current=playback.terminal
+        if (type(current) is not dict or type(current.get('stream_id')) is not str
+                or type(current.get('generation')) is not int
+                or current['stream_id']!=terminal['stream_id']
+                or current['generation']!=terminal['generation']
+                or playback.active is not None or playback.paused is not None or playback.reservation_busy):
+            raise RuntimeError('Local terminal references changed')
+        if (playback.worker and playback.worker.is_alive()
+                or any(job.is_alive() for job in playback.stop_jobs)):
+            return False
+        if not playback.retire_terminal(terminal['stream_id'],terminal['generation']):
+            raise RuntimeError('Local terminal stop receipt unknown')
+        return True
+
+
 def first_lease_invalid_record(peer,current,status_at,authority,now,started,phase,lease):
     """Project only the captured gate inputs, before close. Never inhibit close."""
     try:
@@ -225,10 +243,9 @@ def run_session(scheduler,poller,lease,client,stop_client,source,stop,duration,p
                             or scheduler.speech_adapter.playback.status()['terminal_unknown'] or backend.withdrawn):
                         raise SessionFailure('audio_completion_unknown')
                     if retire_job and retire_job.future.done():
-                        if retire_job.future.result() and not scheduler.speech_adapter.playback.retire_terminal(
-                                retiring_terminal['stream_id'],retiring_terminal['generation']):
-                            raise RuntimeError('Local terminal references changed')
-                        retire_job=None;retiring_terminal=None;next_retire=now+.02
+                        if (not retire_job.future.result() or
+                                commit_retired_terminal(scheduler.speech_adapter.playback,retiring_terminal)):
+                            retire_job=None;retiring_terminal=None;next_retire=now+.02
                     speech_status=scheduler.speech_adapter.status()
                     terminal=scheduler.speech_adapter.playback.terminal_receipt()
                     if (terminal is not None and not retire_job and now>=next_retire

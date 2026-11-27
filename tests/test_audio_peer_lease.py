@@ -498,8 +498,19 @@ class JoinedLeaseTests(unittest.TestCase):
         cfg=load(Path(__file__).resolve().parents[1]/'config.autonomous.example.json');cfg['period_s']=.02
         scheduler=Scheduler(cfg,Gateway(.01),speech_adapter=speech,audio_adapter=audio)
         poller=AudioPolling(fixture.client,audio,fixture.peer.boot_id);stop=threading.Event();reports=[];status=[]
+        first_unknown=[];playback_status=fixture.local.status
+        def observe_playback():
+            value=playback_status()
+            if not stop.is_set() and not first_unknown and (value['quarantined'] or value['terminal_unknown'] or fixture.remote.withdrawn):
+                lease=fixture.lease.status()
+                first_unknown.append(dict(at=time.monotonic(),
+                    flags={key:value[key] for key in ('quarantined','terminal_unknown','execution_busy','stop_known','closed')},
+                    remote_withdrawn=fixture.remote.withdrawn,
+                    remote_phase=(fixture.remote.pending_stream or {}).get('phase'),
+                    lease_reason=lease.get('withdrawal_reason'),lease_first_close=lease.get('first_close')))
+            return value
         def run():reports.append(run_session(scheduler,poller,fixture.lease,fixture.client,fixture.client.at_port(fixture.server.stop_address[1]),fixture.peer.boot_id,stop,None,status.append,lifetime='lease'))
-        with patch.object(audio.stt,'transcribe',return_value='Neutral lease fixture input'):
+        with patch.object(audio.stt,'transcribe',return_value='Neutral lease fixture input'),patch.object(fixture.local,'status',observe_playback):
             runner=threading.Thread(target=run);runner.start()
             try:
                 for index in range(3):
@@ -510,6 +521,9 @@ class JoinedLeaseTests(unittest.TestCase):
                 stop.set();runner.join(2);self.assertFalse(runner.is_alive())
                 self.assertTrue(reports[0]['cleanup_verified']);self.assertTrue(reports[0]['continuous'])
                 self.assertFalse(reports[0]['continuous_acceptance']);self.assertEqual(reports[0]['reservation_attempts'],3)
+            except AssertionError as exc:
+                projected=[{key:r.get(key) for key in ('reason','failure_code','first_lease_invalid','first_reducer_expiry','cleanup_issues')} for r in reports]
+                self.fail(f'{exc}; first_audio_unknown={first_unknown}; session={projected}')
             finally:stop.set();runner.join(3);audio.close();speech.close();fixture.tearDown()
 
 
