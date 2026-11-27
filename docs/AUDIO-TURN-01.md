@@ -71,6 +71,14 @@ Hub держит только один STT worker, один pending PCM slot п�
 не создаёт candidate/main. Final silence с пустым STT завершает прежний текст;
 пустой весь turn не создаёт utterance.
 
+Полученный final защищён до проверки его STT: следующий raw turn может занимать
+только один отдельный pending slot, его перезапись не отзывает finishing worker.
+Если pending ещё занят самим final, следующий raw capture получает capacity отказ.
+После final admission более новая recognized реплика использует обычный State
+supersession. Никакого продления TTL или второго worker нет; глобальные отказы
+по-прежнему уничтожают оба состояния. Основание и replay:
+[trial002](releases/2026-11-27-audio-final-isolation.md).
+
 Same source/capture authority, exact observation sequence, segment index и
 смежные sample intervals обязательны. Gap/reorder/overwrite, ошибка STT, expiry,
 cap, echo, privacy/STOP/source change уничтожают retained text; поздний worker
