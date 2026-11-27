@@ -169,17 +169,30 @@ def run_block(label, model_rel, port, installed_root, binary, lock, cases, outpu
             summary['listener_owned_at_end'] = listener_owned(process, port)
         finally:
             # A live unreaped Popen child cannot have its PID reused by another process.
-            if process.poll() is None:
-                process.terminate()
+            # A watchdog/second Ctrl-C cannot interrupt the bounded reap or hide its receipt.
+            old_mask = signal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGALRM, signal.SIGINT})
+            cleanup_error = None
+            try:
                 try:
-                    process.wait(timeout=10)
-                except subprocess.TimeoutExpired:
-                    process.kill()
-                    process.wait(timeout=5)
-            summary.update(known_exit=process.poll() is not None, returncode=process.returncode,
-                           total_block_s=time.monotonic() - begin)
-            write(output / (label + '-results.json'), summary)
-            write(output / (label + '-owner.json'), {k: v for k, v in summary.items() if k != 'cases'})
+                    if process.poll() is None:
+                        process.terminate()
+                        try:
+                            process.wait(timeout=10)
+                        except subprocess.TimeoutExpired:
+                            process.kill()
+                            process.wait(timeout=5)
+                except Exception as exc:
+                    cleanup_error = exc
+                    summary['cleanup_error_class'] = type(exc).__name__
+                finally:
+                    summary.update(known_exit=process.poll() is not None, returncode=process.returncode,
+                                   total_block_s=time.monotonic() - begin)
+                    write(output / (label + '-results.json'), summary)
+                    write(output / (label + '-owner.json'), {k: v for k, v in summary.items() if k != 'cases'})
+            finally:
+                signal.pthread_sigmask(signal.SIG_SETMASK, old_mask)
+            if cleanup_error is not None or not summary['known_exit']:
+                raise RuntimeError('Own process cleanup unknown') from cleanup_error
     return summary
 
 

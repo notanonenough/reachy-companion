@@ -82,6 +82,23 @@ class VoiceModelCompareTests(unittest.TestCase):
     def test_global_deadline_cannot_be_swallowed_as_case_failure(self):
         self.assertFalse(issubclass(compare.ComparisonDeadline, Exception))
 
+    def test_unknown_cleanup_keeps_receipt_and_aborts(self):
+        child = Mock(pid=123, returncode=None)
+        child.poll.return_value = None
+        child.wait.side_effect = compare.subprocess.TimeoutExpired('fixture', 5)
+        with tempfile.TemporaryDirectory() as directory, \
+             patch.object(compare, 'file_digest', return_value='fixture'), \
+             patch.object(compare.socket, 'socket'), \
+             patch.object(compare.subprocess, 'Popen', return_value=child), \
+             patch.object(compare, 'listener_owned', side_effect=RuntimeError('fixture failure')):
+            with self.assertRaisesRegex(RuntimeError, 'cleanup unknown'):
+                compare.run_block('9b', 'model.gguf', 18941, Path(directory), Path('/synthetic/llama'),
+                                  {'model.gguf': {'sha256': 'fixture'}}, [], Path(directory))
+            receipt = json.loads((Path(directory) / '9b-owner.json').read_text())
+        child.kill.assert_called_once_with()
+        self.assertFalse(receipt['known_exit'])
+        self.assertEqual(receipt['cleanup_error_class'], 'TimeoutExpired')
+
 
 if __name__ == '__main__':
     unittest.main()
