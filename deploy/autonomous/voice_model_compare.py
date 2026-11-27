@@ -4,6 +4,7 @@ import copy
 import hashlib
 from http.client import HTTPException
 import json
+import re
 import signal
 import socket
 import subprocess
@@ -62,7 +63,11 @@ def listener_owned(process, port):
     result = subprocess.run(['/usr/sbin/lsof', '-nP', '-a', '-p', str(process.pid),
                              '-iTCP:' + str(port), '-sTCP:LISTEN', '-Fp'],
                             capture_output=True, text=True, timeout=2)
-    return result.returncode == 0 and result.stdout.splitlines() == ['p' + str(process.pid)]
+    fields = result.stdout.splitlines()
+    # macOS lsof emits the file-set marker even with only p selected (-Fp).
+    return (result.returncode == 0 and len(fields) >= 2
+            and fields[0] == 'p' + str(process.pid)
+            and all(re.fullmatch(r'f[0-9]+', field) for field in fields[1:]))
 
 
 class MeasuredBackend(ModelBackend):

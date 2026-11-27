@@ -61,6 +61,29 @@ class VoiceModelCompareTests(unittest.TestCase):
                 backend.post('http://127.0.0.1:18941/completion', {}, 30)
         post.assert_not_called()
 
+    def test_actual_macos_lsof_file_records_and_strict_negative_shapes(self):
+        child = Mock(pid=27764)
+        child.poll.return_value = None
+        for output, code, expected in (
+            ('p27764\nf3\n', 0, True),  # Actual first-window stdout.
+            ('p27764\nf3\nf4\n', 0, True),
+            ('p27765\nf3\n', 0, False),
+            ('p27764\nf3\np27765\nf4\n', 0, False),
+            ('p27764\nf3\np27764\nf4\n', 0, False),
+            ('p27764\nf3\nnunknown\n', 0, False),
+            ('p27764\nf3u\n', 0, False),
+            ('p27764\n', 0, False),
+            ('', 0, False),
+            ('p27764\nf3\n', 1, False),
+        ):
+            with self.subTest(output=output, code=code), \
+                 patch.object(compare.subprocess, 'run', return_value=Mock(stdout=output, returncode=code)):
+                self.assertEqual(bool(compare.listener_owned(child, 18941)), expected)
+        child.poll.return_value = -15
+        with patch.object(compare.subprocess, 'run') as run:
+            self.assertFalse(compare.listener_owned(child, 18941))
+        run.assert_not_called()
+
     def test_failure_after_spawn_still_reaps_exact_child(self):
         child = Mock(pid=123, returncode=None)
         child.poll.side_effect = lambda: child.returncode
