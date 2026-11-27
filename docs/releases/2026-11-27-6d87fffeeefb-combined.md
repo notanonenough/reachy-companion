@@ -6,6 +6,8 @@
 Один aggregate дошёл до правильного арифметического значения в полной фразе и
 подтверждённого device PCM. Независимое акустическое подтверждение ответа пока
 **unknown**. Это протокол измерений, не выпуск и не закрытие всей #30.
+Для этого bounded release обязательный открытый gate — слышимость правильного
+ответа; numeric-only остаётся ограничением опыта, а не новым release gate.
 
 ## Установка и откат
 
@@ -95,7 +97,7 @@ reported_cache_n0. Main client включает transport, tokenization и valid
 1190 повторных receipt observations сведены к27 accepted и одному late failed
 motion; conflicting duplicates0. Command duration .350–.425s (median .379),
 planning median .099s, expression dispatch .805–1.212s (median1.037).
-Исторический3aea median1.202s и current1.037s — разные сеансы, не рандомизированное
+Исторический3aea median1.204s и current1.037s — разные сеансы, не рандомизированное
 сравнение и не физический onset. Время expression включает проверку/submit/wait.
 
 43 quiet pre-dispatch samples: jitter yaw.146°, pitch.058°, body.088° <1°.
