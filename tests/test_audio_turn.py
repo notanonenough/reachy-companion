@@ -159,6 +159,22 @@ class SourceQueueTests(unittest.TestCase):
             self.assertGreaterEqual(item['capture_age_s'],0)
             self.assertEqual(peer.observation_samples,(2-index)*64000)
         self.assertIsNone(self.take(peer));self.assertFalse(peer.observation_queue)
+    def test_clean_delivered_final_close_is_not_reported_as_loss(self):
+        peer,_=self.peer();self.publish(peer,meta(final=True));self.take(peer)
+        peer.close();peer.close()
+        self.assertEqual(peer.observation_drops,0);self.assertIsNone(peer.observation_drop_reason)
+        self.assertFalse(peer.observation_queue);self.assertEqual(peer.observation_samples,0)
+    def test_delivered_unfinished_turn_close_is_one_abandonment(self):
+        peer,_=self.peer();self.publish(peer,meta());self.take(peer)
+        peer.close();peer.close()
+        self.assertEqual(peer.observation_drops,1);self.assertEqual(peer.observation_drop_reason,'closed')
+    def test_new_turn_counts_delivered_unfinished_prefix_but_not_final(self):
+        for final in (False,True):
+            peer,_=self.peer();self.publish(peer,meta(final=final));self.take(peer)
+            self.assertTrue(self.publish(peer,meta(final=True,turn='b'*32)))
+            self.assertEqual(peer.observation_drops,int(not final))
+            self.assertEqual(self.take(peer)['turn']['turn_id'],'b'*32)
+            if not final:self.assertFalse(self.publish(peer,meta(1,True,320)))
     def test_cap_clears_all_pcm_and_blocks_remaining_turn(self):
         peer,_=self.peer();self.assertTrue(self.publish(peer,meta(samples=128000)))
         self.assertFalse(self.publish(peer,meta(1,False,128000,128000)))
@@ -193,6 +209,7 @@ class SourceQueueTests(unittest.TestCase):
                 self.assertTrue(peer.closed)
             else:peer.close()
             self.assertFalse(peer.observation_queue);self.assertEqual(peer.observation_samples,0)
+            self.assertEqual(peer.observation_drops,1)
             self.assertFalse(self.publish(peer,meta(1,True,320)))
 
 

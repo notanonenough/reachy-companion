@@ -162,11 +162,13 @@ class AudioPeer:
             return True
 
     def _drop_observations(self, reason, blocked=None):
+        lost=(bool(self.observation_queue) or self.capture_turn is not None and not self.capture_turn['final']
+            or reason in ('invalid_segment','missing_prefix','discontinuity','turn_cap'))
         self.observation_queue.clear();self.observation_samples=0
         if blocked is not None:self.blocked_turn=blocked
         elif self.capture_turn is not None:self.blocked_turn=self.capture_turn['turn_id']
         self.capture_turn=None;self.capture_turn_start=None
-        self.observation_drop_reason=reason;self.observation_drops+=1
+        if lost:self.observation_drop_reason=reason;self.observation_drops+=1
 
     def publish(self, pcm, captured_end, echo_reference, *, turn=None):
         if not isinstance(pcm, bytes) or not pcm or len(pcm)%2 or len(pcm)>256000:
@@ -188,7 +190,8 @@ class AudioPeer:
                 if turn['turn_id']==self.blocked_turn:return False
                 previous=self.capture_turn
                 if previous is None or previous['turn_id']!=turn['turn_id']:
-                    if self.observation_queue:self._drop_observations('new_turn')
+                    if self.observation_queue or previous is not None and not previous['final']:
+                        self._drop_observations('new_turn')
                     if turn['segment_index']!=0:
                         self._drop_observations('missing_prefix',turn['turn_id']);return False
                     self.capture_turn_start=turn['sample_start']
