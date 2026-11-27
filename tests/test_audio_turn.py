@@ -8,7 +8,7 @@ import unittest
 from http.server import BaseHTTPRequestHandler,ThreadingHTTPServer
 from reachy_companion.autonomous.audio_adapter import AudioAdapter,HttpSTT
 from reachy_companion.autonomous.audio_turn import segment
-from reachy_companion.autonomous.response_endpoint import TurnEndpoint
+from reachy_companion.autonomous.response_endpoint import TurnEndpoint,LegacyEndpoint
 
 
 class Vad:
@@ -201,12 +201,13 @@ class ActualTurnPipelineTests(unittest.TestCase):
     def test_normal_fullpath_empty_silence_tail_yields_one_main(self):self.exercise(True)
     def test_normal_fullpath_short_silence_ended_input_has_no_extra_wait(self):self.exercise(False,short=True)
     def test_normal_read_deadline_and_silence_burst_delivers_both_segments(self):self.exercise(True,burst=True)
-    def exercise(self,empty_tail,short=False,burst=False):
+    def test_finite_legacy_producer_preserves_existing_single_pcm_lineage(self):self.exercise(False,short=True,legacy=True)
+    def exercise(self,empty_tail,short=False,burst=False,legacy=False):
         from test_companion_session import SessionTests
         from reachy_companion.transcription import TranscriptionSlot
         fixture=SessionTests();fixture.setUp();self.addCleanup(fixture.tearDown)
-        fixture.audio.endpoint_v1=True;fixture.audio.continuous_input=True;fixture.audio.result_ttl_s=8
-        captures=deque();dispatch=fixture.peer.dispatch;endpoint=TurnEndpoint(Vad());offset=0
+        fixture.audio.endpoint_v1=not legacy;fixture.audio.continuous_input=not legacy;fixture.audio.result_ttl_s=2 if legacy else 8
+        captures=deque();dispatch=fixture.peer.dispatch;endpoint=(LegacyEndpoint if legacy else TurnEndpoint)(Vad(),max_seconds=4,silence_frames=20);offset=0
         def observe(path,body):
             nonlocal offset
             if path=='/observation' and captures:
@@ -221,7 +222,7 @@ class ActualTurnPipelineTests(unittest.TestCase):
                     offset+=len(chunk)//2
                 if burst:self.assertEqual(len(parts),2)
                 for part in parts:
-                    if not fixture.peer.publish(part['pcm'],part['captured_end'],None,turn=part['turn']):raise AssertionError('fixture permission')
+                    if not fixture.peer.publish(part['pcm'],part['captured_end'],None,turn=part.get('turn')):raise AssertionError('fixture permission')
             return dispatch(path,body)
         fixture.peer.dispatch=observe
         texts=deque(['What is two plus two?'] if short else ['What is two plus two?','' if empty_tail else 'Answer with one number.']);stt_calls=[];main_calls=[]
@@ -241,6 +242,11 @@ class ActualTurnPipelineTests(unittest.TestCase):
         server=ThreadingHTTPServer(('127.0.0.1',0),Handler);threading.Thread(target=server.serve_forever,daemon=True).start()
         self.addCleanup(server.server_close);self.addCleanup(server.shutdown)
         fixture.audio.stt=HttpSTT('http://127.0.0.1:'+str(server.server_port),'t'*32,timeout=8)
+        audio_events=[];ingest=fixture.scheduler.ingest
+        def ingest_event(event,now=None):
+            if event.get('audio'):audio_events.append(event)
+            return ingest(event,now)
+        fixture.scheduler.ingest=ingest_event
         original=fixture.gateway.main
         def main(task):main_calls.append(task.prompt);return original(task)
         fixture.gateway.main=main;reports=[]
@@ -268,6 +274,13 @@ class ActualTurnPipelineTests(unittest.TestCase):
         self.assertEqual(main_calls,['What is two plus two?'+('' if empty_tail or short else ' Answer with one number.')])
         self.assertEqual(len(stt_calls),1 if short else 2);self.assertEqual(reports[0]['counts']['new_turn'],1)
         self.assertEqual(reports[0]['counts']['task_started'],1);self.assertTrue(reports[0]['cleanup_verified'])
+        if legacy:
+            import hashlib
+            audio=audio_events[0]['audio']
+            self.assertEqual(audio['lineage_id'],fixture.peer.boot_id+':'+str(audio['sequence']))
+            self.assertEqual(audio['pcm_sha256'],hashlib.sha256(b'\1\0'*3200+b'\0\0'*6400).hexdigest())
+            self.assertNotIn('aggregation',audio);self.assertLess(audio['capture_age_ms'],2000)
+            self.assertEqual(len(audio_events),1)
 
 
 if __name__=='__main__':unittest.main()

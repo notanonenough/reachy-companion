@@ -19,6 +19,15 @@ runtime=importlib.util.module_from_spec(spec);spec.loader.exec_module(runtime)
 
 
 class DeviceRuntimeTests(unittest.TestCase):
+    def test_legacy_lease_rejected_before_owner_or_hardware_construction(self):
+        argv=['device_audio_runtime','--config','fixture','--output','fixture-out','--owner-file','fixture-owner',
+            '--controller','controller','--allow-capture-output','--lifetime','lease','--audio-protocol','legacy']
+        with patch.object(sys,'argv',argv),patch.object(runtime,'Config') as config,patch.object(runtime,'agent') as agent, \
+                patch.object(runtime,'AlsaCapture') as capture,patch.object(runtime,'AudioPeer') as peer:
+            with self.assertRaisesRegex(ValueError,'finite probe'):runtime.main()
+            config.assert_not_called();agent.assert_not_called();capture.assert_not_called();peer.assert_not_called()
+
+
     def test_invalid_pcm_controls_fail_before_agent_activation(self):
         for option,value in (('--echo-tail-seconds','nan'),('--echo-tail-seconds','.1'),('--endpoint-silence-frames','9'),
                 ('--stop-port','-1'),('--stop-port','65536'),('--stop-port','8780')):

@@ -106,3 +106,30 @@ class TurnEndpoint:
                 self.endpoint.started=True;self.endpoint.run=old.run;self.endpoint.silence=old.silence
             self.endpoint.feed(remainder)
         return ready
+
+
+class LegacyEndpoint:
+    """Explicit finite practice producer with the original single-segment proof.
+
+    No aggregate is relabelled as legacy. The caller must restrict this mode to
+    a separately authorized finite probe, never normal production lease mode.
+    """
+    def __init__(self, vad, *, max_seconds=8, silence_frames=30):
+        self.vad=vad;self.settings=dict(max_seconds=max_seconds,silence_frames=silence_frames)
+        self.no_response=0;self.dropped=0;self.last_drop=None;self.clear()
+
+    def clear(self):
+        self.endpoint=ResponseEndpoint(self.vad,**self.settings)
+
+    def feed(self, pcm, *, sample_start, captured_end):
+        endpoint=self.endpoint
+        available=len(endpoint.pcm)+len(endpoint.pending)+len(pcm)
+        endpoint.feed(pcm)
+        if not endpoint.reason:return []
+        ready=[]
+        if endpoint.started:
+            unused=(available-len(endpoint.pcm))//2
+            ready.append(dict(pcm=bytes(endpoint.pcm),captured_end=captured_end-unused/16000))
+        else:self.no_response+=1
+        self.clear()
+        return ready

@@ -15,14 +15,22 @@ Normal production `companion_session` явно включает `endpoint_v1=Tru
 Библиотечный AudioAdapter по умолчанию остаётся legacy для существующих отдельных
 fixture/probe callers. Legacy mode **отвергает** typed segments, а strict mode
 отвергает payload без typed metadata. Неизвестная граница не становится final.
-Device runtime публикует только новый protocol. Старые device и новый normal Hub
-не совместимы для dialogue admission: обновлять как один проверенный candidate.
-Отдельный legacy ResponseEndpoint остаётся для его существующих probe callers.
-Конкретно `deploy/autonomous/realtime_audio_session.py` — старый practice probe —
-не поддерживает новый typed device и отвергнет все его audio observations. Он
-**не является пригодным путём приёмки этого candidate**. Штатные точки входа —
-`production_start.py` и `companion_session`; миграция либо удаление practice probe
-потребует отдельной задачи. Untyped библиотечные fixtures сохраняют прежний путь.
+Device runtime по умолчанию публикует новый protocol. Старые device и новый normal
+Hub не совместимы для dialogue admission: обновлять как один проверенный candidate.
+Normal `production_start.py device` явно выбирает `--audio-protocol endpoint_v1`
+и lease lifetime; legacy с lease отвергается до создания owner/mic/capture.
+
+Отдельный `deploy/autonomous/realtime_audio_session.py` — старый practice probe,
+используемый для `voice_memory_fixture` — сохраняет `voice-working-2`: одна source
+sequence, один PCM digest и age<2000ms. Для него новый device binary запускают
+**явно** с `device_audio_runtime.py --audio-protocol legacy --lifetime finite`
+вместе с прежними обязательными config/output/owner/controller/duration и capture
+opt-in аргументами. Его Hub command `realtime_audio_session.py` не меняется.
+LegacyEndpoint использует прежний ResponseEndpoint→untyped publish без aggregate
+relabel. Это отдельный finite опыт с собственным разрешением и обычным cleanup;
+его нельзя использовать для приёмки normal production или нового turn contract.
+Без этого producer flag legacy practice consumer отвергнет typed observations.
+Untyped библиотечные fixtures сохраняют прежний путь; нового handshake нет.
 
 Typed metadata version1 содержит:
 
