@@ -1,6 +1,6 @@
 # Карта разработки Reachy Companion
 
-Обновлено: 24 ноября 2026, Asia/Baku. Единственный редактор — ведущий `/root`.
+Обновлено: 27 ноября 2026, Asia/Baku. Единственный редактор — ведущий `/root`.
 Основание: [правила работы](../AGENTS.md), [решения 1–38](REVIEW-NOTES.md),
 [целевое поведение](BEHAVIOR.md). Карта описывает проверенный исходный код;
 сохранённая конфигурация не считается доказательством текущего состояния устройств.
@@ -57,8 +57,8 @@ STT-end→first-TTS-PCM11.209s по Hub clock; main client interval7.650s не �
 
 | Карточка | Статус, владелец и ревьюер | Следующий шаг и контакт |
 |---|---|---|
-| [#30 — поворот головы и ответ](https://github.com/notanonenough/reachy-companion/issues/30) | Автор `/root/implementer`, ревьюер `/root/reviewer`. [PR #41](https://github.com/notanonenough/reachy-companion/pull/41) | Принято в main через `2322a0db6`. Ревью [f5682bc42](https://github.com/notanonenough/reachy-companion/pull/41#pullrequestreview-6087971020), полный прогон и обе проверки CI прошли. Автор готовит установку общего кандидата после #42. Контроль 16:25 по Баку. |
-| [#39 — граница реплики](https://github.com/notanonenough/reachy-companion/issues/39) | Автор `/root/ci_implementer`, ревьюер `/root/reviewer`. [PR #42](https://github.com/notanonenough/reachy-companion/pull/42) | В [ревью](https://github.com/notanonenough/reachy-companion/pull/42#pullrequestreview-6087960543) воспроизведена потеря пары фрагментов из одного чтения. Автор исправляет доставку и проверяет результат со свежей main. Контроль 16:25 по Баку. |
+| [#30 — поворот головы и ответ](https://github.com/notanonenough/reachy-companion/issues/30) | Автор `/root/implementer`, ревьюер `/root/reviewer`. [PR #41](https://github.com/notanonenough/reachy-companion/pull/41) | Принято в main через `2322a0db6`. Ревью [f5682bc42](https://github.com/notanonenough/reachy-companion/pull/41#pullrequestreview-6087971020), полный прогон и обе проверки CI прошли. Для #30 и #39 выбран `20ccaad220e39e288dab1a3c7e8b535baa70ee54`. Окно 27.11 16:28–16:50 Баку на установку и проверку трёх узлов с резервной копией 3aea. Единственный владелец стенда `/root/implementer`. Контроль 16:38. Опыт после сверки установки. |
+| [#39 — граница реплики](https://github.com/notanonenough/reachy-companion/issues/39) | Автор `/root/ci_implementer`, ревьюер `/root/reviewer`. [PR #42](https://github.com/notanonenough/reachy-companion/pull/42) | Доставка исправлена. Принято через `20ccaad22`, [ревью 86610656](https://github.com/notanonenough/reachy-companion/pull/42#pullrequestreview-6088101035) и обе проверки CI прошли. Физическую проверку ведёт #30 в общем окне. Контроль 16:38. |
 | [#26 — измерения устойчивости](https://github.com/notanonenough/reachy-companion/issues/26) | Владелец `/root/ci_implementer`, ревьюер `/root/reviewer` | Ожидает OBSERVE-02. Очерёдность пересматриваем после приёмки #30. |
 
 **Релизное окно 27 ноября 2026, 15:00 по Баку.** Обработано в 16:12. Последний тег `stand-2026-11-23.1`. После него изменён 21 файл в src и deploy. Установленный кандидат `3aea1cd42` не прошёл сквозную приёмку. Выпуск продолжается в #30 с прежним владельцем стенда. После принятия #41 и #42 ведущий выбирает точный коммит, назначает один повторный опыт и выпускает его при успешной приёмке.
