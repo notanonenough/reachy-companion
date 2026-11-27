@@ -454,7 +454,7 @@ def _run_session_cli(args,private_trace):
         audio=AudioAdapter(HttpSTT(companion['network']['compute_url'],companion.token,timeout=stt_deadline,
             diagnostics=cfg.get('production',{}).get('stt_diagnostics',False)),
             result_ttl_s=stt_deadline,
-            **({'continuous_input':True} if cfg.get('production') else {}))
+            **({'continuous_input':True,'endpoint_v1':True} if cfg.get('production') else {}))
         pcm=Playback(RemotePCM(client,stop_port=args.peer_stop_port,source_boot=args.source_boot,
             max_streams=32 if args.lifetime=='finite' else None,lifetime=args.lifetime),chunk_frames=4096,
             motion=motion if cfg['actuators']!='bounded_stock' else None)

@@ -86,6 +86,7 @@ def analyze_trace(rows):
         if needs_authority and not valid_authority(row.get('authority'),identity[1]):
             issues['invalid_authority']+=1;continue
         clean['authority']=row.get('authority') if needs_authority else None
+        if 'aggregation' in row:clean['aggregation']=row['aggregation']
         if kind=='main_transport':
             receipt=project_model_timing(row.get('model_timing'),request_id=row.get('attempt_id'),
                 gateway_boot_id=row['authority']['compute_boot_id'])
@@ -143,6 +144,11 @@ def analyze_trace(rows):
         if (type(admission.get('authority')) is not dict or
                 any(row.get('authority')!=admission['authority'] for row in (request,result,check))):
             issues['authority_mismatch']+=1;continue
+        if admission.get('aggregation') is not None:
+            # Retain denominator/counts; never label the final fragment's STT
+            # duration as the whole aggregated utterance. Detailed turn timing
+            # requires its own member/clock join, not the legacy single source.
+            issues['aggregate_timing_unsupported']+=1;continue
         source=stt.get(tuple(admission.get(k) for k in source_keys))
         if source is None:issues['missing_stt']+=1;continue
         if not ordered(source.get('started_at'),source.get('ended_at'),source.get('at'),admission.get('at')):

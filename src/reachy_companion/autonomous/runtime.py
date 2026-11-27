@@ -274,7 +274,8 @@ class Scheduler:
             emit(self,'input_admission',text=event['text'] if admitted else None,
                 input_ref=refs[0] if len(refs)==1 else None,authority=self.state.authority.wire(),
                 lineage_id=audio.get('lineage_id'),source_boot=audio.get('source_boot'),sequence=audio.get('sequence'),
-                disposition='admitted' if admitted else 'blocked')
+                disposition='admitted' if admitted else 'blocked',
+                **({key:audio[key] for key in ('aggregation','turn_id','segments','earliest_deadline')} if audio.get('aggregation')=='endpoint_v1' else {}))
         if event.get('type')=='operator' and self.state.privacy:self.revoke_context(old_authority)
         if event.get('type')=='stop':
             if self.speech_adapter:self.speech_adapter.interrupt('stop',False)

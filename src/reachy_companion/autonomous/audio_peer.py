@@ -62,6 +62,9 @@ class AudioPeer:
         self.lease_requests=0;self.max_lease_gap_ms=0;self.last_lease=None
         self.streams = {}
         self.observation = None
+        self.observation_queue=[];self.observation_samples=0
+        self.capture_turn=None;self.capture_turn_start=None;self.blocked_turn=None
+        self.observation_drop_reason=None;self.observation_drops=0
         self.sequence = 0
         self.last_output_end = 0
         self.last_output = None
@@ -158,15 +161,59 @@ class AudioPeer:
             self.audio_level=dict(rms=rms,delta=None if previous is None else rms-previous['rms'],captured_end=captured_end)
             return True
 
-    def publish(self, pcm, captured_end, echo_reference):
+    def _drop_observations(self, reason, blocked=None):
+        lost=(bool(self.observation_queue) or self.capture_turn is not None and not self.capture_turn['final']
+            or reason in ('invalid_segment','missing_prefix','discontinuity','turn_cap'))
+        self.observation_queue.clear();self.observation_samples=0
+        if blocked is not None:self.blocked_turn=blocked
+        elif self.capture_turn is not None:self.blocked_turn=self.capture_turn['turn_id']
+        self.capture_turn=None;self.capture_turn_start=None
+        if lost:self.observation_drop_reason=reason;self.observation_drops+=1
+
+    def publish(self, pcm, captured_end, echo_reference, *, turn=None):
         if not isinstance(pcm, bytes) or not pcm or len(pcm)%2 or len(pcm)>256000:
             raise ValueError('Bounded mono16k observation')
+        if turn is not None:
+            from .audio_turn import segment
+            try:turn=segment(turn,len(pcm)//2)
+            except ValueError:
+                with self.lock:self._drop_observations('invalid_segment')
+                raise
         with self.lock:
-            if not self.permitted():return False
+            if not self.permitted():
+                if self.capture_turn or self.observation_queue:self._drop_observations('permission_withdrawn')
+                return False
             if self.lifetime=='lease' and self.sequence>=2**63-1:self.close('observation_sequence_exhausted');return False
-            self.sequence += 1
-            self.observation = dict(pcm=pcm, captured_end=captured_end,
-                source_boot=self.boot_id, sequence=self.sequence, echo_reference=echo_reference)
+            if turn is not None:
+                # One finite source turn, not a general capture backlog. Reject
+                # before retaining PCM; every queued timestamp stays original.
+                if turn['turn_id']==self.blocked_turn:return False
+                previous=self.capture_turn
+                if previous is None or previous['turn_id']!=turn['turn_id']:
+                    if self.observation_queue or previous is not None and not previous['final']:
+                        self._drop_observations('new_turn')
+                    if turn['segment_index']!=0:
+                        self._drop_observations('missing_prefix',turn['turn_id']);return False
+                    self.capture_turn_start=turn['sample_start']
+                elif (previous['final'] or turn['segment_index']!=previous['segment_index']+1
+                        or turn['sample_start']!=previous['sample_end']):
+                    self._drop_observations('discontinuity',turn['turn_id']);return False
+                samples=len(pcm)//2
+                if (len(self.observation_queue)>=3 or self.observation_samples+samples>192000
+                        or turn['sample_end']-self.capture_turn_start>192000
+                        or turn['segment_index']==2 and not turn['final']):
+                    self._drop_observations('turn_cap',turn['turn_id']);return False
+                self.observation=None  # Never mix legacy and typed observations.
+                self.sequence+=1
+                value=dict(pcm=pcm,captured_end=captured_end,source_boot=self.boot_id,
+                    sequence=self.sequence,echo_reference=echo_reference,turn=turn)
+                self.capture_turn=turn
+                self.observation_queue.append(value);self.observation_samples+=samples
+            else:
+                if self.capture_turn or self.observation_queue:self._drop_observations('legacy_switch')
+                self.sequence+=1
+                self.observation=dict(pcm=pcm,captured_end=captured_end,
+                    source_boot=self.boot_id,sequence=self.sequence,echo_reference=echo_reference)
             return True
 
     def operator_status(self):
@@ -207,6 +254,8 @@ class AudioPeer:
                 closed=self.closed, permitted=self.permitted(), operator_ready=self.operator_ready(),
                 agent_mute_supported=self.mute_owner is not None,operator_control_execution_busy=self.operator_control_busy,
                 agent_mute_receipt=None if self.operator_control_receipt is None else dict(self.operator_control_receipt),operator=self.operator_status(), playback=self.playback.status(), observation_sequence=self.sequence,
+                observation_queue=len(self.observation_queue),observation_samples=self.observation_samples,
+                observation_drops=self.observation_drops,observation_drop_reason=self.observation_drop_reason,
                 close_reason=self.close_reason,first_close=self.first_close,watch_error=self.watch_error,
                 watch_execution_busy=self.watch.is_alive(),operator_execution_busy=bool(self.operator_job and self.operator_job.is_alive()),max_operator_ms=self.max_operator_ms,operator_requests=self.operator_requests)
         if path == '/stop':
@@ -256,6 +305,12 @@ class AudioPeer:
         if path == '/observation':
             with self.lock:
                 value=self.observation;self.observation=None
+                if self.observation_queue:
+                    if not 0<=self.clock()-self.observation_queue[0]['captured_end']<=.25:
+                        self._drop_observations('stale_capture')
+                    else:
+                        value=self.observation_queue.pop(0)
+                        self.observation_samples-=len(value['pcm'])//2
                 level=getattr(self,'audio_level',None)
                 telemetry={}
                 level_age = self.clock()-level['captured_end'] if level else None
@@ -379,6 +434,7 @@ class AudioPeer:
                     operator_age_remaining_ms=max(0,(self.operator_deadline-now)*1000),controller_lease_remaining_ms=max(0,(self.lease_deadline-now)*1000),lease_requests=self.lease_requests)
                 observers=self.close_observers;self.close_observers=[]
             self.closed=True;self.observation=None
+            self._drop_observations('closed')
         with self.playback.lock:self.playback.closed=True
         result=self.playback.interrupt('peer_withdrawal',preserve=False,wait=False)
         for observer in observers:
@@ -692,7 +748,8 @@ class AudioPolling:
                             self.adapter.submit(pcm,source_boot=self.source_boot,
                                 sequence=observation['sequence'],captured_end=started-age,
                                 authority=authority,operator_binding=binding,
-                                echo_reference=observation.get('echo_reference'))
+                                echo_reference=observation.get('echo_reference'),
+                                **({'turn':observation.get('turn')} if getattr(self.adapter,'endpoint_v1',False) or 'turn' in observation else {}))
             if (not self.job and now>=self.next_poll and operator and operator['microphone_enabled']
                     and not operator['privacy_all'] and now<operator['valid_until']):
                 binding=tuple(operator['binding']);self.calls+=1;self.next_poll=now+.05

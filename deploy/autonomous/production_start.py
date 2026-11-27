@@ -66,6 +66,7 @@ def main():
                     '--owner-file', str(path), '--controller', args.controller,
                     '--lifetime', 'lease', '--allow-capture-output', '--allow-agent-mute',
                     '--port', '8780', '--stop-port', '8781', '--listen', args.listen_device,
+                    '--audio-protocol', 'endpoint_v1',
                     '--endpoint-max-seconds', '4', '--endpoint-silence-frames', '20']
         if args.lease_datagram_port:
             sys.argv += ['--lease-datagram-port', str(args.lease_datagram_port)]

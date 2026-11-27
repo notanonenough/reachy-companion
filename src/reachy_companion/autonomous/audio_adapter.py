@@ -77,10 +77,14 @@ class HttpSTT:
 
 
 class AudioAdapter:
-    def __init__(self, stt, *, clock=time.monotonic,continuous_input=False,result_ttl_s=2):
+    def __init__(self, stt, *, clock=time.monotonic,continuous_input=False,result_ttl_s=2,endpoint_v1=False):
         if type(continuous_input) is not bool:raise ValueError('Explicit continuous input mode')
         if type(result_ttl_s) not in (int,float) or not math.isfinite(result_ttl_s) or not .5<=result_ttl_s<=15:
             raise ValueError('Bounded recognition result TTL required')
+        if type(endpoint_v1) is not bool:raise ValueError('Explicit endpoint protocol mode')
+        self.endpoint_v1=endpoint_v1
+        self.turn_capture=None;self.turn_text=[];self.turn_segments=[]
+        self.turn_dropped=0;self.last_turn_drop=None
         self.result_ttl_s=result_ttl_s
         self.continuous_input=continuous_input
         self.stt, self.clock = stt, clock
@@ -115,10 +119,20 @@ class AudioAdapter:
                 return False
             self.source, self.source_generation, self.sequence = boot, generation, -1
             self.latest_utterance_sequence=-1
-            self._withdraw()
+            self._withdraw('source_changed')
             return True
 
-    def _withdraw(self):
+    def abandon_turn(self, reason):
+        # Local owner/mailbox operation. In-flight STT remains occupied but its
+        # generation can no longer contribute text to a later turn.
+        with self.lock:
+            self.turn_dropped+=1;self.last_turn_drop=reason
+            self._withdraw()
+
+    def _withdraw(self, reason=None):
+        if reason and self.turn_capture:
+            self.turn_dropped+=1;self.last_turn_drop=reason
+        self.turn_capture=None;self.turn_text=[];self.turn_segments=[]
         if self.result and getattr(self,'private_trace',None) is not None:
             observation=self.result[0]
             emit(self,'stt_disposition',lineage_id=observation['lineage_id'],
@@ -140,9 +154,10 @@ class AudioAdapter:
                 allowed = (operator['microphone_enabled'] is True and operator['quiet'] is False
                            and operator['privacy_all'] is False and now < operator['valid_until'])
             if not self.same_capture_scope(authority,self.authority) or signature != self.operator_signature or not allowed:
-                self._withdraw()
+                self._withdraw('authority_or_permission')
             self.authority, self.operator_signature, self.allowed = authority, signature, allowed
             self.operator_deadline = operator['valid_until'] if allowed else 0
+            if self.turn_capture and now>=self.turn_capture['deadline']:self.abandon_turn('expired')
             event = None
             if self.job and not self.job.is_alive():
                 self.job = None
@@ -154,9 +169,13 @@ class AudioAdapter:
                         emit(self,'stt_disposition',lineage_id=observation['lineage_id'],source_boot=observation['source_boot'],
                             sequence=observation['sequence'],disposition='fresh' if fresh_for_admission else 'stale')
                     if fresh_for_admission:
-                        if error or not text.strip():
+                        if self.endpoint_v1:
+                            text=self.finish_segment(observation,text,error)
+                        if text is None:
+                            pass  # A recognized nonfinal segment is not a no-response.
+                        elif error or not text.strip():
                             self.counts['no_response'] += 1
-                            if not error:self.counts['empty'] += 1
+                            if not error and text is not None:self.counts['empty'] += 1
                             self.last_error = error
                         else:
                             self.counts['completed'] += 1
@@ -167,8 +186,9 @@ class AudioAdapter:
                                 lineage_id=observation['lineage_id'], pcm_sha256=observation['pcm_sha256'],
                                 origin='unknown', speaker_identity='unknown', speaker_confidence=0,
                                 echo_reference=observation['echo_reference'],
-                                capture_age_ms=int((now-observation['captured_end'])*1000),
+                                capture_age_ms=(math.ceil if self.endpoint_v1 else int)((now-observation['captured_end'])*1000),
                                 ttl_ms=int(self.result_ttl_s*1000), confirmed=False))
+                            if 'aggregation' in observation:event['audio'].update(observation['aggregation'])
                             event['audio']['stt_provenance']='pc_http_stt' if type(self.stt) is HttpSTT else 'fixture_or_unverified_stt'
                     else:
                         self.counts['stale'] += 1
@@ -197,7 +217,8 @@ class AudioAdapter:
                                     audio_s=observation['audio_s'],pcm_sha256=observation['pcm_sha256'],
                                     captured_end=observation['captured_end'],capture_basis='hub_monotonic_conservative_mapping',
                                     started_at=started,ended_at=self.clock(),authority=observation['authority'].wire() if isinstance(observation['authority'],Authority) else None,
-                                    disposition='stale' if not fresh else 'error' if error else 'recognized' if text.strip() else 'empty',error_kind=error)
+                                    disposition='stale' if not fresh else 'error' if error else 'recognized' if text.strip() else 'empty',error_kind=error,
+                                    **({'endpoint_segment':observation['turn']} if self.endpoint_v1 else {}))
                             if error:
                                 self.counts['errors'] += 1
                                 if error in ('TimeoutError','socket.timeout'):self.counts['timeouts'] += 1
@@ -249,7 +270,7 @@ class AudioAdapter:
             return event
 
     def submit(self, pcm, *, source_boot, sequence, captured_end, authority,
-               operator_binding, origin='unknown', echo_reference=None):
+               operator_binding, origin='unknown', echo_reference=None, turn=None):
         """Called by trusted source adapter after conservative capture-clock mapping."""
         if (not isinstance(pcm, bytes) or not pcm or len(pcm) % 2 or len(pcm) > 16000*2*8
                 or type(sequence) is not int or sequence < 0
@@ -260,6 +281,14 @@ class AudioAdapter:
             raise ValueError('Bounded owned playback reference')
         if origin == 'owned_playback' and echo_reference is None:
             raise ValueError('Owned echo requires reference')
+        if self.endpoint_v1:
+            from .audio_turn import segment
+            try:turn=segment(turn,len(pcm)//2)
+            except ValueError:
+                self.abandon_turn('invalid_segment');return False
+        elif turn is not None:
+            # Legacy mode never silently reclassifies a typed deadline as final.
+            return False
         with self.lock:
             now = self.clock()
             if (self.closed or not self.allowed or now >= self.operator_deadline
@@ -267,11 +296,35 @@ class AudioAdapter:
                     or not 0 <= now-captured_end <= .25 or authority != self.authority
                     or tuple(operator_binding) != self.operator_signature[0]):
                 self.counts['stale'] += 1
+                if self.endpoint_v1:self.abandon_turn('stale_or_reordered')
                 return False
+            previous_sequence=self.sequence
             self.sequence = sequence
             if origin == 'owned_playback':
                 self.counts['echo'] += 1
+                if self.endpoint_v1:self.abandon_turn('echo')
                 return False
+            if self.endpoint_v1:
+                if self.pending:
+                    self.counts['overwritten']+=1;self.abandon_turn('overwritten')
+                current=self.turn_capture
+                if turn['segment_index']==0:
+                    if current:self.abandon_turn('replaced_turn')
+                    self.turn_capture=dict(turn=turn,sequence=sequence,deadline=captured_end+self.result_ttl_s,
+                        captured_end=captured_end,start=turn['sample_start'])
+                elif (current is None or turn['turn_id']!=current['turn']['turn_id']
+                        or turn['segment_index']!=current['turn']['segment_index']+1
+                        or sequence!=current['sequence']+1 or sequence!=previous_sequence+1
+                        or turn['sample_start']!=current['turn']['sample_end']):
+                    self.abandon_turn('discontinuity');return False
+                else:
+                    if now>=current['deadline']:
+                        self.abandon_turn('expired');return False
+                    if turn['sample_end']-current['start']>192000:
+                        self.abandon_turn('duration_cap');return False
+                    current.update(turn=turn,sequence=sequence,deadline=min(current['deadline'],captured_end+self.result_ttl_s))
+                if turn['segment_index']==2 and not turn['final']:
+                    self.abandon_turn('segment_cap');return False
             self.latest_utterance_sequence=sequence
             if self.pending:
                 self.counts['overwritten'] += 1
@@ -279,19 +332,44 @@ class AudioAdapter:
                 source_boot=source_boot, sequence=sequence, captured_end=captured_end,
                 deadline=captured_end+self.result_ttl_s, authority=authority,
                 operator_signature=self.operator_signature, echo_reference=echo_reference,
-                lineage_id=source_boot+':'+str(sequence))
+                lineage_id=source_boot+':'+str(sequence),**({'turn':turn} if self.endpoint_v1 else {}))
             self.counts['submitted'] += 1
             return True
 
+    def finish_segment(self, observation, text, error):
+        turn=observation['turn']
+        if error:
+            self.abandon_turn('stt_error');return None
+        if turn['segment_index']!=len(self.turn_segments):
+            self.abandon_turn('missing_result');return None
+        self.turn_segments.append(dict(source_boot=observation['source_boot'],sequence=observation['sequence'],
+            lineage_id=observation['lineage_id'],**turn))
+        if text.strip():self.turn_text.append(text.strip())
+        combined=' '.join(self.turn_text)
+        if len(combined)>1024:
+            self.abandon_turn('text_cap');return None
+        if not turn['final']:return None
+        current=self.turn_capture
+        if current is None or self.clock()>=current['deadline']:
+            self.abandon_turn('expired');return None
+        # Keep the first capture/deadline for the existing Sensor freshness
+        # projection. A later segment must never refresh the retained prefix.
+        observation['captured_end']=current['deadline']-self.result_ttl_s
+        observation['lineage_id']=observation['source_boot']+':turn:'+turn['turn_id']
+        observation['aggregation']=dict(aggregation='endpoint_v1',turn_id=turn['turn_id'],
+            segments=list(self.turn_segments),earliest_deadline=current['deadline'])
+        self.turn_capture=None;self.turn_text=[];self.turn_segments=[]
+        return combined
+
     def interrupt(self):
         with self.lock:
-            self._withdraw()
+            self._withdraw('interrupted')
 
     def close(self):
         with self.lock:
             self.closed = True
             self.allowed = False
-            self._withdraw()
+            self._withdraw('closed')
 
     def status(self):
         with self.lock:
@@ -300,4 +378,5 @@ class AudioAdapter:
                         last_sequence=self.sequence,latest_utterance_sequence=self.latest_utterance_sequence, counts=dict(self.counts),
                         last_error=self.last_error, recent=list(self.diagnostics),
                         waiting_terminal=bool(type(self.stt) is HttpSTT and self.stt.waiting_terminal),
-                        allowed=self.allowed, processing_paused=self.processing_paused, result_ttl_s=self.result_ttl_s)
+                        allowed=self.allowed, processing_paused=self.processing_paused, result_ttl_s=self.result_ttl_s,
+                        endpoint_v1=self.endpoint_v1,turn_dropped=self.turn_dropped,last_turn_drop=self.last_turn_drop)

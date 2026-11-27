@@ -4,17 +4,19 @@ This is an utterance boundary only. It cannot establish a trusted negative
 speech window for resuming an interrupted output.
 """
 import math
+import uuid
 
 
 class ResponseEndpoint:
     rate = 16000
     frame_bytes = 640  # 20 ms, mono S16LE
 
-    def __init__(self, vad, *, max_seconds=8, silence_frames=30):
+    def __init__(self, vad, *, max_seconds=8, silence_frames=30, preserve_remainder=False):
         if (type(max_seconds) not in (int,float) or not math.isfinite(max_seconds) or not 1<=max_seconds<=8
                 or type(silence_frames) is not int or not 10<=silence_frames<=50):
             raise ValueError('Finite endpoint bounds required')
         self.vad = vad
+        self.preserve_remainder=preserve_remainder
         self.limit = int(max_seconds * 50)
         self.silence_frames = silence_frames
         self.pending = bytearray()
@@ -47,7 +49,7 @@ class ResponseEndpoint:
                 self.reason = 'speech_then_silence'
             elif self.frames >= self.limit:
                 self.reason = 'response_deadline'
-        if self.reason:
+        if self.reason and not self.preserve_remainder:
             self.pending.clear()
 
     def receipt(self):
@@ -59,3 +61,75 @@ class ResponseEndpoint:
     def clear(self):
         self.pending.clear()
         self.pcm.clear()
+
+
+class TurnEndpoint:
+    """Device-side contiguous segments, bounded PCM remainder and VAD turn state.
+
+    Sample offsets count captured source samples, not wall clock or Hub time.
+    After a cap, suppress the remainder of that speech turn until actual silence.
+    """
+    def __init__(self, vad, *, max_seconds=4, silence_frames=20):
+        self.vad=vad;self.settings=dict(max_seconds=max_seconds,silence_frames=silence_frames,preserve_remainder=True)
+        self.received=0;self.dropped=0;self.last_drop=None;self.no_response=0;self.clear()
+
+    def clear(self):
+        self.endpoint=ResponseEndpoint(self.vad,**self.settings)
+        self.turn_id=uuid.uuid4().hex;self.index=0;self.start=self.received
+        self.turn_start=self.start;self.suppressed=False
+
+    def feed(self, pcm, *, sample_start, captured_end):
+        if type(sample_start) is not int or sample_start<0:raise ValueError('Source sample offset required')
+        if sample_start!=self.received:
+            self.received=sample_start;self.clear();self.dropped+=1;self.last_drop='capture_discontinuity'
+        self.received+=len(pcm)//2
+        self.endpoint.feed(pcm)
+        ready=[]
+        while self.endpoint.reason:
+            old=self.endpoint;end=self.start+len(old.pcm)//2
+            final=old.reason=='speech_then_silence'
+            if old.started and not self.suppressed:
+                if self.index>=3 or end-self.turn_start>192000:
+                    self.suppressed=True;self.dropped+=1;self.last_drop='turn_cap'
+                else:
+                    ready.append(dict(pcm=bytes(old.pcm),captured_end=captured_end-(self.received-end)/16000,
+                        turn=dict(version=1,turn_id=self.turn_id,segment_index=self.index,
+                            end_reason='silence' if final else 'deadline',final=final,
+                            sample_start=self.start,sample_end=end,clock_basis='source_capture_samples')))
+                    self.index+=1
+            if not old.started:self.no_response+=1
+            remainder=bytes(old.pending)
+            self.endpoint=ResponseEndpoint(self.vad,**self.settings);self.start=end
+            if final or not old.started:
+                self.turn_id=uuid.uuid4().hex;self.index=0;self.turn_start=end;self.suppressed=False
+            else:
+                self.endpoint.started=True;self.endpoint.run=old.run;self.endpoint.silence=old.silence
+            self.endpoint.feed(remainder)
+        return ready
+
+
+class LegacyEndpoint:
+    """Explicit finite practice producer with the original single-segment proof.
+
+    No aggregate is relabelled as legacy. The caller must restrict this mode to
+    a separately authorized finite probe, never normal production lease mode.
+    """
+    def __init__(self, vad, *, max_seconds=8, silence_frames=30):
+        self.vad=vad;self.settings=dict(max_seconds=max_seconds,silence_frames=silence_frames)
+        self.no_response=0;self.dropped=0;self.last_drop=None;self.clear()
+
+    def clear(self):
+        self.endpoint=ResponseEndpoint(self.vad,**self.settings)
+
+    def feed(self, pcm, *, sample_start, captured_end):
+        endpoint=self.endpoint
+        available=len(endpoint.pcm)+len(endpoint.pending)+len(pcm)
+        endpoint.feed(pcm)
+        if not endpoint.reason:return []
+        ready=[]
+        if endpoint.started:
+            unused=(available-len(endpoint.pcm))//2
+            ready.append(dict(pcm=bytes(endpoint.pcm),captured_end=captured_end-unused/16000))
+        else:self.no_response+=1
+        self.clear()
+        return ready
