@@ -2,10 +2,11 @@ import contextlib
 import importlib.util
 import io
 import json
+from http.client import IncompleteRead
 from pathlib import Path
 import tempfile
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 
 PATH = Path(__file__).resolve().parents[1] / 'deploy/autonomous/voice_model_compare.py'
@@ -116,6 +117,34 @@ class VoiceModelCompareTests(unittest.TestCase):
         child.kill.assert_called_once_with()
         self.assertFalse(receipt['known_exit'])
         self.assertEqual(receipt['cleanup_error_class'], 'TimeoutExpired')
+
+    def test_incomplete_http_response_blocks_every_later_inference_and_reaps(self):
+        child = Mock(pid=123, returncode=None)
+        child.poll.side_effect = lambda: child.returncode
+        child.wait.side_effect = lambda **kw: setattr(child, 'returncode', -15)
+        health = MagicMock()
+        health.__enter__.return_value.status = 200
+        calls = []
+        def transport(url, payload, timeout, token_env=''):
+            calls.append(url)
+            if url.endswith('/tokenize'):
+                return {'tokens': [1]}
+            raise IncompleteRead(b'truncated')
+        cases, _ = compare.corpus()
+        with tempfile.TemporaryDirectory() as directory, \
+             patch.object(compare, 'file_digest', return_value='a' * 64), \
+             patch.object(compare.socket, 'socket'), \
+             patch.object(compare.subprocess, 'Popen', return_value=child), \
+             patch.object(compare, 'urlopen', return_value=health), \
+             patch.object(compare, 'listener_owned', return_value=True), \
+             patch.object(compare.ModelBackend, 'post', side_effect=transport):
+            report = compare.run_block('9b', 'model.gguf', 18941, Path(directory), Path('/synthetic/llama'),
+                                       {'model.gguf': {'sha256': 'a' * 64}}, cases['cases'], Path(directory))
+        self.assertEqual(sum(url.endswith('/completion') for url in calls), 1)
+        self.assertEqual(report['cases'][0]['error_class'], 'ExecutionUnknown')
+        self.assertEqual([v['state'] for v in report['cases'][1:]], ['not_run'] * 12)
+        self.assertTrue(report['known_exit'])
+        child.terminate.assert_called_once_with()
 
 
 if __name__ == '__main__':

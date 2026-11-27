@@ -2,6 +2,7 @@
 import argparse
 import copy
 import hashlib
+from http.client import HTTPException
 import json
 import signal
 import socket
@@ -81,7 +82,12 @@ class MeasuredBackend(ModelBackend):
         if url.endswith('/completion'):
             payload = {**payload, 'seed': 1729, 'cache_prompt': False}
             self.payload_sha256 = digest(payload)
-        response = super().post(url, payload, timeout, token_env)
+        try:
+            response = super().post(url, payload, timeout, token_env)
+        except HTTPException as exc:
+            # An incomplete response cannot establish native execution termination.
+            # This measurement must not send another inference into that process.
+            raise ExecutionUnknown('Native HTTP response incomplete') from exc
         if url.endswith('/completion'):
             self.native = {key: response.get(key) for key in
                            ('content', 'stop_type', 'tokens_predicted', 'tokens_evaluated',
