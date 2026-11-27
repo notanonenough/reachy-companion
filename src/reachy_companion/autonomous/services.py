@@ -48,10 +48,15 @@ class Services:
             self.store.append(event, destinations=destinations if self.scheduler.config['export_enabled'] else ())
 
     def busy(self):
-        jobs=list(self.polls.values())+list(self.exports.values())+list(self.tool_jobs.values())
-        if self.maintenance:jobs.append(self.maintenance)
-        if self.update_job:jobs.append(self.update_job)
-        return sum(not row[0].future.done() for row in jobs)
+        return sum(not job.future.done() for _,job in self.owned_jobs())
+
+    def owned_jobs(self):
+        """Retained handles only: safe after DB close, no results or configured names."""
+        for category,rows in (('poll',self.polls),('export',self.exports),('tool',self.tool_jobs)):
+            for index,row in enumerate(rows.values()):
+                yield 'background.'+category+':'+str(index),row[0]
+        for category,row in (('maintenance',self.maintenance),('update',self.update_job)):
+            if row:yield 'background.'+category,row[0]
 
     def update(self,patch,expected,reason,now,origin='agent'):
         state=self.scheduler.state

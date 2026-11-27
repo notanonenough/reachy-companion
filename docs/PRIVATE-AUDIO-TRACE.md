@@ -63,7 +63,19 @@ STOP event или наблюдаемая privacy необратимо закры
 Записи, уже поставленные в очередь до отзыва, допустимо дописать после него.
 Снятие privacy не включает trace снова. Очередь/лимиты/потеря lineage/writer
 failure помечают incomplete и bounded dropped count, не меняя решение runtime.
-Drain после обычного cleanup ограничен 0.5 s и выполняется один раз; последующие
+В normal joined Hub STOP сначала отзывает прежние peer/output admissions и
+закрывает scheduler. После этого terminal-only ожидание уже запущенных workers
+имеет grace8s от входа в cleanup, включая время существующих close-вызовов.
+В ожидании нет `advance`, новых задач или применения поздних результатов к
+State/SQLite; STT text после STOP подавлен. Это не срок гарантированного завершения
+STT/model transport: неизвестный worker сохраняет busy и делает trace incomplete.
+Сам close может превысить grace; `terminal_drain.overrun` сообщает это честно,
+без обещания hard shutdown deadline. Прежний supervisor fallback10s не меняется.
+`terminal_drain` в final report/status содержит budget/elapsed/completed и до32
+remaining categories с ordinal/age (null, если thread не имеет start receipt),
+remaining_count/truncated. Имена sensors/tools и содержимое запросов не копируются.
+
+Writer drain после этого cleanup ограничен 0.5 s и выполняется один раз; последующие
 close не ждут снова. Если writer не завершился, результат `drain_timeout`.
 Отсутствующий или недописанный footer не считается успешно закрытым trace.
 

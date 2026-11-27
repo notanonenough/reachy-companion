@@ -344,13 +344,17 @@ class Hub:
         if payload is not None and self.stock_selected():
             if path not in ('/api/move/goto','/api/move/play/wake_up','/api/move/play/goto_sleep','/api/motors/set_mode/enabled'):
                 raise ValueError('Stock mutation is not in the explicit motion route')
-            self.stock_check();self.stock_dependencies();self.stock_check()
+            self.stock_check();active=self.stock_dependencies();self.stock_check()
             if path=='/api/move/goto':
                 # The REST schema's null means leave an axis unchanged. Never
                 # inherit an SDK default body yaw of zero for an antenna gesture.
                 if getattr(self.stock_scope,'follow_body',False):
                     from .motion_limits import validate_follow_step
-                    validate_follow_step(payload,self.factory('/api/state/full'))
+                    current=self.factory('/api/state/full')
+                    if active:raise RuntimeError('Robot is controlled by another app or movement')
+                    if type(current) is not dict or current.get('control_mode')!='enabled':
+                        raise RuntimeError('Expressions require enabled motors')
+                    validate_follow_step(payload,current)
                 else:payload=dict(payload,body_yaw=None)
                 payload.setdefault('head_pose',None)
             try:return self.factory(path,payload)
@@ -527,14 +531,17 @@ class Hub:
                 self.stock_scope.expression_version=binding['expression_version']
                 self.stock_check()
             for step in steps:
-                state = self.status()
-                daemon = state['daemon']
-                if daemon['state'] != 'running' or not (daemon.get('backend_status') or {}).get('ready'):
-                    raise RuntimeError('Robot is not ready')
-                if state['ownership']['state'] != 'free' or self.robot('/api/move/running'):
-                    raise RuntimeError('Robot is controlled by another app or movement')
-                if state['robot']['control_mode'] != 'enabled':
-                    raise RuntimeError('Expressions require enabled motors')
+                if not follow:
+                    state = self.status()
+                    daemon = state['daemon']
+                    if daemon['state'] != 'running' or not (daemon.get('backend_status') or {}).get('ready'):
+                        raise RuntimeError('Robot is not ready')
+                    if state['ownership']['state'] != 'free' or self.robot('/api/move/running'):
+                        raise RuntimeError('Robot is controlled by another app or movement')
+                    if state['robot']['control_mode'] != 'enabled':
+                        raise RuntimeError('Expressions require enabled motors')
+                # The single internal follow step checks all of these predicates
+                # in robot()'s fresh mutation preflight, including measured limits.
                 self.move('/api/move/goto', step)
             if self.stock_selected():
                 return dict(ok=True,steps_observed=len(steps),pose_verified=False,hard_stop_certified=False)

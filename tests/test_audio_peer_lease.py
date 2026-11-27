@@ -10,6 +10,7 @@ import threading
 import time
 import unittest
 from unittest.mock import patch
+from reachy_companion.autonomous import terminal_drain
 from reachy_companion.autonomous.audio_peer import AudioPeer,PeerClient,PeerLease,RemotePCM,create_server,owner_binding,stream_identity
 from reachy_companion.autonomous.playback import Playback,ReplayPCM
 from urllib.error import HTTPError
@@ -385,6 +386,10 @@ class TypedAckTests(unittest.TestCase):
 
 
 class JoinedLeaseTests(unittest.TestCase):
+    # These tests inspect unresolved slots before releasing their held transport.
+    # Exercise expiry with a short test grace; default8s completion is covered by
+    # test_terminal_drain's actual2s STT/Services path.
+    @patch.object(terminal_drain,'TERMINAL_GRACE_S',1)
     def test_first_renewal_attempt_without_ack_cannot_start_model_admission(self):
         self.first_renewal_ack(False)
     def test_malformed_first_ack_with_bool_epoch_has_zero_model_admission(self):
@@ -436,6 +441,7 @@ class JoinedLeaseTests(unittest.TestCase):
         finally:
             release.set();stop.set();runner.join(3);audio.close();speech.close();fixture.tearDown()
 
+    @patch.object(terminal_drain,'TERMINAL_GRACE_S',1)
     def test_stop_keeps_media_close_job_busy_while_real_remote_progress_is_held(self):
         from reachy_companion.autonomous.audio_adapter import AudioAdapter,HttpSTT
         from reachy_companion.autonomous.audio_peer import AudioPolling

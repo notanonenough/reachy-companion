@@ -16,12 +16,14 @@ from .lease_diagnostics import project_first_lease_invalid,project_lease_withdra
 
 
 from .autonomous.stock_diagnostics import project as project_stock_diagnostics
+from .autonomous.terminal_drain import project as project_terminal_drain
 
 
 def report_summary(report):
     result={k:report[k] for k in ('mode','accepted','reason','errors','error','cleanup_error',
         'failure_code','cleanup_verified','cleanup_issues','elapsed_s','peer_close_reason','microphone_restored','capture_closed') if k in report}
     if 'first_lease_invalid' in report:result['first_lease_invalid']=project_first_lease_invalid(report['first_lease_invalid'])
+    if 'terminal_drain' in report:result['terminal_drain']=project_terminal_drain(report['terminal_drain'])
     if 'first_reducer_expiry' in report:result['first_reducer_expiry']=project_first_reducer_expiry(report['first_reducer_expiry'])
     motion=report.get('motion_after')
     if isinstance(motion,dict) and 'stock_diagnostics' in motion:
