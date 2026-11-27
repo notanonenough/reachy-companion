@@ -144,4 +144,4 @@ Private evidence: `~/reachy-release-backups/20261127-6d87fffeeefb/combined-trial
 и соседний `camera-only`; raw content в Git не переносится. Исторические
 intermittent failures не объявлены полностью устранёнными по одному успеху.
 
-Bounded evidence manifest24 SHA256 `43c517e409057f67c49c84c8de2dcd02c21705ad4074e9ec3445cda671e74e6f`.
+Bounded evidence manifest-v2,24 files SHA256 `3bdb8ff697d3f9066ccafaf90bc523da0f4488c14c5b39e0afb5b8db2ead61bb`.
