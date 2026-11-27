@@ -117,9 +117,9 @@ def run_block(label, model_rel, port, installed_root, binary, lock, cases, outpu
     begin = time.monotonic()
     with (output / (label + '-server.log')).open('wb') as log:
         process = subprocess.Popen(argv, stdin=subprocess.DEVNULL, stdout=log, stderr=log)
-        summary['pid'] = process.pid
-        write(output / (label + '-owner.json'), summary)
         try:
+            summary['pid'] = process.pid
+            write(output / (label + '-owner.json'), summary)
             deadline = begin + 90
             while True:
                 if process.poll() is not None:

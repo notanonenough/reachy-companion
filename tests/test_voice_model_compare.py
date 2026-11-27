@@ -82,6 +82,24 @@ class VoiceModelCompareTests(unittest.TestCase):
     def test_global_deadline_cannot_be_swallowed_as_case_failure(self):
         self.assertFalse(issubclass(compare.ComparisonDeadline, Exception))
 
+    def test_first_receipt_disk_failure_still_reaps_spawned_child(self):
+        child = Mock(pid=123, returncode=None)
+        child.poll.side_effect = lambda: child.returncode
+        child.wait.side_effect = lambda **kw: setattr(child, 'returncode', -15)
+        with tempfile.TemporaryDirectory() as directory, \
+             patch.object(compare, 'file_digest', return_value='fixture'), \
+             patch.object(compare.socket, 'socket'), \
+             patch.object(compare.subprocess, 'Popen', return_value=child), \
+             patch.object(compare, 'write', side_effect=PermissionError('fixture disk failure')), \
+             patch.object(compare, 'listener_owned') as listener:
+            with self.assertRaises(PermissionError):
+                compare.run_block('9b', 'model.gguf', 18941, Path(directory), Path('/synthetic/llama'),
+                                  {'model.gguf': {'sha256': 'fixture'}}, [], Path(directory))
+        listener.assert_not_called()
+        child.terminate.assert_called_once_with()
+        child.wait.assert_called_once_with(timeout=10)
+        self.assertEqual(child.returncode, -15)
+
     def test_unknown_cleanup_keeps_receipt_and_aborts(self):
         child = Mock(pid=123, returncode=None)
         child.poll.return_value = None
