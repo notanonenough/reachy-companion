@@ -194,6 +194,14 @@ class AudioAdapter:
                         self.counts['stale'] += 1
             if self.pending and not self.job and allow_start:
                 observation, self.pending = self.pending, None
+                # A deferred next turn starts only after the protected final's
+                # result was consumed above. Never refresh its capture deadline.
+                if observation.get('deferred_turn'):
+                    if self.turn_capture is not None:
+                        self.abandon_turn('unfinished_turn');return event
+                    self.latest_utterance_sequence=observation['sequence']
+                    self.begin_turn(observation['turn'],observation['sequence'],
+                        observation['captured_end'],observation['deadline'])
                 if self._fresh(observation, self.generation):
                     generation = self.generation
                     self.counts['started'] += 1
@@ -304,37 +312,69 @@ class AudioAdapter:
                 self.counts['echo'] += 1
                 if self.endpoint_v1:self.abandon_turn('echo')
                 return False
+            deferred=False
             if self.endpoint_v1:
-                if self.pending:
-                    self.counts['overwritten']+=1;self.abandon_turn('overwritten')
-                current=self.turn_capture
-                if turn['segment_index']==0:
-                    if current:self.abandon_turn('replaced_turn')
-                    self.turn_capture=dict(turn=turn,sequence=sequence,deadline=captured_end+self.result_ttl_s,
-                        captured_end=captured_end,start=turn['sample_start'])
-                elif (current is None or turn['turn_id']!=current['turn']['turn_id']
-                        or turn['segment_index']!=current['turn']['segment_index']+1
-                        or sequence!=current['sequence']+1 or sequence!=previous_sequence+1
-                        or turn['sample_start']!=current['turn']['sample_end']):
-                    self.abandon_turn('discontinuity');return False
-                else:
-                    if now>=current['deadline']:
-                        self.abandon_turn('expired');return False
-                    if turn['sample_end']-current['start']>192000:
-                        self.abandon_turn('duration_cap');return False
-                    current.update(turn=turn,sequence=sequence,deadline=min(current['deadline'],captured_end+self.result_ttl_s))
-                if turn['segment_index']==2 and not turn['final']:
-                    self.abandon_turn('segment_cap');return False
-            self.latest_utterance_sequence=sequence
+                disposition=self.accept_segment(turn,sequence,captured_end,previous_sequence,now)
+                if disposition is None:return False
+                deferred=disposition=='deferred'
+            if not deferred:self.latest_utterance_sequence=sequence
             if self.pending:
                 self.counts['overwritten'] += 1
             self.pending = dict(pcm=pcm, audio_s=len(pcm)/32000, pcm_sha256=hashlib.sha256(pcm).hexdigest(),
                 source_boot=source_boot, sequence=sequence, captured_end=captured_end,
                 deadline=captured_end+self.result_ttl_s, authority=authority,
                 operator_signature=self.operator_signature, echo_reference=echo_reference,
-                lineage_id=source_boot+':'+str(sequence),**({'turn':turn} if self.endpoint_v1 else {}))
+                lineage_id=source_boot+':'+str(sequence),**({'turn':turn,'deferred_turn':deferred} if self.endpoint_v1 else {}))
             self.counts['submitted'] += 1
             return True
+
+    def begin_turn(self, turn, sequence, captured_end, deadline):
+        self.turn_capture=dict(turn=turn,sequence=sequence,deadline=deadline,
+            captured_end=captured_end,start=turn['sample_start'])
+
+    def discard_pending_turn(self, reason):
+        # A newer raw capture is not a recognized replacement of the finishing
+        # utterance. Dropping this sole next-turn slot must not revoke the worker
+        # or retained text of an already received final segment.
+        self.turn_dropped+=1;self.last_turn_drop=reason
+        if self.pending:
+            self.counts['overwritten']+=1
+            self.pending=None
+
+    def accept_segment(self, turn, sequence, captured_end, previous_sequence, now):
+        current=self.turn_capture
+        if current and current['turn']['final'] and turn['turn_id']!=current['turn']['turn_id']:
+            if now>=current['deadline']:
+                self.abandon_turn('expired');return None
+            if self.pending and not self.pending.get('deferred_turn'):
+                # The final itself still owns the one pending PCM slot. It is
+                # already a complete captured turn; do not replace it with noise.
+                self.turn_dropped+=1;self.last_turn_drop='finishing_capacity'
+                return None
+            if turn['segment_index']!=0 or turn['sample_start']<current['turn']['sample_end']:
+                self.discard_pending_turn('pending_discontinuity');return None
+            if self.pending:self.discard_pending_turn('pending_overwritten')
+            return 'deferred'
+        if self.pending:
+            self.counts['overwritten']+=1;self.abandon_turn('overwritten')
+        current=self.turn_capture
+        if turn['segment_index']==0:
+            if current:self.abandon_turn('replaced_turn')
+            self.begin_turn(turn,sequence,captured_end,captured_end+self.result_ttl_s)
+        elif (current is None or turn['turn_id']!=current['turn']['turn_id']
+                or turn['segment_index']!=current['turn']['segment_index']+1
+                or sequence!=current['sequence']+1 or sequence!=previous_sequence+1
+                or turn['sample_start']!=current['turn']['sample_end']):
+            self.abandon_turn('discontinuity');return None
+        else:
+            if now>=current['deadline']:
+                self.abandon_turn('expired');return None
+            if turn['sample_end']-current['start']>192000:
+                self.abandon_turn('duration_cap');return None
+            current.update(turn=turn,sequence=sequence,deadline=min(current['deadline'],captured_end+self.result_ttl_s))
+        if turn['segment_index']==2 and not turn['final']:
+            self.abandon_turn('segment_cap');return None
+        return 'active'
 
     def finish_segment(self, observation, text, error):
         turn=observation['turn']

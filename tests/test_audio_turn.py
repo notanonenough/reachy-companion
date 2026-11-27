@@ -139,6 +139,80 @@ class TurnTests(unittest.TestCase):
         self.assertTrue(fresh[0]['turn']['final']);self.assertNotEqual(fresh[0]['turn']['turn_id'],parts[0]['turn']['turn_id'])
 
 
+class FinishingTurnTests(unittest.TestCase):
+    adapter=TurnTests.adapter;tick=TurnTests.tick;submit=TurnTests.submit;finish=TurnTests.finish
+    def held_final(self, *, error=False):
+        a=self.adapter(deque(['question']));self.submit(a,meta(samples=64000));self.finish(a)
+        release=threading.Event();entered=threading.Event()
+        def transcribe(pcm):
+            if len(pcm)==45120*2:
+                entered.set();release.wait(1)
+                if error:raise RuntimeError('fixture final failed')
+                return 'format'
+            return 'new question' if pcm[0]==1 else ''
+        a.stt.transcribe=transcribe;self.clock[0]=2.82;self.tick(a)
+        self.submit(a,meta(1,True,64000,45120));self.tick(a);self.assertTrue(entered.wait(.5))
+        self.addCleanup(release.set)
+        return a,release
+    def next(self,a,seq,turn,at):
+        self.clock[0]=at;self.tick(a)
+        return self.submit(a,meta(final=True,start=109120+(seq-3)*320,turn=turn),seq=seq)
+    def test_hardware_order_pending_replacement_does_not_revoke_finishing_stt(self):
+        a,release=self.held_final();generation=a.generation
+        self.assertTrue(self.next(a,3,'b'*32,4.32));self.assertTrue(self.next(a,4,'c'*32,4.94))
+        self.assertEqual(a.generation,generation);self.assertEqual(a.counts['overwritten'],1)
+        self.assertEqual(a.pending['deadline'],4.94+8);self.clock[0]=5.261;self.tick(a)
+        release.set();a.job.join(1);event=self.tick(a)
+        self.assertEqual(event['text'],'question format');self.assertEqual(event['audio']['earliest_deadline'],8)
+        self.assertEqual([v['sequence'] for v in event['audio']['segments']],[1,2])
+        self.assertEqual(a.turn_capture['deadline'],4.94+8)
+        a.job.join(1);new=self.tick(a)
+        self.assertEqual(new['text'],'new question');self.assertEqual(new['audio']['segments'][0]['sequence'],4)
+        self.assertEqual(a.counts['stale'],0);self.assertEqual(a.counts['completed'],2)
+        from pathlib import Path
+        from reachy_companion.autonomous.config import load
+        from reachy_companion.autonomous.runtime import Scheduler,ReplayGateway
+        scheduler=Scheduler(load(Path(__file__).resolve().parents[1]/'config.autonomous.example.json'),ReplayGateway())
+        self.addCleanup(scheduler.close)
+        scheduler.ingest(event,5.3);old_ref=next(iter(scheduler.state.candidates))
+        scheduler.ingest(new,5.4)
+        self.assertNotIn(old_ref,scheduler.state.candidates)
+        self.assertEqual(scheduler.state.current_utterance,'new question')
+        self.assertEqual(scheduler.state.counts['new_turn'],2)
+    def test_missing_next_prefix_drops_only_next_turn(self):
+        a,release=self.held_final();generation=a.generation
+        self.next(a,3,'b'*32,4.32)
+        self.assertFalse(self.submit(a,meta(1,True,109440,turn='b'*32),seq=4))
+        self.assertFalse(a.pending);self.assertEqual(a.generation,generation)
+        release.set();a.job.join(1);self.assertEqual(self.tick(a)['text'],'question format')
+    def test_final_pending_slot_is_not_replaced_by_new_raw_turn(self):
+        a=self.adapter(deque());release=threading.Event();entered=threading.Event()
+        def transcribe(pcm):
+            if len(pcm)==128000:entered.set();release.wait(1);return 'question'
+            return 'format'
+        a.stt.transcribe=transcribe;self.submit(a,meta(samples=64000));self.tick(a)
+        self.assertTrue(entered.wait(.5));generation=a.generation
+        self.clock[0]=2.82;self.tick(a);self.submit(a,meta(1,True,64000,45120))
+        try:
+            self.assertFalse(self.next(a,3,'b'*32,4.32))
+            self.assertEqual(a.pending['turn']['turn_id'],'a'*32);self.assertEqual(a.generation,generation)
+        finally:release.set();a.job.join(1)
+        self.assertIsNone(self.tick(a));a.job.join(1)
+        self.assertEqual(self.tick(a)['text'],'question format')
+    def test_global_withdrawals_and_final_error_still_discard_both(self):
+        for mode in ('stop','privacy','source','authority','echo','expiry','error'):
+            with self.subTest(mode=mode):
+                a,release=self.held_final(error=mode=='error');self.next(a,3,'b'*32,4.32)
+                if mode=='stop':a.interrupt()
+                elif mode=='privacy':a.advance('scope',{**operator(self.clock[0]),'privacy_all':True})
+                elif mode=='source':a.bind_source('other',1)
+                elif mode=='authority':a.advance('changed',operator(self.clock[0]))
+                elif mode=='echo':self.submit(a,meta(final=True,turn='c'*32),seq=4,origin='owned_playback',echo_reference='owned')
+                elif mode=='expiry':self.clock[0]=8;self.tick(a)
+                release.set();a.job.join(1);self.assertIsNone(self.tick(a))
+                self.assertFalse(a.pending);self.assertFalse(a.turn_capture);self.assertEqual(a.counts['completed'],0)
+
+
 class SourceQueueTests(unittest.TestCase):
     def peer(self):
         from test_audio_peer import PeerTests
@@ -219,7 +293,8 @@ class ActualTurnPipelineTests(unittest.TestCase):
     def test_normal_fullpath_short_silence_ended_input_has_no_extra_wait(self):self.exercise(False,short=True)
     def test_normal_read_deadline_and_silence_burst_delivers_both_segments(self):self.exercise(True,burst=True)
     def test_finite_legacy_producer_preserves_existing_single_pcm_lineage(self):self.exercise(False,short=True,legacy=True)
-    def exercise(self,empty_tail,short=False,burst=False,legacy=False):
+    def test_final_stt_survives_following_background_turn_and_pending_overwrite(self):self.exercise(False,finishing=True)
+    def exercise(self,empty_tail,short=False,burst=False,legacy=False,finishing=False):
         from test_companion_session import SessionTests
         from reachy_companion.transcription import TranscriptionSlot
         fixture=SessionTests();fixture.setUp();self.addCleanup(fixture.tearDown)
@@ -243,6 +318,7 @@ class ActualTurnPipelineTests(unittest.TestCase):
             return dispatch(path,body)
         fixture.peer.dispatch=observe
         texts=deque(['What is two plus two?'] if short else ['What is two plus two?','' if empty_tail else 'Answer with one number.']);stt_calls=[];main_calls=[]
+        if finishing:texts.appendleft('');texts.append('')
         slot=TranscriptionSlot();stt_entered=threading.Event();stt_release=threading.Event()
         class Handler(BaseHTTPRequestHandler):
             def log_message(self,*args):pass
@@ -252,7 +328,7 @@ class ActualTurnPipelineTests(unittest.TestCase):
                 else:
                     pcm=base64.b64decode(data['pcm_base64']);stt_calls.append(len(pcm))
                     def recognize():
-                        if burst and len(stt_calls)==1:stt_entered.set();stt_release.wait(2)
+                        if burst and len(stt_calls)==1 or finishing and len(stt_calls)==3:stt_entered.set();stt_release.wait(2)
                         return texts.popleft()
                     value=dict(execution=data['execution'],transcript=slot.run(data['execution'],recognize))
                 raw=json.dumps(value).encode();self.send_response(200);self.send_header('Content-Length',str(len(raw)));self.end_headers();self.wfile.write(raw)
@@ -273,10 +349,25 @@ class ActualTurnPipelineTests(unittest.TestCase):
             if burst:captures.append(b'\1\0'*57920+b'\0\0'*7680)
             elif short:captures.append(b'\1\0'*3200+b'\0\0'*6400)
             else:
+                if finishing:
+                    captures.append(b'\x09\0'*3200+b'\0\0'*6400)
+                    fixture.wait(lambda:fixture.audio.counts['empty']==1)
                 captures.append(b'\1\0'*64000)
                 fixture.wait(lambda:len(fixture.audio.turn_segments)==1)
                 self.assertEqual(main_calls,[]);self.assertEqual(fixture.scheduler.state.counts.get('new_turn',0),0)
                 captures.append((b'' if empty_tail else b'\2\0'*3200)+b'\0\0'*6400)
+            if finishing:
+                self.assertTrue(stt_entered.wait(1));generation=fixture.audio.generation
+                captures.append(b'\3\0'*3200+b'\0\0'*6400)
+                fixture.wait(lambda:fixture.audio.pending is not None)
+                first_pending=fixture.audio.pending['turn']['turn_id']
+                captures.append(b'\4\0'*3200+b'\0\0'*6400)
+                fixture.wait(lambda:fixture.audio.counts['overwritten']==1)
+                with fixture.audio.lock:
+                    self.assertNotEqual(first_pending,fixture.audio.pending['turn']['turn_id'])
+                    self.assertEqual(fixture.audio.generation,generation)
+                self.assertEqual(main_calls,[])
+                stt_release.set()
             if burst:
                 self.assertTrue(stt_entered.wait(1))
                 fixture.wait(lambda:fixture.audio.pending is not None)
@@ -289,8 +380,12 @@ class ActualTurnPipelineTests(unittest.TestCase):
             fixture.stop.set();runner.join(3);self.assertFalse(runner.is_alive())
         finally:stt_release.set();fixture.stop.set();runner.join(3)
         self.assertEqual(main_calls,['What is two plus two?'+('' if empty_tail or short else ' Answer with one number.')])
-        self.assertEqual(len(stt_calls),1 if short else 2);self.assertEqual(reports[0]['counts']['new_turn'],1)
+        self.assertEqual(len(stt_calls),4 if finishing else 1 if short else 2);self.assertEqual(reports[0]['counts']['new_turn'],1)
         self.assertEqual(reports[0]['counts']['task_started'],1);self.assertTrue(reports[0]['cleanup_verified'])
+        if finishing:
+            self.assertEqual([m['sequence'] for m in audio_events[0]['audio']['segments']],[2,3])
+            self.assertEqual(fixture.peer.sequence,5);self.assertEqual(fixture.audio.counts['stale'],0)
+            self.assertEqual(fixture.audio.counts['overwritten'],1)
         if legacy:
             import hashlib
             audio=audio_events[0]['audio']
