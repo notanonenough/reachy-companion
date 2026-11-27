@@ -18,6 +18,11 @@ fixture/probe callers. Legacy mode **отвергает** typed segments, а str
 Device runtime публикует только новый protocol. Старые device и новый normal Hub
 не совместимы для dialogue admission: обновлять как один проверенный candidate.
 Отдельный legacy ResponseEndpoint остаётся для его существующих probe callers.
+Конкретно `deploy/autonomous/realtime_audio_session.py` — старый practice probe —
+не поддерживает новый typed device и отвергнет все его audio observations. Он
+**не является пригодным путём приёмки этого candidate**. Штатные точки входа —
+`production_start.py` и `companion_session`; миграция либо удаление practice probe
+потребует отдельной задачи. Untyped библиотечные fixtures сохраняют прежний путь.
 
 Typed metadata version1 содержит:
 
