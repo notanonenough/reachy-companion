@@ -3,7 +3,8 @@ import copy
 import json
 import time
 import unittest
-from unittest.mock import Mock,patch
+from types import SimpleNamespace
+from unittest.mock import Mock,call,patch
 from urllib.error import HTTPError
 from reachy_companion.autonomous.stock_motion_adapter import StockMotionAdapter
 from reachy_companion.autonomous.stock_diagnostics import project
@@ -38,6 +39,20 @@ class StockDiagnosticTests(unittest.TestCase):
         except Exception as exc:outcome=type(exc).__name__
         return outcome,self.hub.stock_diagnostic_snapshot()
 
+    def stop_case_on_clock(self, problem):
+        # Compare IO under the same elapsed time, not two wall-clock races.
+        # Diagnostics may read the clock, but only the actual polling sleep
+        # advances it; failed recording cannot gain an extra poll budget.
+        clock=SimpleNamespace(now=0.0,sleeps=[])
+        clock.monotonic=lambda:clock.now
+        def sleep(seconds):
+            clock.sleeps.append(seconds);clock.now+=seconds
+        clock.sleep=sleep
+        with patch('reachy_companion.hub.time',clock), \
+                patch('reachy_companion.autonomous.stock_diagnostics.monotonic',clock.monotonic):
+            outcome,record=self.stop_case(problem)
+        return outcome,record,clock
+
     def test_normal_and_failure_write_order_flags_and_first_cause(self):
         cases={'normal':(None,None),'404':('stop_post','request_error'),'500':('stop_post','request_error'),
             'transport':('stop_post','request_error'),'timeout':('stop_post','request_error'),
@@ -45,7 +60,7 @@ class StockDiagnosticTests(unittest.TestCase):
             'absence_timeout':('stop_observation','absence_timeout')}
         for problem,(stage,cause) in cases.items():
             with self.subTest(problem=problem):
-                self.setUp();outcome,record=self.stop_case(problem)
+                self.setUp();outcome,record,clock=self.stop_case_on_clock(problem)
                 calls=self.hub.factory.call_args_list;flags=(self.hub.stock_unknown,self.hub.stock_owned,self.hub.stock_stop_observed)
                 self.assertEqual(self.writes,[('/api/move/stop',{'uuid':fixtures.OWN})])
                 self.assertEqual(record['first_failure'] is None,problem=='normal')
@@ -54,11 +69,22 @@ class StockDiagnosticTests(unittest.TestCase):
                 stop=record['stop_receipt'];self.assertTrue(stop['completed']);self.assertGreaterEqual(stop['finished_at'],stop['started_at'])
                 self.assertEqual(stop['post']['accepted'],problem not in ('404','500','transport','timeout'))
                 self.assertNotIn('SECRET',json.dumps(record));self.assertNotIn('PRIVATE',json.dumps(record))
+                if problem=='absence_timeout':
+                    self.assertEqual(outcome,'TimeoutError')
+                    self.assertEqual(flags,(True,fixtures.OWN,False))
+                    self.assertFalse(stop['absence_observed'])
+                    self.assertEqual(clock.sleeps,[.001]*20)
+                    self.assertGreaterEqual(clock.now,self.config['timeouts']['move'])
+                    self.assertLess(clock.now-clock.sleeps[-1],self.config['timeouts']['move'])
+                    self.assertEqual(calls,[call('/api/daemon/status'),call('/api/daemon/robot-app-lock-status'),
+                        call('/api/move/running'),call('/api/move/stop',{'uuid':fixtures.OWN})]
+                        +[call('/api/move/running')]*20)
                 # Identical actual IO and old outcomes when recording itself fails.
                 self.setUp();self.hub.stock_diagnostics=Mock();self.hub.stock_diagnostics.begin_stop.side_effect=OSError('disk')
                 self.hub.stock_diagnostics.fail.side_effect=RuntimeError('logger');self.hub.stock_diagnostics.preflight.side_effect=ValueError('diag')
-                other,_=self.stop_case(problem)
+                other,_,other_clock=self.stop_case_on_clock(problem)
                 self.assertEqual(other,outcome);self.assertEqual(self.hub.factory.call_args_list,calls)
+                self.assertEqual(other_clock.sleeps,clock.sleeps);self.assertEqual(other_clock.now,clock.now)
                 self.assertEqual((self.hub.stock_unknown,self.hub.stock_owned,self.hub.stock_stop_observed),flags)
 
     def test_first_failure_and_its_final_stop_are_immutable(self):
