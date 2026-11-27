@@ -36,6 +36,24 @@ class SessionFailure(RuntimeError):
         super().__init__(code)
 
 
+def commit_retired_terminal(playback, terminal):
+    """Keep the remote ACK while new local stop references finish returning."""
+    with playback.lock:
+        current=playback.terminal
+        if (type(current) is not dict or type(current.get('stream_id')) is not str
+                or type(current.get('generation')) is not int
+                or current['stream_id']!=terminal['stream_id']
+                or current['generation']!=terminal['generation']
+                or playback.active is not None or playback.paused is not None or playback.reservation_busy):
+            raise RuntimeError('Local terminal references changed')
+        if (playback.worker and playback.worker.is_alive()
+                or any(job.is_alive() for job in playback.stop_jobs)):
+            return False
+        if not playback.retire_terminal(terminal['stream_id'],terminal['generation']):
+            raise RuntimeError('Local terminal stop receipt unknown')
+        return True
+
+
 def first_lease_invalid_record(peer,current,status_at,authority,now,started,phase,lease):
     """Project only the captured gate inputs, before close. Never inhibit close."""
     try:
@@ -123,12 +141,23 @@ def session_context(config,*,allow_camera=False,readback=None,readback_sha256=No
     return None
 
 
+def peer_status_interval(timeout):
+    """Leave transport time and 25ms reducer allowance within the 300ms receipt guard."""
+    if type(timeout) not in (int,float) or not math.isfinite(timeout) or timeout<=0:
+        raise ValueError('Positive finite peer status transport timeout required')
+    # The floor bounds load; it cannot make an oversized/late transport fresh.
+    return min(.1,max(.025,.3-timeout-.025))
+
+
 def run_session(scheduler,poller,lease,client,stop_client,source,stop,duration,publish,*,lifetime='finite',status_transport=None):
     """Reducer-owned loop. Each remote operation keeps one real occupied slot."""
     if lifetime not in ('finite','lease') or type(lifetime) is not str:raise ValueError('Explicit normal lifetime')
     if lifetime=='finite' and (type(duration) not in (int,float) or not math.isfinite(duration) or not 1<=duration<=180):
         raise ValueError('Normal session must fit the existing finite device window')
     if lifetime=='lease' and (duration is not None or lease.source_boot!=source):raise ValueError('Explicit owned lease lifetime without finite duration')
+    # Production PeerClient always declares timeout. Older substituted IO fixtures
+    # without that attribute use its existing default; malformed values fail.
+    active_peer_interval=peer_status_interval(getattr(client,'timeout',.25))
     trace=getattr(lease,'reducer_trace',None)
     if trace is None:trace=ReducerTrace();lease.reducer_trace=trace
     trace.bind_current()
@@ -171,6 +200,8 @@ def run_session(scheduler,poller,lease,client,stop_client,source,stop,duration,p
                 except Exception as exc:peer_receipt=None;startup.failure(type(exc).__name__)
                 network.observe('robot',peer_job.started,now,peer_ok)
                 if scheduler.production:scheduler.ingest(network.event(now),now)
+                if peer_ok and startup.phase=='ACTIVE':
+                    next_peer=max(peer_job.started+.025,startup.last_status+active_peer_interval)
                 peer_job=None
             if startup.advance()=='WITHDRAWN' and not scheduler.production:reason=startup.reason;break
             if not peer_job and now>=next_peer:
@@ -212,10 +243,9 @@ def run_session(scheduler,poller,lease,client,stop_client,source,stop,duration,p
                             or scheduler.speech_adapter.playback.status()['terminal_unknown'] or backend.withdrawn):
                         raise SessionFailure('audio_completion_unknown')
                     if retire_job and retire_job.future.done():
-                        if retire_job.future.result() and not scheduler.speech_adapter.playback.retire_terminal(
-                                retiring_terminal['stream_id'],retiring_terminal['generation']):
-                            raise RuntimeError('Local terminal references changed')
-                        retire_job=None;retiring_terminal=None;next_retire=now+.02
+                        if (not retire_job.future.result() or
+                                commit_retired_terminal(scheduler.speech_adapter.playback,retiring_terminal)):
+                            retire_job=None;retiring_terminal=None;next_retire=now+.02
                     speech_status=scheduler.speech_adapter.status()
                     terminal=scheduler.speech_adapter.playback.terminal_receipt()
                     if (terminal is not None and not retire_job and now>=next_retire

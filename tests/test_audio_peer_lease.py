@@ -11,7 +11,8 @@ import time
 import unittest
 from unittest.mock import patch
 from reachy_companion.autonomous import terminal_drain
-from reachy_companion.autonomous.audio_peer import AudioPeer,PeerClient,PeerLease,RemotePCM,create_server,owner_binding,stream_identity
+from reachy_companion.autonomous.audio_peer import AudioPeer,PeerClient,PeerLease,PersistentPeer,RemotePCM,create_server,owner_binding,stream_identity
+from reachy_companion.autonomous.lease_datagram import LeaseDatagramServer,DatagramRenewal
 from reachy_companion.autonomous.playback import Playback,ReplayPCM
 from urllib.error import HTTPError
 
@@ -30,7 +31,7 @@ def wait(predicate,timeout=2):
 
 
 class LeaseProtocolTests(unittest.TestCase):
-    def setUp(self,start_lease=True):
+    def setUp(self,start_lease=True,datagram=False):
         self.operator=dict(agent_boot_id='fixture-agent',microphone_epoch=1,microphone_enabled=True,
             microphone_owner_id='fixture-owner',microphone_state_error=None,listening=False,capture_active=False,phase='paused',
             motion_policy=dict(epoch=1,quiet=False,privacy_all=False,motor_enabled=False))
@@ -40,7 +41,13 @@ class LeaseProtocolTests(unittest.TestCase):
         self.server=create_server(self.peer,'t'*32,bind='127.0.0.1',port=0,stop_port=0)
         self.listener=threading.Thread(target=self.server.serve_forever,daemon=True);self.listener.start()
         self.client=PeerClient('http://127.0.0.1:'+str(self.server.server_address[1]),'t'*32,'fixture-controller')
-        self.authority=owner_binding(self.owner);self.lease=PeerLease(self.client,source_boot=self.peer.boot_id,authority=self.authority)
+        self.authority=owner_binding(self.owner);self.datagram_server=None;renewal=None
+        if datagram:
+            self.datagram_server=LeaseDatagramServer(self.peer,'t'*32,'127.0.0.1',0)
+            renewal=DatagramRenewal(self.client,self.peer.boot_id,self.datagram_server.socket.getsockname()[1],
+                authority=self.authority,retries=2)
+        self.lease=PeerLease(self.client,source_boot=self.peer.boot_id,authority=self.authority,datagram=renewal,
+            progress_timeout_s=.2 if datagram else .1)
         self.ticking=threading.Event();self.ticking.set()
         def ticks():
             while self.ticking.is_set():self.lease.tick(self.authority);time.sleep(.01)
@@ -55,6 +62,7 @@ class LeaseProtocolTests(unittest.TestCase):
         wait(lambda:not self.local.status()['execution_busy'])
         self.remote.close_transport()
         self.lease.worker.join(1);self.peer.watch.join(1);self.server.shutdown();self.server.server_close();self.listener.join(1)
+        if self.datagram_server:self.datagram_server.close()
     def complete(self,request='fixture-request'):
         self.local.operator('fixture-hub',microphone_enabled=True,valid_until=time.monotonic()+2)
         stream=self.local.begin('fixture-hub',request,deadline=time.monotonic()+2)
@@ -76,6 +84,23 @@ class LeaseProtocolTests(unittest.TestCase):
         self.assertTrue(receipt['verified'])
         self.assertEqual(receipt['consumed_frames'],160)
         self.retire(terminal)
+
+    def test_four_http_handlers_reject_fifth_retirement_without_retry_or_admission(self):
+        # HTTP fallback renewal + media + two held readers exhaust the real
+        # server's four slots. Production uses UDP renewal instead.
+        terminal=self.complete();readers=[PersistentPeer(self.client),PersistentPeer(self.client)]
+        try:
+            for reader in readers:reader.call('/status')
+            wait(lambda:self.server.transport_status()['media_handlers']==4)
+            with patch.object(self.client,'call',wraps=self.client.call) as request:
+                with self.assertRaises(OSError):self.remote.retire(terminal)
+            self.assertEqual(request.call_count,1);self.assertEqual(request.call_args.args[0],'/retire')
+            self.assertEqual(self.remote.pending_stream['phase'],'RETIRING')
+            self.assertTrue(self.remote.withdrawn);self.assertFalse(self.remote.admission_ready())
+            self.assertIsNotNone(self.local.terminal_receipt())
+            self.assertFalse(self.lease.closed);self.assertIsNone(self.lease.withdrawal_reason)
+        finally:
+            for reader in readers:reader.close()
 
     def test_forty_real_worker_completions_retire_bounded_maps_and_cannot_replay_first(self):
         for index in range(40):
@@ -487,7 +512,7 @@ class JoinedLeaseTests(unittest.TestCase):
         from reachy_companion.autonomous.config import load
         from reachy_companion.autonomous.runtime import ReplayGateway,Scheduler
         from reachy_companion.autonomous.speech_adapter import SpeechAdapter
-        fixture=LeaseProtocolTests();fixture.setUp(start_lease=False)
+        fixture=LeaseProtocolTests();fixture.setUp(start_lease=False,datagram=True)
         class Gateway(ReplayGateway):
             def call(self,path):return dict(compute_boot_id=self.boot_id,quarantined=[])
         class TTS:
@@ -497,9 +522,20 @@ class JoinedLeaseTests(unittest.TestCase):
         speech=SpeechAdapter(fixture.local,TTS(),lambda:copy.deepcopy(fixture.operator))
         cfg=load(Path(__file__).resolve().parents[1]/'config.autonomous.example.json');cfg['period_s']=.02
         scheduler=Scheduler(cfg,Gateway(.01),speech_adapter=speech,audio_adapter=audio)
-        poller=AudioPolling(fixture.client,audio,fixture.peer.boot_id);stop=threading.Event();reports=[];status=[]
-        def run():reports.append(run_session(scheduler,poller,fixture.lease,fixture.client,fixture.client.at_port(fixture.server.stop_address[1]),fixture.peer.boot_id,stop,None,status.append,lifetime='lease'))
-        with patch.object(audio.stt,'transcribe',return_value='Neutral lease fixture input'):
+        poller=AudioPolling(fixture.client,audio,fixture.peer.boot_id,persistent=True);stop=threading.Event();reports=[];status=[]
+        first_unknown=[];playback_status=fixture.local.status
+        def observe_playback():
+            value=playback_status()
+            if not stop.is_set() and not first_unknown and (value['quarantined'] or value['terminal_unknown'] or fixture.remote.withdrawn):
+                lease=fixture.lease.status()
+                first_unknown.append(dict(at=time.monotonic(),
+                    flags={key:value[key] for key in ('quarantined','terminal_unknown','execution_busy','stop_known','closed')},
+                    remote_withdrawn=fixture.remote.withdrawn,
+                    remote_phase=(fixture.remote.pending_stream or {}).get('phase'),
+                    lease_reason=lease.get('withdrawal_reason'),lease_first_close=lease.get('first_close')))
+            return value
+        def run():reports.append(run_session(scheduler,poller,fixture.lease,fixture.client,fixture.client.at_port(fixture.server.stop_address[1]),fixture.peer.boot_id,stop,None,status.append,lifetime='lease',status_transport=PersistentPeer(fixture.client)))
+        with patch.object(audio.stt,'transcribe',return_value='Neutral lease fixture input'),patch.object(fixture.local,'status',observe_playback):
             runner=threading.Thread(target=run);runner.start()
             try:
                 for index in range(3):
@@ -507,9 +543,14 @@ class JoinedLeaseTests(unittest.TestCase):
                     self.assertTrue(fixture.peer.publish(b'\x00\x00'*320,time.monotonic(),None))
                     wait(lambda:len(speech.receipts)>=index+1 and fixture.remote.admission_ready())
                 self.assertEqual(fixture.peer.stream_high_water,3);self.assertEqual(fixture.peer.stream_records,{})
+                self.assertGreater(fixture.datagram_server.accepted,0)
+                self.assertEqual(fixture.lease.datagram.authority,fixture.authority)
                 stop.set();runner.join(2);self.assertFalse(runner.is_alive())
                 self.assertTrue(reports[0]['cleanup_verified']);self.assertTrue(reports[0]['continuous'])
                 self.assertFalse(reports[0]['continuous_acceptance']);self.assertEqual(reports[0]['reservation_attempts'],3)
+            except AssertionError as exc:
+                projected=[{key:r.get(key) for key in ('reason','failure_code','first_lease_invalid','first_reducer_expiry','cleanup_issues')} for r in reports]
+                self.fail(f'{exc}; first_audio_unknown={first_unknown}; session={projected}')
             finally:stop.set();runner.join(3);audio.close();speech.close();fixture.tearDown()
 
 

@@ -61,7 +61,9 @@ class Harness:
                     binding=('PRIVATE-AGENT',7,3),private='PRIVATE-CONTENT')
     def call(self,path,**kwargs):
         if path=='/stop':return dict(stop_known=True,execution_busy=False)
-        if self.mode=='peer_receipt_present' and self.steps>=1:raise OSError('PRIVATE-EXCEPTION')
+        if self.mode=='peer_receipt_present' and self.steps>=1:
+            if not hasattr(self,'first_failed_status_at'):self.first_failed_status_at=self.now
+            raise OSError('PRIVATE-EXCEPTION')
         return self.peer
     def advance(self):
         self.steps+=1;self.speech.operator_receipt=self.current()
@@ -104,6 +106,7 @@ class Harness:
             self.startup=PeerStartup(source,clock=lambda:self.now);return self.startup
         record=session.first_lease_invalid_record
         def captured(*args):
+            self.recorded_at=self.now
             value=record(*args);self.timeline.append(('record',json.loads(value)));return value
         try:
             with patch.object(session,'Job',ImmediateJob),patch.object(session,'PeerStartup',startup),patch.object(
@@ -125,7 +128,11 @@ class LeaseDiagnosticTests(unittest.TestCase):
                 self.assertEqual(harness.timeline[0][0],'record');self.assertEqual(harness.timeline[1][0],'close')
                 self.assertTrue(harness.lease.closed);self.assertEqual(harness.lease.withdrawal_reason,'controller_stop')
                 self.assertEqual(harness.statuses[-1]['first_lease_invalid'],record)
-                self.assertEqual(record['elapsed_ms'],220)
+                # A failed status Job is observed on a later reducer iteration;
+                # its start cadence must not prescribe the diagnostic timestamp.
+                self.assertEqual(record['elapsed_ms'],round((harness.recorded_at-harness.started)*1000,3))
+                if mode=='peer_receipt_present':
+                    self.assertAlmostEqual(harness.recorded_at-harness.first_failed_status_at,.11,places=6)
                 if mode=='status_fresh':self.assertEqual(record['peer_status_age_ms'],400)
                 if mode=='current_fresh':self.assertEqual(record['operator_valid_remaining_ms'],-25)
                 self.assertNotIn('PRIVATE',json.dumps(record))
