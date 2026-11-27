@@ -40,6 +40,17 @@ deadline segments. Silence-only tail завершает уже начатую р
 VAD-паузы; не начинает новый turn посреди той же длинной речи. Exclusion/permission
 сброс уничтожает накопление. Existing 4s endpoint и VAD silence settings не меняются.
 
+Device peer имеет отдельный bounded FIFO **одного turn: максимум три записи и
+192000 mono samples (384000 bytes PCM)**. Это новый конечный предел удержания
+на source; Hub PCM turn не накапливает. Один нормальный ALSA read может дать
+deadline и silence segments сразу. `/observation` выдаёт один oldest segment
+за запрос с исходными sequence и captured_end, без обновления свежести.
+Existing poll interval остаётся 50ms. Новый turn при недоставленном старом
+явно уничтожает старый FIFO; cap, discontinuity, stale oldest, permission
+withdrawal и STOP очищают retained PCM и блокируют продолжение потерянного turn.
+Legacy mailbox остаётся latest-only и не смешивается с typed FIFO. Source status
+показывает только длину, sample count и фиксированную причину отказа.
+
 Hub держит только один STT worker, один pending PCM slot прежнего размера и
 до трёх текстовых результатов. Raw PCM turn на Hub не собирается. Результаты
 склеиваются одним пробелом без угадывания/переписывания смысла. Limits: три segments,
@@ -80,7 +91,10 @@ Offline baseline collector сохраняет event denominators и individual S
 `tests/test_audio_turn.py` проверяет настоящий normal run_session с peer HTTP,
 HttpSTT и Scheduler: complete question + format instruction по разные стороны
 deadline дают один полный candidate и один main; silence-only tail и короткая
-silence-ended реплика тоже. PCM и ответы моделей синтетические, аппаратного
+silence-ended реплика тоже. Burst regression использует normal 1024-frame reads:
+конец речи в3.62s даёт два segments в одном read на4.02s. Они проходят две настоящие
+HTTP poll при занятом первом STT; только после release допускается один полный main.
+Queue checks проверяют byte accounting, caps, stale dequeue и очистку STOP/privacy. PCM и ответы моделей синтетические, аппаратного
 качества VAD/STT и ускорения это не доказывает.
 
 Отдельные checks покрывают remainder, caps, metadata validation, legacy refusal,

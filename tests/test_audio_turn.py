@@ -139,11 +139,69 @@ class TurnTests(unittest.TestCase):
         self.assertTrue(fresh[0]['turn']['final']);self.assertNotEqual(fresh[0]['turn']['turn_id'],parts[0]['turn']['turn_id'])
 
 
+class SourceQueueTests(unittest.TestCase):
+    def peer(self):
+        from test_audio_peer import PeerTests
+        fixture=PeerTests();peer,_=fixture.setup_peer();self.addCleanup(fixture.doCleanups)
+        fixture.call(peer,'/lease')
+        return peer,fixture
+    def publish(self,peer,turn,at=None):
+        return peer.publish(b'\1\0'*(turn['sample_end']-turn['sample_start']),
+            time.monotonic() if at is None else at,None,turn=turn)
+    def take(self,peer):return peer.dispatch('/observation',dict(controller='controller'))['observation']
+    def test_fifo_timestamps_sequences_and_byte_accounting(self):
+        peer,_=self.peer();at=time.monotonic()
+        for index in range(3):self.assertTrue(self.publish(peer,meta(index,index==2,index*64000,64000),at))
+        self.assertEqual(peer.observation_samples,192000);self.assertEqual(len(peer.observation_queue),3)
+        for index in range(3):
+            item=self.take(peer);self.assertEqual(item['sequence'],index+1)
+            self.assertEqual(item['turn']['segment_index'],index)
+            self.assertGreaterEqual(item['capture_age_s'],0)
+            self.assertEqual(peer.observation_samples,(2-index)*64000)
+        self.assertIsNone(self.take(peer));self.assertFalse(peer.observation_queue)
+    def test_cap_clears_all_pcm_and_blocks_remaining_turn(self):
+        peer,_=self.peer();self.assertTrue(self.publish(peer,meta(samples=128000)))
+        self.assertFalse(self.publish(peer,meta(1,False,128000,128000)))
+        self.assertEqual(peer.observation_drop_reason,'turn_cap');self.assertEqual(peer.observation_samples,0)
+        self.assertFalse(self.publish(peer,meta(2,True,256000)))
+        self.assertIsNone(self.take(peer));self.assertFalse(peer.observation_queue)
+    def test_new_turn_abandons_old_fifo_and_legacy_cannot_mix(self):
+        peer,_=self.peer();self.publish(peer,meta());self.publish(peer,meta(1,True,320))
+        self.assertTrue(self.publish(peer,meta(final=True,turn='b'*32)))
+        self.assertEqual(peer.observation_drop_reason,'new_turn');self.assertEqual(len(peer.observation_queue),1)
+        self.assertEqual(self.take(peer)['turn']['turn_id'],'b'*32)
+        self.publish(peer,meta(turn='c'*32));peer.publish(b'\0\0'*320,time.monotonic(),None)
+        self.assertEqual(peer.observation_samples,0);self.assertNotIn('turn',self.take(peer))
+        self.assertFalse(self.publish(peer,meta(1,True,320,turn='c'*32)))
+    def test_invalid_fourth_index_cannot_leave_retained_prefix(self):
+        peer,_=self.peer();self.publish(peer,meta())
+        with self.assertRaises(ValueError):self.publish(peer,meta(3,True,320))
+        self.assertFalse(peer.observation_queue);self.assertEqual(peer.observation_samples,0)
+        self.assertFalse(self.publish(peer,meta(1,True,320)))
+    def test_stale_oldest_clears_tail_without_refresh(self):
+        peer,_=self.peer();self.publish(peer,meta(),time.monotonic()-.3)
+        self.publish(peer,meta(1,True,320))
+        self.assertIsNone(self.take(peer));self.assertEqual(peer.observation_drop_reason,'stale_capture')
+        self.assertEqual(peer.observation_samples,0);self.assertFalse(peer.observation_queue)
+    def test_close_and_privacy_release_queued_pcm(self):
+        for privacy in (False,True):
+            peer,fixture=self.peer();self.publish(peer,meta())
+            if privacy:
+                fixture.actual['motion_policy']['privacy_all']=True
+                deadline=time.monotonic()+1
+                while not peer.closed and time.monotonic()<deadline:time.sleep(.002)
+                self.assertTrue(peer.closed)
+            else:peer.close()
+            self.assertFalse(peer.observation_queue);self.assertEqual(peer.observation_samples,0)
+            self.assertFalse(self.publish(peer,meta(1,True,320)))
+
+
 class ActualTurnPipelineTests(unittest.TestCase):
     def test_normal_fullpath_deadline_question_and_format_yields_one_main(self):self.exercise(False)
     def test_normal_fullpath_empty_silence_tail_yields_one_main(self):self.exercise(True)
     def test_normal_fullpath_short_silence_ended_input_has_no_extra_wait(self):self.exercise(False,short=True)
-    def exercise(self,empty_tail,short=False):
+    def test_normal_read_deadline_and_silence_burst_delivers_both_segments(self):self.exercise(True,burst=True)
+    def exercise(self,empty_tail,short=False,burst=False):
         from test_companion_session import SessionTests
         from reachy_companion.transcription import TranscriptionSlot
         fixture=SessionTests();fixture.setUp();self.addCleanup(fixture.tearDown)
@@ -152,13 +210,22 @@ class ActualTurnPipelineTests(unittest.TestCase):
         def observe(path,body):
             nonlocal offset
             if path=='/observation' and captures:
-                pcm=captures.popleft();parts=endpoint.feed(pcm,sample_start=offset,captured_end=time.monotonic());offset+=len(pcm)//2
+                pcm=captures.popleft();parts=[];captured_end=time.monotonic()
+                # Actual ALSA maximum read is 1024 frames. Speech ending at
+                # 3.62s makes deadline+silence end in the same normal read.
+                chunks=[pcm[i:i+2048] for i in range(0,len(pcm),2048)] if burst else [pcm]
+                unread=len(pcm)//2
+                for chunk in chunks:
+                    unread-=len(chunk)//2
+                    parts+=endpoint.feed(chunk,sample_start=offset,captured_end=captured_end-unread/16000)
+                    offset+=len(chunk)//2
+                if burst:self.assertEqual(len(parts),2)
                 for part in parts:
                     if not fixture.peer.publish(part['pcm'],part['captured_end'],None,turn=part['turn']):raise AssertionError('fixture permission')
             return dispatch(path,body)
         fixture.peer.dispatch=observe
         texts=deque(['What is two plus two?'] if short else ['What is two plus two?','' if empty_tail else 'Answer with one number.']);stt_calls=[];main_calls=[]
-        slot=TranscriptionSlot()
+        slot=TranscriptionSlot();stt_entered=threading.Event();stt_release=threading.Event()
         class Handler(BaseHTTPRequestHandler):
             def log_message(self,*args):pass
             def do_POST(self):
@@ -166,7 +233,10 @@ class ActualTurnPipelineTests(unittest.TestCase):
                 if self.path=='/transcribe/reserve':value={'execution':slot.reserve()}
                 else:
                     pcm=base64.b64decode(data['pcm_base64']);stt_calls.append(len(pcm))
-                    value=dict(execution=data['execution'],transcript=slot.run(data['execution'],lambda:texts.popleft()))
+                    def recognize():
+                        if burst and len(stt_calls)==1:stt_entered.set();stt_release.wait(2)
+                        return texts.popleft()
+                    value=dict(execution=data['execution'],transcript=slot.run(data['execution'],recognize))
                 raw=json.dumps(value).encode();self.send_response(200);self.send_header('Content-Length',str(len(raw)));self.end_headers();self.wfile.write(raw)
         server=ThreadingHTTPServer(('127.0.0.1',0),Handler);threading.Thread(target=server.serve_forever,daemon=True).start()
         self.addCleanup(server.server_close);self.addCleanup(server.shutdown)
@@ -177,16 +247,24 @@ class ActualTurnPipelineTests(unittest.TestCase):
         runner=threading.Thread(target=lambda:reports.append(fixture.run_normal(5)));runner.start()
         try:
             fixture.wait(lambda:any(row.get('listening_ready') for row in fixture.latest))
-            if short:captures.append(b'\1\0'*3200+b'\0\0'*6400)
+            if burst:captures.append(b'\1\0'*57920+b'\0\0'*7680)
+            elif short:captures.append(b'\1\0'*3200+b'\0\0'*6400)
             else:
                 captures.append(b'\1\0'*64000)
                 fixture.wait(lambda:len(fixture.audio.turn_segments)==1)
                 self.assertEqual(main_calls,[]);self.assertEqual(fixture.scheduler.state.counts.get('new_turn',0),0)
                 captures.append((b'' if empty_tail else b'\2\0'*3200)+b'\0\0'*6400)
+            if burst:
+                self.assertTrue(stt_entered.wait(1))
+                fixture.wait(lambda:fixture.audio.pending is not None)
+                self.assertEqual(fixture.audio.pending['turn']['segment_index'],1)
+                self.assertTrue(fixture.audio.status()['execution_busy']);self.assertEqual(main_calls,[])
+                self.assertEqual(fixture.peer.sequence,2);self.assertFalse(fixture.peer.observation_queue)
+                stt_release.set()
             fixture.wait(lambda:len(fixture.tts.calls)==1,3)
             fixture.wait(lambda:fixture.speech.status()['receipts'] and not fixture.speech.status()['execution_busy'])
             fixture.stop.set();runner.join(3);self.assertFalse(runner.is_alive())
-        finally:fixture.stop.set();runner.join(3)
+        finally:stt_release.set();fixture.stop.set();runner.join(3)
         self.assertEqual(main_calls,['What is two plus two?'+('' if empty_tail or short else ' Answer with one number.')])
         self.assertEqual(len(stt_calls),1 if short else 2);self.assertEqual(reports[0]['counts']['new_turn'],1)
         self.assertEqual(reports[0]['counts']['task_started'],1);self.assertTrue(reports[0]['cleanup_verified'])
