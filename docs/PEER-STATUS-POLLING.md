@@ -100,3 +100,39 @@ actual ACK→joint-stop→commit sequence, one remote ACK, closed admission, STO
 with a held worker, wrong identity while busy and final receipt validation.
 This fixes the independently reproduced retirement race; it does not establish
 the cause of the older CI `audio_completion_unknown` or hardware latency.
+
+The subsequent CI projection narrows the failure to remote retirement before
+ACK (`withdrawn=true`, phase `RETIRING`), with local cursor/stop flags known and
+no lease/reducer expiry. A separate controlled capacity reproduction holds four
+real HTTP handlers: HTTP renewal, status, observation and PCM. The fifth
+`/retire` connection is rejected (`RemoteDisconnected`), latching unknown with
+no retry or new admission. The historical CI's exact transport exception was
+not retained, so this controlled result is not a retrospective network claim.
+
+Positive joined-loop fixtures now match the selected production transport set:
+real authenticated UDP renewal and PersistentPeer for status/observation.
+`deploy/current/hub/systemd/reachy-production.service.template` supplies
+`--lease-datagram-port 8782`; `production_start.py` forwards it, and
+`companion_session.main` constructs DatagramRenewal, persistent AudioPolling and
+persistent status. The fixtures open a real UDP receiver and assert successful
+renewals with the exact authority binding. No timeout/capacity/lease guard is
+changed. HTTP fallback remains covered by the existing forty-completion
+protocol test and an explicit four-handlers/fifth-retirement rejection test.
+
+A second serial n=1 base/head comparison using this complete transport set
+reproduced the old slow-response freshness failures and the updated success:
+
+| Fixture metric | Baseline2c17 | Updated runtime346e7a27 |
+|---|---:|---:|
+| Fast status starts/s |9.48|24.25|
+| Fast status median client call,ms |2.037|2.473|
+| Fast status median handler,µs |50.7|68.4|
+| Fast maximum reducer tick gap,ms |55.98|60.68|
+| Fast capture→observed speech receipt,s |.21846|.16609|
+| Repeated200ms / single230ms response |freshness withdrawal|no withdrawal|
+
+All six cases completed one synthetic STT/TTS chain and cleanup; peak status
+jobs stayed1. Updated repeated-slow starts were4.80/s including startup. The
+first comparison above used the older HTTP-renewal fixture; neither comparison
+measures acoustic latency or proves zero overhead. Paired JSON and the exact
+fixture are retained under `peer-poll-offline/production-transport`.

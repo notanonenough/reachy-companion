@@ -12,7 +12,7 @@ from test_audio_peer_lease import wait
 from test_companion_session import FixtureTTS, FixtureGateway
 from reachy_companion.autonomous import companion_session as session, playback as playback_module
 from reachy_companion.autonomous.audio_adapter import AudioAdapter, HttpSTT
-from reachy_companion.autonomous.audio_peer import AudioPolling, PersistentPeer, PeerLease
+from reachy_companion.autonomous.audio_peer import AudioPolling, PersistentPeer
 from reachy_companion.autonomous.config import load
 from reachy_companion.autonomous.runtime import Scheduler
 from reachy_companion.autonomous.speech_adapter import SpeechAdapter
@@ -20,15 +20,12 @@ from reachy_companion.autonomous.speech_adapter import SpeechAdapter
 
 class TerminalRetirementTests(unittest.TestCase):
     def run_interleaving(self, mode):
-        fixture=protocol.LeaseProtocolTests();fixture.setUp(start_lease=False)
-        fixture.lease.close();fixture.lease.worker.join(1)
-        fixture.lease=PeerLease(fixture.client,source_boot=fixture.peer.boot_id,
-            authority=fixture.authority,progress_timeout_s=.2)
+        fixture=protocol.LeaseProtocolTests();fixture.setUp(start_lease=False,datagram=True)
         audio=AudioAdapter(HttpSTT('http://127.0.0.1:1','t'*32))
         speech=SpeechAdapter(fixture.local,FixtureTTS(),lambda:copy.deepcopy(fixture.operator))
         cfg=load(Path(__file__).resolve().parents[1]/'config.autonomous.example.json');cfg['period_s']=.02
         scheduler=Scheduler(cfg,FixtureGateway(),speech_adapter=speech,audio_adapter=audio)
-        poller=AudioPolling(fixture.client,audio,fixture.peer.boot_id)
+        poller=AudioPolling(fixture.client,audio,fixture.peer.boot_id,persistent=True)
         stop=threading.Event();release=threading.Event();pending=threading.Event();reports=[]
         playback=fixture.local;remote=fixture.remote;original_remote=remote.retire
         original_commit=session.commit_retired_terminal;thread_type=threading.Thread
@@ -74,7 +71,9 @@ class TerminalRetirementTests(unittest.TestCase):
                     patch.object(session.terminal_drain,'TERMINAL_GRACE_S',grace):
                 runner.start();wait(lambda:audio.allowed)
                 self.assertTrue(fixture.peer.publish(b'\x00\x00'*320,time.monotonic(),None))
-                self.assertTrue(pending.wait(2))
+                self.assertTrue(pending.wait(2),reports)
+                self.assertGreater(fixture.datagram_server.accepted,0)
+                self.assertEqual(fixture.lease.datagram.authority,fixture.authority)
                 self.assertFalse(remote.admission_ready())
                 if mode=='finish':
                     release.set();wait(remote.admission_ready)

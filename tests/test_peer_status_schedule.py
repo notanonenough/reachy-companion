@@ -14,7 +14,7 @@ def run_trial(delay=0, *, timeout=.25, repeated=False, speech=False, duration=1.
     from test_audio_peer_lease import LeaseProtocolTests
     from test_production_cycle import Models
     from test_companion_session import FixtureTTS
-    from reachy_companion.autonomous.audio_peer import AudioPolling, PeerLease, PersistentPeer
+    from reachy_companion.autonomous.audio_peer import AudioPolling, PersistentPeer
     from reachy_companion.autonomous.audio_adapter import AudioAdapter
     from reachy_companion.autonomous.speech_adapter import SpeechAdapter
     from reachy_companion.autonomous.runtime import Scheduler
@@ -22,12 +22,9 @@ def run_trial(delay=0, *, timeout=.25, repeated=False, speech=False, duration=1.
     from reachy_companion.autonomous.durable import DurableStore
     from reachy_companion.autonomous.voice_chain import model_final
 
-    device=LeaseProtocolTests();device.setUp(start_lease=False)
-    # The shared protocol fixture defaults to 100ms. Match the selected
-    # production 200ms progress policy while isolating the 300ms status guard.
-    device.lease.close();device.lease.worker.join(1)
-    device.lease=PeerLease(device.client,source_boot=device.peer.boot_id,
-        authority=device.authority,progress_timeout_s=.2)
+    # Match the production transport set, including a real bound UDP renewal
+    # receiver; HTTP fallback renewal would consume another media handler.
+    device=LeaseProtocolTests();device.setUp(start_lease=False,datagram=True)
     device.client.timeout=timeout
     stop=threading.Event();active=threading.Event();rows=[];calls=[];delayed=[];handler_times=[];speech_seen=[]
     original=device.peer.dispatch
@@ -74,7 +71,7 @@ def run_trial(delay=0, *, timeout=.25, repeated=False, speech=False, duration=1.
     cfg=load(Path(__file__).resolve().parents[1]/'config.autonomous.normal.example.json')
     cfg['context']['enabled']=False;cfg['period_s']=.1
     scheduler=Scheduler(cfg,model,speech_adapter=speaker,audio_adapter=audio)
-    poller=AudioPolling(device.client,audio,device.peer.boot_id);sent=[]
+    poller=AudioPolling(device.client,audio,device.peer.boot_id,persistent=True);sent=[]
     def publish(row):
         rows.append(row)
         if row['stage']=='ACTIVE':active.set()
